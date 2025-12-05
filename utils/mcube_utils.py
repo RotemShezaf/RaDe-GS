@@ -34,6 +34,8 @@ def marching_cubes_with_contraction(
 
     grid_min = bounding_box_min
     grid_max = bounding_box_max
+
+    #split the 3D space
     xs = np.linspace(grid_min[0], grid_max[0], N + 1)
     ys = np.linspace(grid_min[1], grid_max[1], N + 1)
     zs = np.linspace(grid_min[2], grid_max[2], N + 1)
@@ -59,6 +61,8 @@ def marching_cubes_with_contraction(
                     z = []
                     for _, pnts in enumerate(torch.split(points, 256**3, dim=0)):
                         z.append(sdf(pnts))
+                    #create one large tensor along axis 0 
+                    #contains all the sdf values for the input points
                     z = torch.cat(z, axis=0)
                     return z
 

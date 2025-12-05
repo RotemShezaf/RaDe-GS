@@ -4,3 +4,7 @@ scikit-image
 opencv-python
 plyfile
 tqdm
+flask
+matplotlib
+mpl_toolkits
+argparse
