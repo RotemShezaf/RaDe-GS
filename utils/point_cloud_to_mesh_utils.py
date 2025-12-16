@@ -362,22 +362,4 @@ if __name__ == "__main__":
     )
 
 
-def transform_mesh(mesh, transformation):
-    """
-    Apply a transformation matrix to a mesh.
-    
-    Args:
-        mesh: o3d.geometry.TriangleMesh or trimesh.Trimesh
-        transformation: 4x4 transformation matrix (numpy array)
-        
-    Returns:
-        Transformed mesh
-    """
-    if isinstance(mesh, o3d.geometry.TriangleMesh):
-        mesh.transform(transformation)
-    elif isinstance(mesh, trimesh.Trimesh):
-        mesh.apply_transform(transformation)
-    else:
-        raise ValueError("Unsupported mesh type")
-    
-    return mesh
+

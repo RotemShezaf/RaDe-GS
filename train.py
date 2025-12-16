@@ -129,7 +129,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                                                                     render_pkg["render"], 
                                                                     render_pkg["viewspace_points"], 
                                                                     render_pkg["visibility_filter"], 
-                                                                    render_pkg["radii"])
+                                                   render_pkg["radii"])
+        
         gt_image = viewpoint_cam.original_image.cuda()
 
         if dataset.use_decoupled_appearance:
@@ -247,7 +248,7 @@ def training_report(tb_writer, iteration, Ll1, loss, normal_loss, l1_loss, elaps
         torch.cuda.empty_cache()
         validation_configs = ({'name': 'test', 'cameras' : scene.getTestCameras()}, 
                               {'name': 'train', 'cameras' : [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in range(5, 30, 5)]})
-
+        
         for config in validation_configs:
             if config['cameras'] and len(config['cameras']) > 0:
                 l1_test = 0.0

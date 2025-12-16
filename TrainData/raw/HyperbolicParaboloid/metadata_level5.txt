@@ -1,0 +1,11 @@
+Surface Type: HyperbolicParaboloid
+Resolution Level: 5
+Grid Size: 31 x 31
+Total Vertices: 961
+Total Faces: 1800
+Arc Length Resolution: 0.115506
+X Range: (-1.0, 1.0)
+Y Range: (-1.0, 1.0)
+Mesh File: mesh_level5_res31x31_arc0.115506.ply
+Point Cloud File: pointcloud_level5_res31x31_arc0.115506.ply
+Normals File: normals_level5_res31x31_arc0.115506.ply

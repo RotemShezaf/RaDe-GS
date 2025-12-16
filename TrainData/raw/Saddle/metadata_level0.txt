@@ -1,0 +1,11 @@
+Surface Type: Saddle
+Resolution Level: 0
+Grid Size: 1000 x 1000
+Total Vertices: 1000000
+Total Faces: 1996002
+Arc Length Resolution: 0.004444
+X Range: (-1.0, 1.0)
+Y Range: (-1.0, 1.0)
+Mesh File: mesh_level0_res1000x1000_arc0.004444.ply
+Point Cloud File: pointcloud_level0_res1000x1000_arc0.004444.ply
+Normals File: normals_level0_res1000x1000_arc0.004444.ply

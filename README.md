@@ -21,6 +21,13 @@ Baowen Zhang, Chuan Fang, Rakesh Shrestha, Yixun Liang, Xiaoxiao Long, Ping Tan
 git clone https://github.com/BaowenZ/RaDe-GS.git --recursive
 ```
 
+# 2) (Optional) Convert a surface level into Gaussian splats
+python GenerateData/create_gaussian_splats.py Paraboloid 1 --data_root TrainData/raw
+
+# 3) Render COLMAP-style images & cameras (produces JPGs and bin/txt/ply files)
+python GenerateData/create_synthetic_colmap_dataset.py Paraboloid 1 \
+	--data_root TrainData/raw --output_root data/synthetic_polys
+
 ## Install dependencies.
 1. create an environment
 ```
@@ -29,19 +36,55 @@ conda activate radegs
 ```
 
 2. install pytorch and other dependencies.
-```
+The renderer relies on `pyrender` for realistic shading; install it with
+`pip install pyrender imageio` if it is not already available. Each dataset
+contains `images/*.jpg` and `sparse/0/{cameras,images,points3D}.{txt,bin}` plus
+`points3D.ply`, matching what `readColmapSceneInfo` expects.
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
 pip install -r requirements.txt
 ```
+conda install -c conda-forge \
+    numpy \
+    trimesh \
+    pyopengl \
+    mesa-libgl \
+    mesa-libegl \
+    libosmesa
+### Generate synthetic polynomial datasets
+
+For quick experiments without real captures, you can procedurally create
+training data:
+
+```bash
+# 1) Generate multires meshes & point clouds
+python GenerateData/GenerateRawPolynomialMesh.py --base_resolution 800 --num_levels 4
+
+# 2) (Optional) Convert a surface level into Gaussian splats
+python GenerateData/create_gaussian_splats.py Paraboloid 1 --data_root TrainData/raw
+
+# 3) Render COLMAP-style images & cameras (outputs JPG + txt/bin/ply)
+python GenerateData/create_synthetic_colmap_dataset.py Paraboloid 1 \
+    --data_root TrainData/raw --output_root data/synthetic_polys
+
+# 4) Train using the synthetic dataset
+python train.py -s data/synthetic_polys/Paraboloid/level_01 -m output/poly_run
+```
+
+The renderer relies on `pyrender` for realistic shading; install it with
+`pip install pyrender imageio` if it is not already available. Each dataset
+contains `images/*.jpg`, `sparse/0/{cameras,images,points3D}.{txt,bin}`, and
+`points3D.ply`; the script re-parses these files with the COLMAP loaders to
+confirm they match what `readColmapSceneInfo` expects.
 
 3. install submodules
 ```
-pip install submodules/diff-gaussian-rasterization
-pip install submodules/simple-knn/
+pip install --no-build-isolation submodules/diff-gaussian-rasterization
+pip install --no-build-isolation submodules/simple-knn/
 
 # tetra-nerf for Marching Tetrahedra
 cd submodules/tetra_triangulation
-conda install cmake
+conda install -c conda-forge cmake=3.26
 conda install conda-forge::gmp
 conda install conda-forge::cgal
 cmake .

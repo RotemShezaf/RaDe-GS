@@ -1,0 +1,11 @@
+Surface Type: Paraboloid
+Resolution Level: 4
+Grid Size: 62 x 62
+Total Vertices: 3844
+Total Faces: 7442
+Arc Length Resolution: 0.064866
+X Range: (-1.0, 1.0)
+Y Range: (-1.0, 1.0)
+Mesh File: mesh_level4_res62x62_arc0.064866.ply
+Point Cloud File: pointcloud_level4_res62x62_arc0.064866.ply
+Normals File: normals_level4_res62x62_arc0.064866.ply

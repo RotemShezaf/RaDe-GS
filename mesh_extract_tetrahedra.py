@@ -11,8 +11,9 @@ from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
 import numpy as np
 import trimesh
-from tetranerf.utils.extension import cpp
+
 from utils.tetmesh import marching_tetrahedra
+from tetranerf.utils.extension import cpp
 
 
 @torch.no_grad()

@@ -1,0 +1,4 @@
+- [x] Adjust image generation to sample polynomial surface directly per pixel instead of using mesh
+- [x] Implement uniform camera placement on a user-specified radius parameter
+- [x] Update rendering pipeline to evaluate polynomial colors/normals per ray
+- [ ] Ensure COLMAP export still consistent with new image generation

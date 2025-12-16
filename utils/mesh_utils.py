@@ -208,6 +208,7 @@ class GaussianExtractor(object):
 
             weights = torch.ones_like(samples[:,0])
             for i, viewpoint_cam in tqdm(enumerate(self.viewpoint_stack), desc="TSDF integration progress"):
+                #cumputes sdf per frame
                 sdf, rgb, normal, mask_proj = compute_sdf_perframe(i, samples,
                     depthmap = self.depthmaps[i],
                     rgbmap = self.rgbmaps[i],
@@ -217,6 +218,8 @@ class GaussianExtractor(object):
 
                 # volume integration
                 sdf = sdf.flatten()
+
+                #check the maximum distans that is good for intedration 
                 mask_proj = mask_proj & (sdf > -sdf_trunc)
                 sdf = torch.clamp(sdf / sdf_trunc, min=-1.0, max=1.0)[mask_proj]
                 w = weights[mask_proj]
@@ -284,3 +287,16 @@ class GaussianExtractor(object):
             save_img_f32(self.depthmaps[idx][0].cpu().numpy(), os.path.join(vis_path, 'depth_{0:05d}'.format(idx) + ".tiff"))
             save_img_u8(self.normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'normal_{0:05d}'.format(idx) + ".png"))
             save_img_u8(self.depth_normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'depth_normal_{0:05d}'.format(idx) + ".png"))
+
+
+
+def transform_mesh_for_viewpoint(mesh, viewpoint):
+    """
+    transform mesh to the camera viewpoint space
+    """
+    cam = to_cam_open3d([viewpoint])[0]
+    c2w = np.linalg.inv(cam.extrinsic)
+    w2c = cam.extrinsic 
+    
+    mesh.transform(w2c)
+    return mesh
