@@ -37,6 +37,7 @@ import struct
 import trimesh
 import open3d as o3d
 import open3d.visualization.rendering as rendering
+from PIL import Image
 
 from GenerateData.GenerateRawPolynomialMesh import evaluate_polynomial_normal
 
@@ -91,9 +92,8 @@ def parse_args() -> argparse.Namespace:
         help="Strategy for sampling camera centers",
     )
     parser.add_argument("--light_intensity", type=float, default=3.5, help="Directional light intensity for pyrender")
-    parser.add_argument("--points3d_count", type=int, default=20000, help="Number of vertices to dump into COLMAP points3D")
-    parser.add_argument("--points3d_colmap_count", type=int, default=20000, help="Number of 3D points for COLMAP files (points3D.*)")
-    parser.add_argument("--points3d_image_count", type=int, default=20000, help="Number of 3D points used to define image-space resolution / normals")
+    parser.add_argument("--points3d_count", type=int, default=70000, help="Number of vertices to dump into COLMAP points3D")
+    parser.add_argument("--points3d_colmap_count", type=int, default=70000, help="Number of 3D points for COLMAP files (points3D.*)")
     parser.add_argument("--color_scheme", choices=["height", "surface"], default="height", help="Fallback color scheme when the mesh has no vertex colors")
     parser.add_argument("--seed", type=int, default=13, help="Random seed for viewpoint shuffling and point sampling")
     return parser.parse_args()
@@ -116,15 +116,31 @@ def _load_mesh(data_root: Path, surface: str, level: int, color_scheme: str) -> 
     # Convert to Open3D mesh
     vertices = np.asarray(trimesh_mesh.vertices, dtype=np.float64)
     faces = np.asarray(trimesh_mesh.faces, dtype=np.int32)
-    colors = np.asarray(trimesh_mesh.visual.vertex_colors[:, :3], dtype=np.float64)
-    if colors.max() > 1.0:
-        colors = colors / 255.0
+    
+    # Generate UV coordinates
+    uv_coords = _generate_uv_coordinates(vertices)
+    
+    # Sample colors from texture if available, otherwise use procedural colors
+    texture_path = Path(__file__).parent / "textures" / "colors.png"
+    if texture_path.exists():
+        print(f"Sampling vertex colors from texture: {texture_path}")
+        colors = _sample_colors_from_texture(texture_path, uv_coords)
+    else:
+        print(f"Texture not found, using procedural colors")
+        colors = np.asarray(trimesh_mesh.visual.vertex_colors[:, :3], dtype=np.float64)
+        if colors.max() > 1.0:
+            colors = colors / 255.0
     
     mesh = o3d.geometry.TriangleMesh(
         o3d.utility.Vector3dVector(vertices),
         o3d.utility.Vector3iVector(faces)
     )
     mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
+    
+    # For triangle_uvs, we need 3 UV coordinates per triangle
+    # Flatten faces and index into uv_coords to get per-triangle-vertex UVs
+    triangle_uvs = uv_coords[faces.flatten()]
+    mesh.triangle_uvs = o3d.utility.Vector2dVector(triangle_uvs)
     
     return mesh
 
@@ -176,6 +192,79 @@ def _build_colors(vertices: np.ndarray, surface: str, scheme: str) -> np.ndarray
         grad = np.stack([z_norm, 0.4 + 0.4 * (1 - np.abs(z_norm - 0.5)), 1.0 - z_norm], axis=1)
         colors[:, :3] = np.clip(grad * 255, 0, 255).astype(np.uint8)
     colors[:, 3] = 255
+    return colors
+
+
+def _generate_uv_coordinates(vertices: np.ndarray) -> np.ndarray:
+    """Generate UV coordinates for vertices based on x,y positions.
+    
+    Maps x,y coordinates to [0,1] range for texture mapping.
+    
+    Args:
+        vertices: (N, 3) array of vertex positions
+    
+    Returns:
+        uv_coords: (N, 2) array of UV coordinates in [0, 1]
+    """
+    x = vertices[:, 0]
+    y = vertices[:, 1]
+    
+    # Normalize x and y to [0, 1] range
+    u = (x - x.min()) / (np.ptp(x) + 1e-8)
+    v = (y - y.min()) / (np.ptp(y) + 1e-8)
+    return np.column_stack([u, v])
+
+
+def _load_texture_image(texture_path: Path) -> o3d.geometry.Image:
+    """Load texture image and convert to Open3D format.
+    
+    Args:
+        texture_path: Path to texture image file
+    
+    Returns:
+        o3d_image: Open3D Image object
+    """
+    # Load with PIL
+    pil_image = Image.open(texture_path).convert('RGB')
+    
+    # Convert to numpy array
+    img_array = np.array(pil_image, dtype=np.uint8)
+    
+    # Convert to Open3D Image
+    o3d_image = o3d.geometry.Image(img_array)
+    
+    return o3d_image
+
+
+def _sample_colors_from_texture(texture_path: Path, uv_coords: np.ndarray) -> np.ndarray:
+    """Sample RGB colors from texture image at given UV coordinates.
+    
+    Args:
+        texture_path: Path to texture image file
+        uv_coords: (N, 2) array of UV coordinates in [0, 1] range
+    
+    Returns:
+        colors: (N, 3) array of RGB colors in [0, 1] range
+    """
+    # Load texture image
+    pil_image = Image.open(texture_path).convert('RGB')
+    img_array = np.array(pil_image, dtype=np.float32) / 255.0  # Normalize to [0, 1]
+    
+    height, width = img_array.shape[:2]
+    
+    # Convert UV coordinates to pixel coordinates
+    # UV (0,0) is typically bottom-left, but image (0,0) is top-left
+    # So we flip V coordinate
+    u = np.clip(uv_coords[:, 0], 0, 1)
+    v = np.clip(1.0 - uv_coords[:, 1], 0, 1)  # Flip V
+    
+    # Convert to pixel indices
+    x_pixels = (u * (width - 1)).astype(np.int32)
+    y_pixels = (v * (height - 1)).astype(np.int32)
+    
+    # Sample colors from texture
+    colors = img_array[y_pixels, x_pixels, :]
+    
     return colors
 
 
@@ -301,10 +390,23 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
     samples: List[CameraSample] = []
     camera_intrinsics: List[CameraIntrinsics] = []
 
+    # Load texture if it exists
+    texture_path = Path(__file__).parent / "textures" / "colors.png"
+    has_texture = texture_path.exists()
+    
     # Create renderer once outside the loop
     renderer = rendering.OffscreenRenderer(width, height)
     material = rendering.MaterialRecord()
     material.shader = "defaultLit"
+
+   
+    
+    # Apply texture if available
+    if has_texture:
+        print(f"Loading texture from {texture_path}")
+        texture_image = _load_texture_image(texture_path)
+        material.albedo_img = texture_image
+        #print(f"Texture loaded: {texture_image.width}x{texture_image.height}")
     
     # Add geometry once
     renderer.scene.add_geometry("mesh", mesh, material)
@@ -328,7 +430,7 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
         print(f"Color range: [{colors_arr.min():.4f}, {colors_arr.max():.4f}]")
     
     # Set lighting once - reduced from 75000 to 5000
-    renderer.scene.scene.set_sun_light([1,-1,-1], [1,1,1], 5000)
+    renderer.scene.scene.set_sun_light([1,-1, 1], [1,1,1], 10000)
     renderer.scene.scene.enable_sun_light(True)
 
     for idx, (eye, target) in enumerate(zip(centers, targets), start=1):
@@ -537,7 +639,7 @@ def main() -> None:
     centers, targets = _compute_camera_centers(mesh, args.num_views, args, args.seed)
     samples, camera_intrinsics = _render_images(mesh, centers, targets, args, dataset_dir)
 
-    # Separate resolutions for COLMAP vs image-space point usage
+    # Separate resolutions for COLMAP 
     colmap_count = args.points3d_colmap_count or args.points3d_count
 
     # Points for COLMAP points3D.*

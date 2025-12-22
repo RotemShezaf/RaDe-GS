@@ -36,46 +36,22 @@ conda activate radegs
 ```
 
 2. install pytorch and other dependencies.
-The renderer relies on `pyrender` for realistic shading; install it with
-`pip install pyrender imageio` if it is not already available. Each dataset
-contains `images/*.jpg` and `sparse/0/{cameras,images,points3D}.{txt,bin}` plus
-`points3D.ply`, matching what `readColmapSceneInfo` expects.
+```
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
+```
+3. for adding the cuda toolkit headers:
+```
+conda install nvidia/label/cuda-12.1.1::cuda-toolkit -c nvidia/label/cuda-12.1.1
+```
+or
+```
+conda install -c nvidia/label/cuda-12.1.105 cuda-toolkit
+```
+```
 pip install -r requirements.txt
 ```
-conda install -c conda-forge \
-    numpy \
-    trimesh \
-    pyopengl \
-    mesa-libgl \
-    mesa-libegl \
-    libosmesa
-### Generate synthetic polynomial datasets
 
-For quick experiments without real captures, you can procedurally create
-training data:
 
-```bash
-# 1) Generate multires meshes & point clouds
-python GenerateData/GenerateRawPolynomialMesh.py --base_resolution 800 --num_levels 4
-
-# 2) (Optional) Convert a surface level into Gaussian splats
-python GenerateData/create_gaussian_splats.py Paraboloid 1 --data_root TrainData/raw
-
-# 3) Render COLMAP-style images & cameras (outputs JPG + txt/bin/ply)
-python GenerateData/create_synthetic_colmap_dataset.py Paraboloid 1 \
-    --data_root TrainData/raw --output_root data/synthetic_polys
-
-# 4) Train using the synthetic dataset
-python train.py -s data/synthetic_polys/Paraboloid/level_01 -m output/poly_run
-```
-
-The renderer relies on `pyrender` for realistic shading; install it with
-`pip install pyrender imageio` if it is not already available. Each dataset
-contains `images/*.jpg`, `sparse/0/{cameras,images,points3D}.{txt,bin}`, and
-`points3D.ply`; the script re-parses these files with the COLMAP loaders to
-confirm they match what `readColmapSceneInfo` expects.
 
 3. install submodules
 ```
@@ -134,6 +110,30 @@ python mesh_extract_tetrahedra.py -s <path to preprocessed TNT dataset> -m <outp
 # evaluation
 python eval_tnt/run.py --dataset-dir <path to GT TNT dataset> --traj-path <path to preprocessed TNT COLMAP_SfM.log file> --ply-path <output folder>/recon.ply
 ```
+### Generate synthetic polynomial datasets
+
+For quick experiments without real captures, you can procedurally create
+training data:
+
+```bash
+# 1) Generate multires meshes & point clouds
+python GenerateData/GenerateRawPolynomialMesh.py --base_resolution 800 --num_levels 4
+
+
+# 3) Render COLMAP-style images & cameras (outputs JPG + txt/bin/ply)
+python GenerateData/create_synthetic_colmap_dataset.py Paraboloid 1 \
+    --data_root TrainData/raw --output_root data/synthetic_polys
+
+# 4) Train using the synthetic dataset
+python train.py -s data/synthetic_polys/Paraboloid/level_01 -m output/poly_run
+```
+
+The renderer relies on `pyrender` for realistic shading; install it with
+`pip install pyrender imageio` if it is not already available. Each dataset
+contains `images/*.jpg`, `sparse/0/{cameras,images,points3D}.{txt,bin}`, and
+`points3D.ply`; the script re-parses these files with the COLMAP loaders to
+confirm they match what `readColmapSceneInfo` expects.
+
 ## Novel View Synthesis
 ```
 python train.py -s <path to COLMAP or NeRF Synthetic dataset> --eval

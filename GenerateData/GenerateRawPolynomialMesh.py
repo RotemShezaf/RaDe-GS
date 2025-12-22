@@ -199,7 +199,7 @@ def mesh_to_point_cloud(mesh):
 
 
 def generate_multiresolution_data(surface_type, base_resolution=200, num_levels=5, 
-                                   output_dir='TrainData/raw', x_range=(-1, 1), y_range=(-1, 1)):
+                                   output_dir='TrainData/raw', x_range=(-0.5, 0.5), y_range=(-1, 1)):
     """Generate multi-resolution meshes and point clouds for a surface.
     
     Args:
@@ -270,10 +270,10 @@ def main():
     parser.add_argument('--base_resolution', type=int, default=1000, help='Highest resolution grid size (default: 1000)')
     parser.add_argument('--num_levels', type=int, default=6, help='Number of resolution levels (default: 6)')
     parser.add_argument('--output_dir', type=str, default='TrainData/raw', help='Output directory (default: TrainData/raw)')
-    parser.add_argument('--x_min', type=float, default=-1.0, help='Minimum x value (default: -1.0)')
-    parser.add_argument('--x_max', type=float, default=1.0, help='Maximum x value (default: 1.0)')
-    parser.add_argument('--y_min', type=float, default=-1.0, help='Minimum y value (default: -1.0)')
-    parser.add_argument('--y_max', type=float, default=1.0, help='Maximum y value (default: 1.0)')
+    parser.add_argument('--x_min', type=float, default=-0.5, help='Minimum x value (default: -1.0)')
+    parser.add_argument('--x_max', type=float, default=0.5, help='Maximum x value (default: 1.0)')
+    parser.add_argument('--y_min', type=float, default=-0.5, help='Minimum y value (default: -1.0)')
+    parser.add_argument('--y_max', type=float, default=0.5, help='Maximum y value (default: 1.0)')
     args = parser.parse_args()
 
     surfaces = ['Paraboloid', 'Saddle', 'HyperbolicParaboloid']

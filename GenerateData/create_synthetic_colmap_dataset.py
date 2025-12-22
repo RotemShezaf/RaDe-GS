@@ -612,6 +612,7 @@ def _sample_points(mesh: o3d.geometry.TriangleMesh, count: int, seed: int) -> Tu
     else:
         colors = colors.astype(np.uint8)
     rng = np.random.default_rng(seed)
+    breakpoint()
     if len(vertices) > count:
         ids = rng.choice(len(vertices), size=count, replace=False)
         vertices = vertices[ids]
