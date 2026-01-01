@@ -40,6 +40,7 @@ import open3d.visualization.rendering as rendering
 from PIL import Image
 
 from GenerateData.GenerateRawPolynomialMesh import evaluate_polynomial_normal
+from GenerateData.convert_to_logfile import convert_COLMAP_to_log
 
 from scene.colmap_loader import (
     rotmat2qvec,
@@ -76,8 +77,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--surface", choices=SURFACES, help="Surface type to render", default=SURFACES[0])
     parser.add_argument("--level", type=int, help="Resolution level index for polynomial surface (if used)", default=2)
     parser.add_argument("--mesh_level", type=int, help="Mesh resolution level index to render image (PLY)", default=1)
-    parser.add_argument("--data_root", type=str, default="TrainData/raw", help="Base directory containing generated surfaces")
-    parser.add_argument("--output_root", type=str, default="SyntheticData", help="Destination root for the rendered dataset")
+    parser.add_argument("--data_root", type=str, default="TrainData/Polynomial/raw", help="Base directory containing generated surfaces")
+    parser.add_argument("--output_root", type=str, default="TrainData/Polynomial/SyntheticColmapData", help="Destination root for the rendered dataset")
     parser.add_argument("--num_views", type=int, default=50, help="Number of rendered viewpoints along the orbit")
     parser.add_argument("--image_width", type=int, default=960, help="Rendered image width in pixels")
     parser.add_argument("--image_height", type=int, default=720, help="Rendered image height in pixels")
@@ -92,14 +93,41 @@ def parse_args() -> argparse.Namespace:
         help="Strategy for sampling camera centers",
     )
     parser.add_argument("--light_intensity", type=float, default=3.5, help="Directional light intensity for pyrender")
-    parser.add_argument("--points3d_count", type=int, default=70000, help="Number of vertices to dump into COLMAP points3D")
-    parser.add_argument("--points3d_colmap_count", type=int, default=70000, help="Number of 3D points for COLMAP files (points3D.*)")
+    parser.add_argument("--points3d_thresh", type=float, default=None, help="Downsample density threshold for COLMAP points3D (minimum distance between points). If None, no downsampling is performed.")
     parser.add_argument("--color_scheme", choices=["height", "surface"], default="height", help="Fallback color scheme when the mesh has no vertex colors")
+    parser.add_argument("--texture_folder", type=str, default="textures", help="Folder name containing texture images (relative to GenerateData directory)")
+    parser.add_argument("--texture_name", type=str, default="colors", help="Texture image filename (extension optional, will search for .png, .jpg, .jpeg, .bmp, .tif)")
     parser.add_argument("--seed", type=int, default=13, help="Random seed for viewpoint shuffling and point sampling")
     return parser.parse_args()
 
 
-def _load_mesh(data_root: Path, surface: str, level: int, color_scheme: str) -> o3d.geometry.TriangleMesh:
+def _find_texture_file(texture_folder: Path, texture_name: str) -> Path | None:
+    """Find texture file with given name, searching for common image extensions.
+    
+    Args:
+        texture_folder: Path to folder containing textures
+        texture_name: Texture filename with or without extension
+    
+    Returns:
+        Path to texture file if found, None otherwise
+    """
+    # If texture_name already has an extension, try it first
+    if '.' in texture_name:
+        candidate = texture_folder / texture_name
+        if candidate.exists():
+            return candidate
+    
+    # Try common image extensions
+    extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.PNG', '.JPG', '.JPEG']
+    for ext in extensions:
+        candidate = texture_folder / f"{texture_name}{ext}"
+        if candidate.exists():
+            return candidate
+    
+    return None
+
+
+def _load_mesh(data_root: Path, surface: str, level: int, color_scheme: str, texture_folder: str, texture_name: str) -> o3d.geometry.TriangleMesh:
     mesh_candidates = sorted((data_root / surface).glob(f"mesh_level{level}_*.ply"))
     if not mesh_candidates:
         raise FileNotFoundError(f"No mesh for surface={surface} level={level} under {data_root/surface}")
@@ -121,12 +149,13 @@ def _load_mesh(data_root: Path, surface: str, level: int, color_scheme: str) -> 
     uv_coords = _generate_uv_coordinates(vertices)
     
     # Sample colors from texture if available, otherwise use procedural colors
-    texture_path = Path(__file__).parent / "textures" / "colors.png"
-    if texture_path.exists():
+    texture_folder_path = Path(__file__).parent / texture_folder
+    texture_path = _find_texture_file(texture_folder_path, texture_name)
+    if texture_path is not None:
         print(f"Sampling vertex colors from texture: {texture_path}")
         colors = _sample_colors_from_texture(texture_path, uv_coords)
     else:
-        print(f"Texture not found, using procedural colors")
+        print(f"Texture not found in {texture_folder_path}, using procedural colors")
         colors = np.asarray(trimesh_mesh.visual.vertex_colors[:, :3], dtype=np.float64)
         if colors.max() > 1.0:
             colors = colors / 255.0
@@ -372,7 +401,7 @@ def _compute_camera_centers(
 
 
 
-def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets: np.ndarray, args: argparse.Namespace, output_dir: Path) -> List[CameraSample]:
+def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets: np.ndarray, args: argparse.Namespace, output_dir: Path, texture_folder: str, texture_name: str) -> List[CameraSample]:
     """Render images using Open3D renderer.
 
     The camera sampling (centers/targets) is preserved from the original
@@ -391,8 +420,9 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
     camera_intrinsics: List[CameraIntrinsics] = []
 
     # Load texture if it exists
-    texture_path = Path(__file__).parent / "textures" / "colors.png"
-    has_texture = texture_path.exists()
+    texture_folder_path = Path(__file__).parent / texture_folder
+    texture_path = _find_texture_file(texture_folder_path, texture_name)
+    has_texture = texture_path is not None
     
     # Create renderer once outside the loop
     renderer = rendering.OffscreenRenderer(width, height)
@@ -406,6 +436,10 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
         print(f"Loading texture from {texture_path}")
         texture_image = _load_texture_image(texture_path)
         material.albedo_img = texture_image
+        material.shader = "defaultLit"
+    material.base_metallic = 0.0  # Non-metallic for better diffuse shading
+    material.base_roughness = 0.6  # Slightly rough for better form perception
+    material.base_reflectance = 0.4  # Moderate reflectance
         #print(f"Texture loaded: {texture_image.width}x{texture_image.height}")
     
     # Add geometry once
@@ -429,9 +463,35 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
         colors_arr = np.asarray(mesh.vertex_colors)
         print(f"Color range: [{colors_arr.min():.4f}, {colors_arr.max():.4f}]")
     
-    # Set lighting once - reduced from 75000 to 5000
-    renderer.scene.scene.set_sun_light([1,-1, 1], [1,1,1], 10000)
+    # Set lighting - directional light from multiple angles
+    renderer.scene.scene.set_sun_light([0.577, -0.577, 0.577], [1.0, 1.0, 1.0], 50000)
+    '''
+        # Set lighting - optimize single sun light for better 3D structure visibility
+    # Direction vector points FROM light TO origin (negative values light from that direction)
+    renderer.scene.scene.set_sun_light(
+        [-0.3, -0.5, -0.8],  # More frontal angle reduces harsh shadows
+        [1.0, 1.0, 1.0],     # White light
+        75000                 # Increased intensity for clearer structure
+    )
     renderer.scene.scene.enable_sun_light(True)
+    
+    # Use neutral gray background for better edge/silhouette contrast
+    renderer.scene.set_background([0.7, 0.7, 0.7, 1.0])
+    '''
+
+        # Add additional lights from different angles
+    #renderer.scene.scene.add_directional_light([0.1, 0.1, -1.0], [1.0, 1.0, 1.0], 30000)  # Front light
+    #renderer.scene.scene.add_directional_light([-0.707, 0.0, -0.707], [0.8, 0.8, 1.0], 20000)  # Side fill light
+    #renderer.scene.scene.enable_sun_light(True)
+    # Add indirect lighting to reduce shadows
+    renderer.scene.set_background([0, 0, 0, 0])  # Black background for splats only for object
+    
+    # Enable indirect lighting if available
+    try:
+        renderer.scene.scene.enable_indirect_light(True)
+        renderer.scene.scene.set_indirect_light_intensity(30000)
+    except:
+        pass  # Not all Open3D versions support this
 
     for idx, (eye, target) in enumerate(zip(centers, targets), start=1):
 
@@ -449,6 +509,7 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
         # get the world-to-camera transform and set R, T
         w2c = np.linalg.inv(c2w)
         R_w2c = np.transpose(w2c[:3,:3])  # R is stored transposed due to 'glm' in CUDA code
+        R_w2c = w2c[:3,:3]
         tvec = w2c[:3, 3]
 
 
@@ -556,19 +617,60 @@ def _write_images_bin(path: Path, samples: Sequence[CameraSample]) -> None:
             f.write(struct.pack("<Q", 0))  # num points2D
 
 
-def _sample_points(mesh: o3d.geometry.TriangleMesh, count: int, seed: int) -> Tuple[np.ndarray, np.ndarray]:
+def _sample_points(mesh: o3d.geometry.TriangleMesh, thresh: float | None, seed: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Sample exact mesh vertices using radius-based thinning for uniform distribution.
+    
+    Uses greedy Poisson disk sampling: iteratively selects vertices ensuring 
+    no two selected points are closer than the specified radius threshold.
+    If thresh is None, returns all mesh vertices without downsampling.
+    
+    Args:
+        mesh: Triangle mesh to sample from
+        thresh: Minimum distance between sampled points (radius threshold), or None for no downsampling
+        seed: Random seed for reproducibility
+    """
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
     colors = np.asarray(mesh.vertex_colors, dtype=np.float64)
-    if colors.max() <= 1.0:
-        colors = (colors * 255.0).astype(np.uint8)
+    
+    # If no threshold specified, return all vertices
+    if thresh is None:
+        sampled_vertices = vertices
+        sampled_colors = colors
     else:
-        colors = colors.astype(np.uint8)
-    rng = np.random.default_rng(seed)
-    if len(vertices) > count:
-        ids = rng.choice(len(vertices), size=count, replace=False)
-        vertices = vertices[ids]
-        colors = colors[ids]
-    return vertices, colors
+        import sklearn.neighbors as skln
+        
+        # Random shuffle vertices
+        rng = np.random.default_rng(seed)
+        shuffle_order = np.arange(len(vertices))
+        rng.shuffle(shuffle_order)
+        vertices_shuffled = vertices[shuffle_order]
+        
+        # Build KD-tree and find neighbors within radius
+        nn_engine = skln.NearestNeighbors(n_neighbors=1, radius=thresh, algorithm='kd_tree', n_jobs=-1)
+        nn_engine.fit(vertices_shuffled)
+        rnn_idxs = nn_engine.radius_neighbors(vertices_shuffled, radius=thresh, return_distance=False)
+        
+        # Greedy selection: keep point if not already masked, mask its neighbors
+        mask = np.ones(len(vertices_shuffled), dtype=bool)
+        for curr, neighbor_idxs in enumerate(rnn_idxs):
+            if mask[curr]:
+                mask[neighbor_idxs] = False
+                mask[curr] = True
+        
+        # Map back to original indices
+        selected_shuffled = np.where(mask)[0]
+        selected_indices = shuffle_order[selected_shuffled]
+        
+        sampled_vertices = vertices[selected_indices]
+        sampled_colors = colors[selected_indices]
+    
+    # Convert to uint8 [0-255] range
+    if sampled_colors.max() <= 1.0:
+        sampled_colors = (sampled_colors * 255.0).astype(np.uint8)
+    else:
+        sampled_colors = sampled_colors.astype(np.uint8)
+    
+    return sampled_vertices, sampled_colors
 
 
 def _write_points3d_txt(path: Path, vertices: np.ndarray, colors: np.ndarray) -> None:
@@ -628,22 +730,19 @@ def main() -> None:
     data_root = Path(args.data_root)
     # Use mesh_level for loading the triangulated mesh (default: level 0)
     mesh_level = getattr(args, "mesh_level", args.level)
-    mesh = _load_mesh(data_root, args.surface, mesh_level, args.color_scheme)
+    mesh = _load_mesh(data_root, args.surface, mesh_level, args.color_scheme, args.texture_folder, args.texture_name)
 
     # Load analytical normals if available, otherwise calculate from mesh
     _load_normals_if_available(data_root, args.surface, mesh_level, mesh)
 
-    dataset_dir = Path(args.output_root) / args.surface / f"level_{args.level:02d}"
+    dataset_dir = Path(args.output_root) / f"{args.texture_name}_texture" / args.surface / f"level_{args.level:02d}"
     _ensure_dirs(dataset_dir)
 
     centers, targets = _compute_camera_centers(mesh, args.num_views, args, args.seed)
-    samples, camera_intrinsics = _render_images(mesh, centers, targets, args, dataset_dir)
+    samples, camera_intrinsics = _render_images(mesh, centers, targets, args, dataset_dir, args.texture_folder, args.texture_name)
 
-    # Separate resolutions for COLMAP 
-    colmap_count = args.points3d_colmap_count or args.points3d_count
-
-    # Points for COLMAP points3D.*
-    points_xyz_colmap, points_rgb_colmap = _sample_points(mesh, colmap_count, args.seed)
+    # Points for COLMAP points3D.* using radius-based downsampling
+    points_xyz_colmap, points_rgb_colmap = _sample_points(mesh, args.points3d_thresh, args.seed)
 
     sparse_dir = dataset_dir / "sparse" / "0"
     _write_cameras_txt(sparse_dir / "cameras.txt", camera_intrinsics)
@@ -654,8 +753,22 @@ def main() -> None:
     _write_points3d_bin(sparse_dir / "points3D.bin", points_xyz_colmap, points_rgb_colmap)
     _write_points3d_ply(sparse_dir / "points3D.ply", points_xyz_colmap, points_rgb_colmap)
 
+    # Generate COLMAP_SFM.log file using convert_COLMAP_to_log
+    logfile_name = f"{args.surface}_COLMAP_SfM.log"
+    logfile_path = dataset_dir / logfile_name
+    convert_COLMAP_to_log(
+        filename=str(sparse_dir / "cameras.bin"),
+        logfile_out=str(logfile_path),
+        input_images=str(dataset_dir / "images"),
+        formatp="jpg"
+    )
+    print(f"Generated COLMAP log file: {logfile_path}")
+
+    # Create training script in the dataset directory
+    _create_training_script(dataset_dir)
+
     print("Synthetic dataset created at", dataset_dir)
-    print("Next step: run train.py with -s", dataset_dir)
+    print("Next step: run ./train_and_extract_mesh.sh in", dataset_dir)
     _validate_dataset(dataset_dir)
 
 
@@ -667,6 +780,68 @@ def _write_points3d_bin(path: Path, vertices: np.ndarray, colors: np.ndarray) ->
         for idx, (v, c) in enumerate(zip(vertices, colors), start=1):
             f.write(struct.pack("<QdddBBBd", idx, v[0], v[1], v[2], int(c[0]), int(c[1]), int(c[2]), 1.0))
             f.write(struct.pack("<Q", 0))  # track length
+
+
+def _create_training_script(dataset_dir: Path) -> None:
+    """Create a train_and_extract_mesh.sh script in the dataset directory.
+    
+    Args:
+        dataset_dir: Path to the dataset directory where script will be created
+    """
+    script_path = dataset_dir / "train_and_extract_mesh.sh"
+    
+    script_content = f"""#!/bin/bash
+
+# Auto-generated training and mesh extraction script
+# Dataset: {dataset_dir}
+
+DATASET_DIR="{dataset_dir}"
+OUTPUT_DIR="${{DATASET_DIR}}/output"
+
+echo "=========================================="
+echo "Training Gaussian Splatting Model"
+echo "=========================================="
+echo "Dataset: ${{DATASET_DIR}}"
+echo "Output: ${{OUTPUT_DIR}}"
+echo ""
+
+python train.py -s "${{DATASET_DIR}}" -m "${{OUTPUT_DIR}}" --eval
+
+# Check if training was successful
+if [ $? -ne 0 ]; then
+    echo "Training failed! Exiting..."
+    exit 1
+fi
+
+echo ""
+echo "=========================================="
+echo "Extracting Mesh with Tetrahedra"
+echo "=========================================="
+echo ""
+
+python mesh_extract_tetrahedra.py -s "${{DATASET_DIR}}" -m "${{OUTPUT_DIR}}" --eval
+
+# Check if mesh extraction was successful
+if [ $? -ne 0 ]; then
+    echo "Mesh extraction failed!"
+    exit 1
+fi
+
+echo ""
+echo "=========================================="
+echo "Pipeline completed successfully!"
+echo "Results saved to: ${{OUTPUT_DIR}}"
+echo "=========================================="
+"""
+    
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write(script_content)
+    
+    # Make script executable
+    import stat
+    script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
+    
+    print(f"Created training script: {script_path}")
 
 if __name__ == "__main__":
     main()
