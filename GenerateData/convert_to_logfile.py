@@ -45,7 +45,7 @@ import os
 import glob
 import numpy as np
 from numpy import matrix
-import read_write_model as read_model
+import  utils.colmap_read_model as read_model
 
 
 def write_SfM_log(T, i_map, filename):

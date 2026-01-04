@@ -109,7 +109,59 @@ def compute_arc_length_resolution(x_range, y_range, nx, ny, surface_type):
     return avg_arc_length
 
 
-def generate_surface_mesh(surface_type, nx, ny, x_range, y_range):
+def _adaptive_sample_1d(param_range, num_points, surface_type, axis='x', y_fixed=0.0, x_fixed=0.0):
+    """Sample parameter range adaptively to achieve uniform arc length spacing.
+    
+    Uses cumulative arc length to distribute points uniformly along the curve.
+    
+    Args:
+        param_range: (min, max) for the parameter
+        num_points: number of points to sample
+        surface_type: type of surface
+        axis: 'x' or 'y' - which axis to sample
+        y_fixed: fixed y value when sampling x
+        x_fixed: fixed x value when sampling y
+    
+    Returns:
+        samples: array of parameter values with uniform arc length spacing
+    """
+    # First, sample densely to estimate arc length
+    dense_samples = 1000
+    t = np.linspace(param_range[0], param_range[1], dense_samples)
+    
+    if axis == 'x':
+        x = t
+        y = np.full_like(t, y_fixed)
+    else:  # axis == 'y'
+        x = np.full_like(t, x_fixed)
+        y = t
+    
+    z = evaluate_polynomial(x, y, surface_type)
+    
+    # Compute arc length at each point
+    if axis == 'x':
+        dx = np.diff(x)
+        dz = np.diff(z)
+        ds = np.sqrt(dx**2 + dz**2)
+    else:
+        dy = np.diff(y)
+        dz = np.diff(z)
+        ds = np.sqrt(dy**2 + dz**2)
+    
+    # Cumulative arc length
+    arc_lengths = np.concatenate([[0], np.cumsum(ds)])
+    total_length = arc_lengths[-1]
+    
+    # Sample uniformly in arc length space
+    target_arc_lengths = np.linspace(0, total_length, num_points)
+    
+    # Interpolate back to parameter space
+    uniform_samples = np.interp(target_arc_lengths, arc_lengths, t)
+    
+    return uniform_samples
+
+
+def generate_surface_mesh(surface_type, nx, ny, x_range, y_range, adaptive=False):
     """Generate triangulated mesh for polynomial surface.
     
     Args:
@@ -118,14 +170,21 @@ def generate_surface_mesh(surface_type, nx, ny, x_range, y_range):
         ny: number of points in y direction
         x_range: (min, max) for x
         y_range: (min, max) for y
+        adaptive: if True, use adaptive sampling based on arc length
     
     Returns:
         mesh: trimesh.Trimesh object
         arc_length: resolution metric
     """
-    # Create grid
-    x = np.linspace(x_range[0], x_range[1], nx)
-    y = np.linspace(y_range[0], y_range[1], ny)
+    if adaptive:
+        # Adaptive sampling: distribute points uniformly in arc length
+        x = _adaptive_sample_1d(x_range, nx, surface_type, axis='x', y_fixed=0.0)
+        y = _adaptive_sample_1d(y_range, ny, surface_type, axis='y', x_fixed=0.0)
+    else:
+        # Uniform parameter space sampling
+        x = np.linspace(x_range[0], x_range[1], nx)
+        y = np.linspace(y_range[0], y_range[1], ny)
+    
     X, Y = np.meshgrid(x, y)
     
     # Evaluate surface
@@ -199,7 +258,8 @@ def mesh_to_point_cloud(mesh):
 
 
 def generate_multiresolution_data(surface_type, base_resolution=200, num_levels=5, 
-                                   output_dir='TrainData/raw', x_range=(-0.5, 0.5), y_range=(-1, 1)):
+                                   output_dir='TrainData/raw', x_range=(-0.5, 0.5), y_range=(-1, 1),
+                                   adaptive_sampling=False):
     """Generate multi-resolution meshes and point clouds for a surface.
     
     Args:
@@ -207,6 +267,7 @@ def generate_multiresolution_data(surface_type, base_resolution=200, num_levels=
         base_resolution: highest resolution (number of points per dimension)
         num_levels: number of resolution levels
         output_dir: base output directory
+        adaptive_sampling: if True, use arc-length adaptive sampling for uniform mesh
     """
     # Create output directory
     surface_dir = Path(output_dir) / surface_type
@@ -214,6 +275,7 @@ def generate_multiresolution_data(surface_type, base_resolution=200, num_levels=
     
     print(f"\nGenerating data for {surface_type}...")
     print(f"Output directory: {surface_dir}")
+    print(f"Adaptive sampling: {'enabled' if adaptive_sampling else 'disabled'}")
     
     # Generate resolution levels
     resolutions = []
@@ -227,7 +289,7 @@ def generate_multiresolution_data(surface_type, base_resolution=200, num_levels=
     for level, (nx, ny) in enumerate(resolutions):
         print(f"\n  Level {level}: Resolution {nx}x{ny}")
         # Generate mesh
-        mesh, normals, arc_length = generate_surface_mesh(surface_type, nx, ny, x_range, y_range)
+        mesh, normals, arc_length = generate_surface_mesh(surface_type, nx, ny, x_range, y_range, adaptive=adaptive_sampling)
         print(f"    Generated mesh: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
         print(f"    Arc length resolution: {arc_length:.6f}")
         # Save mesh
@@ -269,11 +331,12 @@ def main():
     parser = argparse.ArgumentParser(description="Polynomial Surface Mesh and Point Cloud Generator")
     parser.add_argument('--base_resolution', type=int, default=1000, help='Highest resolution grid size (default: 1000)')
     parser.add_argument('--num_levels', type=int, default=6, help='Number of resolution levels (default: 6)')
-    parser.add_argument('--output_dir', type=str, default='TrainData/raw', help='Output directory (default: TrainData/raw)')
-    parser.add_argument('--x_min', type=float, default=-0.5, help='Minimum x value (default: -1.0)')
-    parser.add_argument('--x_max', type=float, default=0.5, help='Maximum x value (default: 1.0)')
-    parser.add_argument('--y_min', type=float, default=-0.5, help='Minimum y value (default: -1.0)')
-    parser.add_argument('--y_max', type=float, default=0.5, help='Maximum y value (default: 1.0)')
+    parser.add_argument('--output_dir', type=str, default='TrainData/Polynomial/raw', help='Output directory (default: TrainData/raw)')
+    parser.add_argument('--x_min', type=float, default=-0.8, help='Minimum x value (default: -1.0)')
+    parser.add_argument('--x_max', type=float, default=0.8, help='Maximum x value (default: 1.0)')
+    parser.add_argument('--y_min', type=float, default=-0.8, help='Minimum y value (default: -1.0)')
+    parser.add_argument('--y_max', type=float, default=0.8, help='Maximum y value (default: 1.0)')
+    parser.add_argument('--adaptive', action='store_true', help='Use adaptive sampling for uniform arc length spacing')
     args = parser.parse_args()
 
     surfaces = ['Paraboloid', 'Saddle', 'HyperbolicParaboloid']
@@ -293,6 +356,7 @@ def main():
     print(f"  Output Directory: {output_dir}")
     print(f"  X Range: {x_range}")
     print(f"  Y Range: {y_range}")
+    print(f"  Adaptive Sampling: {'enabled' if args.adaptive else 'disabled'}")
 
     # Generate data for each surface
     for surface_type in surfaces:
@@ -303,7 +367,8 @@ def main():
                 num_levels=num_levels,
                 output_dir=output_dir,
                 x_range=x_range,
-                y_range=y_range
+                y_range=y_range,
+                adaptive_sampling=args.adaptive
             )
         except Exception as e:
             print(f"\nError generating {surface_type}: {e}")

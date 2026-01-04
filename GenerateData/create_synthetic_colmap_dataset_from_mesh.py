@@ -407,7 +407,14 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
     The camera sampling (centers/targets) is preserved from the original
     implementation; rendering is done directly with Open3D mesh.
     """
+    '''
 
+    def fov2focal(fov, pixels):
+        return pixels / (2 * math.tan(fov / 2))
+
+    def focal2fov(focal, pixels):
+        return 2*math.atan(pixels/(2*focal))
+    '''
     width = args.image_width
     height = args.image_height
     yfov = math.radians(args.vertical_fov)
@@ -508,7 +515,7 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
     
         # get the world-to-camera transform and set R, T
         w2c = np.linalg.inv(c2w)
-        R_w2c = np.transpose(w2c[:3,:3])  # R is stored transposed due to 'glm' in CUDA code
+        #R_w2c = np.transpose(w2c[:3,:3])  # R is stored transposed due to 'glm' in CUDA code
         R_w2c = w2c[:3,:3]
         tvec = w2c[:3, 3]
 
@@ -617,7 +624,7 @@ def _write_images_bin(path: Path, samples: Sequence[CameraSample]) -> None:
             f.write(struct.pack("<Q", 0))  # num points2D
 
 
-def _sample_points(mesh: o3d.geometry.TriangleMesh, thresh: float | None, seed: int) -> Tuple[np.ndarray, np.ndarray]:
+def _sample_points(mesh: o3d.geometry.TriangleMesh, thresh: float | None, seed: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Sample exact mesh vertices using radius-based thinning for uniform distribution.
     
     Uses greedy Poisson disk sampling: iteratively selects vertices ensuring 
@@ -628,14 +635,19 @@ def _sample_points(mesh: o3d.geometry.TriangleMesh, thresh: float | None, seed: 
         mesh: Triangle mesh to sample from
         thresh: Minimum distance between sampled points (radius threshold), or None for no downsampling
         seed: Random seed for reproducibility
+    
+    Returns:
+        Tuple of (vertices, colors, normals)
     """
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
     colors = np.asarray(mesh.vertex_colors, dtype=np.float64)
+    normals = np.asarray(mesh.vertex_normals, dtype=np.float64)
     
     # If no threshold specified, return all vertices
     if thresh is None:
         sampled_vertices = vertices
         sampled_colors = colors
+        sampled_normals = normals
     else:
         import sklearn.neighbors as skln
         
@@ -663,6 +675,7 @@ def _sample_points(mesh: o3d.geometry.TriangleMesh, thresh: float | None, seed: 
         
         sampled_vertices = vertices[selected_indices]
         sampled_colors = colors[selected_indices]
+        sampled_normals = normals[selected_indices]
     
     # Convert to uint8 [0-255] range
     if sampled_colors.max() <= 1.0:
@@ -670,7 +683,7 @@ def _sample_points(mesh: o3d.geometry.TriangleMesh, thresh: float | None, seed: 
     else:
         sampled_colors = sampled_colors.astype(np.uint8)
     
-    return sampled_vertices, sampled_colors
+    return sampled_vertices, sampled_colors, sampled_normals
 
 
 def _write_points3d_txt(path: Path, vertices: np.ndarray, colors: np.ndarray) -> None:
@@ -683,7 +696,7 @@ def _write_points3d_txt(path: Path, vertices: np.ndarray, colors: np.ndarray) ->
             f.write(f"{idx} {v[0]:.6f} {v[1]:.6f} {v[2]:.6f} {int(c[0])} {int(c[1])} {int(c[2])} 1.0\n")
 
 
-def _write_points3d_ply(path: Path, vertices: np.ndarray, colors: np.ndarray) -> None:
+def _write_points3d_ply(path: Path, vertices: np.ndarray, colors: np.ndarray, normals: np.ndarray | None = None) -> None:
     # Make sure the parent directory exists
     path.parent.mkdir(parents=True, exist_ok=True)
     header = [
@@ -694,6 +707,9 @@ def _write_points3d_ply(path: Path, vertices: np.ndarray, colors: np.ndarray) ->
         "property float x",
         "property float y",
         "property float z",
+        "property float nx",
+        "property float ny",
+        "property float nz",
         "property uchar red",
         "property uchar green",
         "property uchar blue",
@@ -701,8 +717,13 @@ def _write_points3d_ply(path: Path, vertices: np.ndarray, colors: np.ndarray) ->
     ]
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(header) + "\n")
-        for v, c in zip(vertices, colors):
-            f.write(f"{v[0]:.6f} {v[1]:.6f} {v[2]:.6f} {int(c[0])} {int(c[1])} {int(c[2])}\n")
+        if normals is not None:
+            for v, n, c in zip(vertices, normals, colors):
+                f.write(f"{v[0]:.6f} {v[1]:.6f} {v[2]:.6f} {n[0]:.6f} {n[1]:.6f} {n[2]:.6f} {int(c[0])} {int(c[1])} {int(c[2])}\n")
+        else:
+            # Fallback to zero normals if not provided
+            for v, c in zip(vertices, colors):
+                f.write(f"{v[0]:.6f} {v[1]:.6f} {v[2]:.6f} 0.0 0.0 0.0 {int(c[0])} {int(c[1])} {int(c[2])}\n")
 
 
 def _ensure_dirs(root: Path) -> None:
@@ -742,7 +763,7 @@ def main() -> None:
     samples, camera_intrinsics = _render_images(mesh, centers, targets, args, dataset_dir, args.texture_folder, args.texture_name)
 
     # Points for COLMAP points3D.* using radius-based downsampling
-    points_xyz_colmap, points_rgb_colmap = _sample_points(mesh, args.points3d_thresh, args.seed)
+    points_xyz_colmap, points_rgb_colmap, points_normals_colmap = _sample_points(mesh, args.points3d_thresh, args.seed)
 
     sparse_dir = dataset_dir / "sparse" / "0"
     _write_cameras_txt(sparse_dir / "cameras.txt", camera_intrinsics)
@@ -751,7 +772,7 @@ def main() -> None:
     _write_images_bin(sparse_dir / "images.bin", samples)
     _write_points3d_txt(sparse_dir / "points3D.txt", points_xyz_colmap, points_rgb_colmap)
     _write_points3d_bin(sparse_dir / "points3D.bin", points_xyz_colmap, points_rgb_colmap)
-    _write_points3d_ply(sparse_dir / "points3D.ply", points_xyz_colmap, points_rgb_colmap)
+    _write_points3d_ply(sparse_dir / "points3D.ply", points_xyz_colmap, points_rgb_colmap, points_normals_colmap)
 
     # Generate COLMAP_SFM.log file using convert_COLMAP_to_log
     logfile_name = f"{args.surface}_COLMAP_SfM.log"

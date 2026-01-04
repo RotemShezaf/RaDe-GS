@@ -10,7 +10,9 @@ matplotlib
 argparse
 pygeodesic
 numpy
-pip install PyOpenGL PyOpenGL_accelerate
-pip install pyglet==1.5.27
-pip install pyrender
+PyOpenGL 
+PyOpenGL_accelerate
+pyglet==1.5.27
+pyrender
+imageio
 #export PYOPENGL_PLATFORM=egl

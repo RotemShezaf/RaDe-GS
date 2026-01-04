@@ -76,8 +76,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--surface", choices=SURFACES, help="Surface type to render", default=SURFACES[0])
     parser.add_argument("--level", type=int, help="Resolution level index for polynomial surface (if used)", default=2)
     parser.add_argument("--mesh_level", type=int, help="Mesh resolution level index to render image (PLY)", default=1)
-    parser.add_argument("--data_root", type=str, default="TrainData/raw", help="Base directory containing generated surfaces")
-    parser.add_argument("--output_root", type=str, default="SyntheticData", help="Destination root for the rendered dataset")
+    parser.add_argument("--data_root", type=str, default="TrainData/Polynomial/raw", help="Base directory containing generated surfaces")
+    parser.add_argument("--output_root", type=str, default="TrainData/Polynomial/SyntheticColmapData", help="Destination root for the rendered dataset")
     parser.add_argument("--num_views", type=int, default=50, help="Number of rendered viewpoints along the orbit")
     parser.add_argument("--image_width", type=int, default=960, help="Rendered image width in pixels")
     parser.add_argument("--image_height", type=int, default=720, help="Rendered image height in pixels")
@@ -612,7 +612,6 @@ def _sample_points(mesh: o3d.geometry.TriangleMesh, count: int, seed: int) -> Tu
     else:
         colors = colors.astype(np.uint8)
     rng = np.random.default_rng(seed)
-    breakpoint()
     if len(vertices) > count:
         ids = rng.choice(len(vertices), size=count, replace=False)
         vertices = vertices[ids]
@@ -704,7 +703,7 @@ def main() -> None:
     _write_points3d_ply(sparse_dir / "points3D.ply", points_xyz_colmap, points_rgb_colmap)
 
     print("Synthetic dataset created at", dataset_dir)
-    print("Next step: run train.py with -s", dataset_dir)
+    print("Next step: run train.py  -s", dataset_dir, "-m", dataset_dir / "output" , "-w --eval")
     _validate_dataset(dataset_dir)
 
 

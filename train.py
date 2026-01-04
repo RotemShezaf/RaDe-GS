@@ -151,6 +151,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_median_coord: torch.Tensor = render_pkg["median_coord"]
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
+            breakpoint()
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
