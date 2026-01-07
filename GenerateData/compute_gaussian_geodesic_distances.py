@@ -81,7 +81,7 @@ import numpy as np
 from scipy.spatial import KDTree
 import pickle
 from tqdm import tqdm
-
+from load_utils import find_available_iterations, load_gaussian_data
 # Ensure project root is in sys.path for module imports
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
@@ -422,6 +422,19 @@ def compute_geodesic_distances_for_sources(
     
     return distances
 
+def map_indexes_between_surfaces(source_idx, source_points, dest_surface):
+    """
+    Docstring for map_indexes_between_surfaces
+    Map indexes from source surface to destination surface using KD-tree nearest neighbor search.
+    :param source_idx: the indexes of the surface
+    :param source_points: the source points
+    :param dest_surface: destination points
+    """
+
+    # Build KD-tree for efficient nearest neighbor search
+    tree = KDTree(dest_surface)
+    closest_distances, closest_indices = tree.query(source_points[source_idx])
+    return closest_indices 
 
 def find_closest_mesh_vertices(
     gaussian_centers: np.ndarray,
@@ -496,23 +509,7 @@ def transfer_geodesic_to_gaussians(
     # Transfer distances by indexing
     gaussian_geodesic_distances = mesh_geodesic_distances[:, gaussian_to_mesh_indices]
     
-    # Map source mesh indices to Gaussian indices
-    # For each source, find which Gaussian is closest to that source's mesh vertex
-    print(f"\n  Mapping source indices to Gaussian indices...")
-    source_gaussian_indices = np.zeros(num_sources, dtype=np.int32)
-    
-    for i, source_mesh_idx in enumerate(source_mesh_indices):
-        # Find which Gaussian maps to this source mesh vertex
-        # (or is closest to it if no exact match)
-        matches = np.where(gaussian_to_mesh_indices == source_mesh_idx)[0]
-        if len(matches) > 0:
-            # If multiple Gaussians map to the same mesh vertex, take the first one
-            source_gaussian_indices[i] = matches[0]
-        else:
-            # If no exact match, find the Gaussian with the smallest distance from this source
-            # This happens when no Gaussian is exactly at the source mesh vertex
-            source_distances = mesh_geodesic_distances[i, gaussian_to_mesh_indices]
-            source_gaussian_indices[i] = np.argmin(source_distances)
+
     
     print(f"  Mapped {num_sources} sources to Gaussian indices")
     print(f"  Source Gaussian index range: [{source_gaussian_indices.min()}, {source_gaussian_indices.max()}]")
@@ -523,7 +520,7 @@ def transfer_geodesic_to_gaussians(
     print(f"    Mean: {gaussian_geodesic_distances.mean():.6f}")
     print(f"    Std: {gaussian_geodesic_distances.std():.6f}")
     
-    return gaussian_geodesic_distances, source_gaussian_indices
+    return gaussian_geodesic_distances
 
 
 def save_partial_results(
@@ -559,6 +556,7 @@ def save_partial_results(
     np.savez_compressed(
         output_path,
         gaussian_positions=gaussian_positions,
+        #indexes in mes
         source_indices=source_indices,
         source_positions=source_positions,
         geodesic_distances=geodesic_distances,
@@ -641,8 +639,8 @@ def merge_partial_results(output_folder: Path, verbose: bool = False) -> None:
     merged_geodesic_distances = np.concatenate(all_geodesic_distances, axis=0)
     merged_source_gaussian_indices = np.concatenate(all_source_gaussian_indices, axis=0)
     
-    # Sort by source index for consistency
-    sort_order = np.argsort(merged_source_indices)
+    # Sort by gaussian source index (the indexes of sources in the Gaussian splat)
+    sort_order = np.argsort(merged_source_gaussian_indices)
     merged_source_indices = merged_source_indices[sort_order]
     merged_source_positions = merged_source_positions[sort_order]
     merged_geodesic_distances = merged_geodesic_distances[sort_order]
@@ -737,7 +735,7 @@ def main() -> None:
         x_range=x_range,
         y_range=y_range,
     )
-    
+    breakpoint()
     # Determine source range for this run
     if args.source_start is not None and args.source_end is not None:
         source_start = args.source_start
@@ -759,12 +757,16 @@ def main() -> None:
         source_indices=source_indices,
         verbose=args.verbose
     )
+
+    source_gaussian_indices = map_indexes_between_surfaces(source_indices, mesh_vertices, gaussian_positions)
+    
     
     # Step 6: Find closest mesh vertices for Gaussians
     gaussian_to_mesh_indices, gaussian_to_mesh_distances = find_closest_mesh_vertices(
         gaussian_centers=gaussian_positions,
         mesh_vertices=mesh_vertices
     )
+
     
     # Step 7: Transfer geodesic distances to Gaussians
     gaussian_geodesic_distances, source_gaussian_indices = transfer_geodesic_to_gaussians(
