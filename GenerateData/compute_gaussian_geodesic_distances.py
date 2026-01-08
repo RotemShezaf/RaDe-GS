@@ -81,16 +81,16 @@ import numpy as np
 from scipy.spatial import KDTree
 import pickle
 from tqdm import tqdm
-from load_utils import find_available_iterations, load_gaussian_data
 # Ensure project root is in sys.path for module imports
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from utils.geodesic_utils import load_ply
 from distance.dist import exact_geodesic_via_vtp_vertex_distance, vertex_dist
 from plyfile import PlyData
+from utils.geodesic_utils import load_ply
 from GenerateData.GenerateRawPolynomialMesh import generate_surface_mesh
+from GenerateData.utils.load_utils import load_ground_truth_mesh, find_available_iterations, load_gaussian_data
 
 
 def parse_args() -> argparse.Namespace:
@@ -176,6 +176,11 @@ def parse_args() -> argparse.Namespace:
     
     # Optional settings
     parser.add_argument(
+        "--use_mahalanobis",
+        action="store_true",
+        help="Use Mahalanobis distance based on Gaussian covariance for distance computations"
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -204,110 +209,6 @@ def parse_args() -> argparse.Namespace:
             parser.error("--source_start must be less than --source_end")
     
     return args
-
-
-def find_available_iterations(output_folder: Path) -> list[int]:
-    """
-    Find all available iteration directories in the output folder.
-    
-    Args:
-        output_folder: Base output folder (e.g., output/polynomial/Paraboloid)
-    
-    Returns:
-        Sorted list of available iteration numbers
-    """
-    point_cloud_dir = output_folder / "point_cloud"
-    if not point_cloud_dir.exists():
-        return []
-    
-    iterations = []
-    for iter_dir in point_cloud_dir.glob("iteration_*"):
-        if iter_dir.is_dir():
-            try:
-                iter_num = int(iter_dir.name.split("_")[1])
-                # Check if point_cloud.ply exists
-                if (iter_dir / "point_cloud.ply").exists():
-                    iterations.append(iter_num)
-            except (ValueError, IndexError):
-                continue
-    
-    return sorted(iterations)
-
-
-def load_gaussian_ply(ply_path: Path) -> Tuple[np.ndarray, dict]:
-    """
-    Load Gaussian splatting PLY file and extract positions.
-    
-    Args:
-        ply_path: Path to Gaussian PLY file
-    
-    Returns:
-        Tuple of:
-        - positions: (N, 3) array of Gaussian center positions
-        - all_data: dict containing all Gaussian attributes
-    """
-    print(f"Loading Gaussian PLY from: {ply_path}")
-    plydata = PlyData.read(str(ply_path))
-    
-    # Extract positions
-    xyz = np.stack((
-        np.asarray(plydata.elements[0]["x"]),
-        np.asarray(plydata.elements[0]["y"]),
-        np.asarray(plydata.elements[0]["z"])
-    ), axis=1)
-    
-    print(f"  Loaded {len(xyz)} Gaussians")
-    
-    # Store all data for potential future use
-    all_data = {
-        'xyz': xyz,
-        'plydata': plydata
-    }
-    
-    return xyz, all_data
-
-
-def load_ground_truth_mesh(
-    data_root: Path,
-    surface: str,
-    level: int = 0
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Load the ground truth mesh at specified resolution level.
-    
-    Args:
-        data_root: Base directory containing polynomial mesh data
-        surface: Surface type (e.g., 'Paraboloid', 'Saddle', 'HyperbolicParaboloid')
-        level: Resolution level (0 = highest resolution)
-    
-    Returns:
-        Tuple of (vertices, faces) arrays
-    """
-    print(f"\n{'='*80}")
-    print(f"Loading Ground Truth Mesh")
-    print(f"{'='*80}")
-    
-    surface_dir = data_root / surface
-    mesh_candidates = sorted(surface_dir.glob(f"mesh_level{level}_*.ply"))
-    
-    if not mesh_candidates:
-        raise FileNotFoundError(
-            f"No mesh found for surface={surface} level={level} in {surface_dir}"
-        )
-    
-    mesh_path = mesh_candidates[0]
-    print(f"Path: {mesh_path}")
-    
-    vertices, faces = load_ply(str(mesh_path))
-    
-    print(f"  Vertices: {len(vertices)}")
-    print(f"  Faces: {len(faces)}")
-    print(f"  Vertex range:")
-    print(f"    X: [{vertices[:, 0].min():.4f}, {vertices[:, 0].max():.4f}]")
-    print(f"    Y: [{vertices[:, 1].min():.4f}, {vertices[:, 1].max():.4f}]")
-    print(f"    Z: [{vertices[:, 2].min():.4f}, {vertices[:, 2].max():.4f}]")
-    
-    return vertices, faces
 
 
 def generate_source_mesh_and_map(
@@ -422,46 +323,76 @@ def compute_geodesic_distances_for_sources(
     
     return distances
 
-def map_indexes_between_surfaces(source_idx, source_points, dest_surface):
+def map_indexes_between_gaussian_and_surfaces(
+    source_idx,
+    source_points,
+    dest_surface,
+    use_mahalanobis=False,
+    dest_scales=None,
+    dest_rotations=None
+):
     """
-    Docstring for map_indexes_between_surfaces
-    Map indexes from source surface to destination surface using KD-tree nearest neighbor search.
-    :param source_idx: the indexes of the surface
-    :param source_points: the source points
-    :param dest_surface: destination points
+    Map indexes from source surface to destination surface.
+    
+    Args:
+        source_idx: Indices to map from source
+        source_points: Source point positions
+        dest_surface: Destination point positions
+        use_mahalanobis: Whether to use Mahalanobis distance
+        dest_scales: (N, 3) scales for destination Gaussians (required if use_mahalanobis=True)
+        dest_rotations: (N, 4) rotations for destination Gaussians (required if use_mahalanobis=True)
+    
+    Returns:
+        Array of closest destination indices
     """
-
-    # Build KD-tree for efficient nearest neighbor search
-    tree = KDTree(dest_surface)
-    closest_distances, closest_indices = tree.query(source_points[source_idx])
-    return closest_indices 
+    from GenerateData.utils.data_generation_utils import map_points_to_surface
+    
+    return map_points_to_surface(
+        query_points=source_points[source_idx],
+        target_points=dest_surface,
+        use_mahalanobis=use_mahalanobis,
+        target_scales=dest_scales,
+        target_rotations=dest_rotations
+    ) 
 
 def find_closest_mesh_vertices(
     gaussian_centers: np.ndarray,
-    mesh_vertices: np.ndarray
+    mesh_vertices: np.ndarray,
+    use_mahalanobis: bool = False,
+    gaussian_scales: Optional[np.ndarray] = None,
+    gaussian_rotations: Optional[np.ndarray] = None
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Find the closest mesh vertex for each Gaussian center using KD-tree.
+    Find the closest mesh vertex for each Gaussian center.
     
     Args:
         gaussian_centers: (G, 3) array of Gaussian center positions
         mesh_vertices: (N, 3) array of mesh vertex positions
+        use_mahalanobis: Whether to use Mahalanobis distance
+        gaussian_scales: (G, 3) Gaussian scales (required if use_mahalanobis=True)
+        gaussian_rotations: (G, 4) Gaussian rotations (required if use_mahalanobis=True)
     
     Returns:
         Tuple of:
         - closest_indices: (G,) array of mesh vertex indices
-        - closest_distances: (G,) array of Euclidean distances to closest vertex
+        - closest_distances: (G,) array of distances to closest vertex
     """
+    from GenerateData.utils.data_generation_utils import map_points_to_surface
+    
     print(f"\n{'='*80}")
     print(f"Finding Closest Mesh Vertices")
     print(f"{'='*80}")
-    print(f"  Building KD-tree for {len(mesh_vertices)} mesh vertices...")
-    
-    # Build KD-tree for efficient nearest neighbor search
-    tree = KDTree(mesh_vertices)
-    
+    print(f"  Method: {'Mahalanobis' if use_mahalanobis else 'Euclidean'} distance")
     print(f"  Querying nearest neighbors for {len(gaussian_centers)} Gaussians...")
-    closest_distances, closest_indices = tree.query(gaussian_centers)
+    
+    closest_indices, closest_distances = map_points_to_surface(
+        query_points=gaussian_centers,
+        target_points=mesh_vertices,
+        use_mahalanobis=use_mahalanobis,
+        query_scales=gaussian_scales,
+        query_rotations=gaussian_rotations,
+        return_distances=True
+    )
     
     print(f"\n  Projection statistics:")
     print(f"    Mean distance to closest vertex: {closest_distances.mean():.6f}")
@@ -469,6 +400,7 @@ def find_closest_mesh_vertices(
     print(f"    Min distance to closest vertex: {closest_distances.min():.6f}")
     print(f"    Std distance to closest vertex: {closest_distances.std():.6f}")
     
+    breakpoint()
     # Check for potential issues
     if closest_distances.max() > 0.1:
         print(f"\n  Warning: Some Gaussians are far from the mesh (max distance = {closest_distances.max():.6f})")
@@ -480,7 +412,8 @@ def find_closest_mesh_vertices(
 def transfer_geodesic_to_gaussians(
     mesh_geodesic_distances: np.ndarray,
     gaussian_to_mesh_indices: np.ndarray,
-    source_mesh_indices: np.ndarray
+    source_mesh_indices: np.ndarray,
+    source_gaussian_indices: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Transfer geodesic distances from mesh vertices to Gaussian splats.
@@ -676,6 +609,67 @@ def merge_partial_results(output_folder: Path, verbose: bool = False) -> None:
     print(f"    Std: {merged_geodesic_distances.std():.6f}")
 
 
+def save_computation_metadata(
+    output_folder: Path,
+    args: argparse.Namespace,
+    num_gaussians: int,
+    num_sources: int,
+    surface_name: Optional[str] = None
+) -> None:
+    """
+    Save metadata about the geodesic distance computation.
+    
+    Args:
+        output_folder: Output folder path
+        args: Command line arguments
+        num_gaussians: Number of Gaussians
+        num_sources: Total number of sources
+        surface_name: Surface name
+    """
+    metadata = {
+        'computation_info': {
+            'timestamp': datetime.now().isoformat(),
+            'script': 'compute_gaussian_geodesic_distances.py',
+            'description': 'Ground truth geodesic distances on Gaussian splats'
+        },
+        'surface': {
+            'name': surface_name if surface_name else args.surface,
+            'type': args.surface if args.surface else 'Unknown',
+            'data_root': str(args.data_root),
+            'mesh_level': args.mesh_level
+        },
+        'gaussian_data': {
+            'source_folder': str(args.gaussian_output),
+            'iteration': args.iteration if args.iteration else 'auto (highest)',
+            'num_gaussians': num_gaussians
+        },
+        'source_generation': {
+            'method': 'parametric_mesh',
+            'source_mesh_resolution': args.source_mesh_resolution,
+            'total_sources': num_sources,
+            'source_selection': args.source_selection
+        },
+        'distance_computation': {
+            'method': 'Mahalanobis' if args.use_mahalanobis else 'Euclidean',
+            'description': 'Gaussian covariance-based distance' if args.use_mahalanobis else 'Standard Euclidean distance',
+            'geodesic_algorithm': 'MMP (exact geodesic via VTP)'
+        },
+        'parameters': {
+            'use_mahalanobis': args.use_mahalanobis,
+            'seed': args.seed,
+            'source_start': args.source_start,
+            'source_end': args.source_end
+        }
+    }
+    
+    # Save metadata
+    metadata_path = output_folder / "geodesic_distance" / "computation_metadata.json"
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+    
+    print(f"\n  Metadata saved to: {metadata_path}")
 
 
 def main() -> None:
@@ -710,8 +704,7 @@ def main() -> None:
         print(f"\nUsing specified iteration: {iteration}")
     
     # Load Gaussian splat
-    gaussian_path = output_folder / "point_cloud" / f"iteration_{iteration}" / "point_cloud.ply"
-    gaussian_positions, gaussian_metadata = load_gaussian_ply(gaussian_path)
+    gaussian_positions, gaussian_scales, gaussian_rotations, gaussian_opacities = load_gaussian_data(output_folder, iteration)
     
     # Step 2: Load ground truth mesh
     data_root = Path(args.data_root)
@@ -735,7 +728,7 @@ def main() -> None:
         x_range=x_range,
         y_range=y_range,
     )
-    breakpoint()
+    
     # Determine source range for this run
     if args.source_start is not None and args.source_end is not None:
         source_start = args.source_start
@@ -749,8 +742,30 @@ def main() -> None:
         source_indices = all_source_indices
         source_positions_subset = all_source_positions
         print(f"\n  Processing all {len(source_indices)} sources")
+
+
+    # Map source indices to Gaussian indices (sources on mesh -> Gaussians)
+    print(f"\n  Mapping source mesh indices to Gaussian indices...")
+    print(f"  Method: {'Mahalanobis' if args.use_mahalanobis else 'Euclidean'} distance")
+    source_gaussian_indices = map_indexes_between_gaussian_and_surfaces(
+        source_indices,
+        mesh_vertices,
+        gaussian_positions,
+        use_mahalanobis=args.use_mahalanobis,
+        dest_scales=gaussian_scales if args.use_mahalanobis else None,
+        dest_rotations=gaussian_rotations if args.use_mahalanobis else None
+    )
     
-    # Step 5: Compute geodesic distances on mesh
+    # Step 5: Find closest mesh vertices for Gaussians
+    gaussian_to_mesh_indices, gaussian_to_mesh_distances = find_closest_mesh_vertices(
+        gaussian_centers=gaussian_positions,
+        mesh_vertices=mesh_vertices,
+        use_mahalanobis=args.use_mahalanobis,
+        gaussian_scales=gaussian_scales if args.use_mahalanobis else None,
+        gaussian_rotations=gaussian_rotations if args.use_mahalanobis else None
+    )
+    
+    # Step 6: Compute geodesic distances on mesh
     mesh_geodesic_distances = compute_geodesic_distances_for_sources(
         vertices=mesh_vertices,
         faces=mesh_faces,
@@ -758,21 +773,15 @@ def main() -> None:
         verbose=args.verbose
     )
 
-    source_gaussian_indices = map_indexes_between_surfaces(source_indices, mesh_vertices, gaussian_positions)
-    
-    
-    # Step 6: Find closest mesh vertices for Gaussians
-    gaussian_to_mesh_indices, gaussian_to_mesh_distances = find_closest_mesh_vertices(
-        gaussian_centers=gaussian_positions,
-        mesh_vertices=mesh_vertices
-    )
+
 
     
     # Step 7: Transfer geodesic distances to Gaussians
-    gaussian_geodesic_distances, source_gaussian_indices = transfer_geodesic_to_gaussians(
+    gaussian_geodesic_distances= transfer_geodesic_to_gaussians(
         mesh_geodesic_distances=mesh_geodesic_distances,
         gaussian_to_mesh_indices=gaussian_to_mesh_indices,
-        source_mesh_indices=source_indices
+        source_mesh_indices=source_indices,
+        source_gaussian_indices=source_gaussian_indices
     )
     
     # Step 8: Save results
@@ -787,6 +796,14 @@ def main() -> None:
         closest_mesh_indices=gaussian_to_mesh_indices,
         closest_mesh_distances=gaussian_to_mesh_distances,
         source_gaussian_indices=source_gaussian_indices
+    )
+    
+    # Save computation metadata
+    save_computation_metadata(
+        output_folder=output_folder,
+        args=args,
+        num_gaussians=len(gaussian_positions),
+        num_sources=len(all_source_indices)
     )
     
     print(f"\n{'#'*80}")
