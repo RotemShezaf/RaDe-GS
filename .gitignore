@@ -20,3 +20,9 @@ train_test_depth.py
 data/
 TrainData/
 SyntheticData/
+deep_eikonal_revisit.zip
+deep_eikonal_revisit/
+__MACOSX/
+GenerateData/brara/
+GenerateData/commom_functions_only_relevant.py
+GenerateData/create_gt_by_mmp.py

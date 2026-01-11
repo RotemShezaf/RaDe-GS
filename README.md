@@ -68,6 +68,11 @@ cmake .
 # export CPATH=/usr/local/cuda-11.3/targets/x86_64-linux/include:$CPATH
 make 
 pip install -e .
+#setup dintance calculation 
+cd distance/external/fmm
+ python setup.py build_ext --inplace
+cd  distance/external/vtp
+python setup.py build_ext --inplace
 ```
 
 # 2. Preparation

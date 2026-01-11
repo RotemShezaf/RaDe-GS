@@ -130,8 +130,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                                                                     render_pkg["viewspace_points"], 
                                                                     render_pkg["visibility_filter"], 
                                                    render_pkg["radii"])
-        
+    
+
+
         gt_image = viewpoint_cam.original_image.cuda()
+
 
         if dataset.use_decoupled_appearance:
             Ll1_render = L1_loss_appearance(rendered_image, gt_image, gaussians, viewpoint_cam.uid)
@@ -151,10 +154,22 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_median_coord: torch.Tensor = render_pkg["median_coord"]
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
-            breakpoint()
+            
+            # Get rendered alpha mask and apply to normal loss
+            rendered_alpha = render_pkg["mask"]
+            valid_mask = (rendered_alpha > 0.0001).float()
+
+            viewpoint_cam_gt_mask = viewpoint_cam.gt_mask
+            if viewpoint_cam_gt_mask is not None:
+                valid_mask = valid_mask * viewpoint_cam_gt_mask.cuda()
+            
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
-            depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
+            
+            # Apply mask to only compute loss on valid regions
+            normal_error_masked = normal_error_map * valid_mask
+            num_valid_pixels = valid_mask.sum() + 1e-6
+            depth_normal_loss = (1-depth_ratio) * (normal_error_masked[0].sum() / num_valid_pixels) + depth_ratio * (normal_error_masked[1].sum() / num_valid_pixels)
         else:
             lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")

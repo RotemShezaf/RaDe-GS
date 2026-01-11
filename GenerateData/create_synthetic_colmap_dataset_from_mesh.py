@@ -1,16 +1,39 @@
 """Generate a synthetic COLMAP-style dataset from the polynomial meshes.
 
-The script loads the meshes produced by ``GenerateRawPolynomialMesh.py`` and
-renders them from multiple virtual cameras placed on an orbit.  For every
-surface/level pair it writes:
+This script creates a synthetic dataset that mimics the structure of a real COLMAP reconstruction.
+It loads meshes produced by ``GenerateRawPolynomialMesh.py`` and renders them from multiple 
+virtual cameras placed on an orbit.
 
-- ``images/``: JPG renders with simple shading
-- ``sparse/0/cameras.txt`` + ``cameras.bin``
-- ``sparse/0/images.txt`` + ``images.bin``
-- ``sparse/0/points3D.{txt,bin,ply}``
+DUAL-LEVEL MESH SYSTEM:
+-----------------------
+The script uses two separate mesh resolution levels for different purposes:
+
+1. IMAGE_MESH_LEVEL (--image_mesh_level): 
+   - Used for rendering the training images from virtual cameras
+   - Can be lower resolution for faster rendering without quality loss
+   - Affects rendering speed but not the final COLMAP point cloud
+   - Default: level 1 (medium resolution)
+
+2. COLMAP_LEVEL (--colmap_level):
+   - Used for generating the COLMAP sparse point cloud (points3D.*)
+   - Should be higher resolution to provide denser geometric information
+   - Affects the quality and density of the point cloud used for reconstruction
+   - Default: level 2 (high resolution)
+
+This separation allows you to optimize rendering speed independently from point cloud quality.
+For example, you can render images from a simpler mesh while providing a dense point cloud
+for accurate geometric reconstruction.
+
+OUTPUT STRUCTURE:
+-----------------
+For every surface, the script writes:
+- ``images/``: JPG renders with simple shading from virtual cameras
+- ``sparse/0/cameras.txt`` + ``cameras.bin``: Camera intrinsics in COLMAP format
+- ``sparse/0/images.txt`` + ``images.bin``: Camera extrinsics (poses) in COLMAP format
+- ``sparse/0/points3D.{txt,bin,ply}``: Sparse 3D point cloud sampled from the mesh
 
 The resulting folder can be consumed directly by ``train.py`` via the standard
-``-s <dataset_root>`` argument.
+``-s <dataset_root>`` argument, just like a real COLMAP reconstruction.
 """
 
 
@@ -75,8 +98,23 @@ class CameraIntrinsics:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render polynomial meshes into a synthetic COLMAP dataset")
     parser.add_argument("--surface", choices=SURFACES, help="Surface type to render", default=SURFACES[0])
-    parser.add_argument("--level", type=int, help="Resolution level index for polynomial surface (if used)", default=2)
-    parser.add_argument("--mesh_level", type=int, help="Mesh resolution level index to render image (PLY)", default=1)
+    
+    # Mesh resolution levels: This script uses a two-level system for flexibility
+    parser.add_argument(
+        "--colmap_level", 
+        type=int, 
+        default=2,
+        help="Resolution level for COLMAP point cloud sampling. Higher values = denser mesh used for points3D.* files. "
+             "This mesh is sampled to generate the sparse point cloud that COLMAP would typically produce."
+    )
+    parser.add_argument(
+        "--image_mesh_level", 
+        type=int, 
+        default=1,
+        help="Resolution level for rendering images. Can be lower resolution than colmap_level for faster rendering. "
+             "The mesh at this level is used to generate the synthetic training images from virtual cameras."
+    )
+    
     parser.add_argument("--data_root", type=str, default="TrainData/Polynomial/raw", help="Base directory containing generated surfaces")
     parser.add_argument("--output_root", type=str, default="TrainData/Polynomial/SyntheticColmapData", help="Destination root for the rendered dataset")
     parser.add_argument("--num_views", type=int, default=50, help="Number of rendered viewpoints along the orbit")
@@ -532,16 +570,28 @@ def _render_images(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, targets
         # Render image
         img = renderer.render_to_image()
         
+        # Convert to numpy array for alpha mask generation
+        img_np = np.asarray(img)
+        
+        # Create ground truth alpha mask: 1.0 for foreground (non-black pixels), 0.0 for background
+        # Background is black [0, 0, 0], so sum of RGB channels will be 0 for background pixels
+        background_threshold = 0.01  # Small threshold to account for numerical precision
+        is_foreground = np.any(img_np > background_threshold, axis=2)
+        alpha_mask = is_foreground.astype(np.uint8) * 255
+        
+        # Create RGBA image by adding alpha channel
+        img_rgba = np.dstack([img_np, alpha_mask])
+        
         # Debug first image
         if idx == 1:
-            img_np = np.asarray(img)
             print(f"First image stats: shape={img_np.shape}, range=[{img_np.min():.4f}, {img_np.max():.4f}], mean={img_np.mean():.4f}")
-            print(f"Unique values (rounded): {len(np.unique(img_np.round(decimals=2)))}")
+            print(f"Alpha mask coverage: {is_foreground.mean()*100:.2f}% foreground")
             if img_np.mean() > 0.9 or img_np.mean() < 0.1:
                 print("WARNING: Image appears blank/uniform - mesh may not be visible!")
         
-        image_name = f"view_{idx:03d}.jpg"
-        o3d.io.write_image(str(output_dir / "images" / image_name), img, quality=97)
+        # Save as PNG with alpha channel to preserve the mask
+        image_name = f"view_{idx:03d}.png"
+        imageio.imwrite(str(output_dir / "images" / image_name), img_rgba)
 
         camera_intrinsics.append(
             CameraIntrinsics(
@@ -749,21 +799,29 @@ def _validate_dataset(dataset_dir: Path) -> None:
 def main() -> None:
     args = parse_args()
     data_root = Path(args.data_root)
-    # Use mesh_level for loading the triangulated mesh (default: level 0)
-    mesh_level = getattr(args, "mesh_level", args.level)
-    mesh = _load_mesh(data_root, args.surface, mesh_level, args.color_scheme, args.texture_folder, args.texture_name)
+    
+    # Load mesh at image_mesh_level for rendering synthetic training images
+    # This can be a lower-resolution mesh for faster rendering without sacrificing quality
+    image_mesh = _load_mesh(data_root, args.surface, args.image_mesh_level, args.color_scheme, args.texture_folder, args.texture_name)
 
     # Load analytical normals if available, otherwise calculate from mesh
-    _load_normals_if_available(data_root, args.surface, mesh_level, mesh)
+    _load_normals_if_available(data_root, args.surface, args.image_mesh_level, image_mesh)
 
-    dataset_dir = Path(args.output_root) / f"{args.texture_name}_texture" / args.surface / f"level_{args.level:02d}"
+    # Output directory includes colmap_level to distinguish different point cloud densities
+    dataset_dir = Path(args.output_root) / f"{args.texture_name}_texture" / args.surface / f"level_{args.colmap_level:02d}"
     _ensure_dirs(dataset_dir)
 
-    centers, targets = _compute_camera_centers(mesh, args.num_views, args, args.seed)
-    samples, camera_intrinsics = _render_images(mesh, centers, targets, args, dataset_dir, args.texture_folder, args.texture_name)
+    # Compute camera positions and render images using the image_mesh_level mesh
+    centers, targets = _compute_camera_centers(image_mesh, args.num_views, args, args.seed)
+    samples, camera_intrinsics = _render_images(image_mesh, centers, targets, args, dataset_dir, args.texture_folder, args.texture_name)
 
-    # Points for COLMAP points3D.* using radius-based downsampling
-    points_xyz_colmap, points_rgb_colmap, points_normals_colmap = _sample_points(mesh, args.points3d_thresh, args.seed)
+    # Load mesh at colmap_level for generating COLMAP point cloud (points3D.*)
+    # This is typically a higher-resolution mesh to provide a denser point cloud
+    # that better represents the surface geometry for reconstruction
+    colmap_mesh = _load_mesh(data_root, args.surface, args.colmap_level, args.color_scheme, args.texture_folder, args.texture_name)
+    # Load analytical normals if available, otherwise calculate from mesh
+    _load_normals_if_available(data_root, args.surface, args.colmap_level, colmap_mesh)
+    points_xyz_colmap, points_rgb_colmap, points_normals_colmap = _sample_points(colmap_mesh, args.points3d_thresh, args.seed)
 
     sparse_dir = dataset_dir / "sparse" / "0"
     _write_cameras_txt(sparse_dir / "cameras.txt", camera_intrinsics)
@@ -781,7 +839,7 @@ def main() -> None:
         filename=str(sparse_dir / "cameras.bin"),
         logfile_out=str(logfile_path),
         input_images=str(dataset_dir / "images"),
-        formatp="jpg"
+        formatp="png"  # Changed from "jpg" to "png" to support alpha channel
     )
     print(f"Generated COLMAP log file: {logfile_path}")
 

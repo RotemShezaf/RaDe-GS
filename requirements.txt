@@ -15,4 +15,10 @@ PyOpenGL_accelerate
 pyglet==1.5.27
 pyrender
 imageio
+Cython
+#for helping download from google drive
+gdown
+gdist
+pyvista
+joblib
 #export PYOPENGL_PLATFORM=egl

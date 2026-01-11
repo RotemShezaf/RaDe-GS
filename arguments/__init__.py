@@ -86,7 +86,7 @@ class OptimizationParams(ParamGroup):
         self.rotation_lr = 0.001
         self.appearance_embeddings_lr = 0.001
         self.appearance_network_lr = 0.001
-        self.percent_dense = 0.01
+        self.percent_dense = 0.02 #0.015
         self.lambda_dssim = 0.2
         self.lambda_depth_normal = 0.05
         self.densification_interval = 100
@@ -94,7 +94,7 @@ class OptimizationParams(ParamGroup):
         self.densify_from_iter = 500
         self.densify_until_iter = 15_000
         self.regularization_from_iter = 15_000
-        self.densify_grad_threshold = 0.0002
+        self.densify_grad_threshold = 0.00002 #0.00002 
 
         super().__init__(parser, "Optimization Parameters")
 
