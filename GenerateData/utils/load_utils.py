@@ -9,11 +9,14 @@ from typing import Optional, Tuple
 import trimesh
 from typing import Tuple, Optional
 import open3d as o3d
+import torch
 
 # Add project root to path
-project_root = Path(__file__).resolve().parent.parent
+project_root = Path(__file__).resolve().parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
+
+from scene.gaussian_model import GaussianModel
 
 #/home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/output/sparse
 def find_available_iterations(output_folder: Path) -> list[int]:
@@ -65,17 +68,19 @@ def load_ply(path: str) -> Tuple[np.ndarray, np.ndarray]:
 
 def load_gaussian_data(
     output_folder: Path,
-    iteration: Optional[int] = None
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    iteration: Optional[int] = None,
+    sh_degree: int = 3
+) -> GaussianModel:
     """
-    Load Gaussian splat data from PLY file.
+    Load Gaussian splat data from PLY file using GaussianModel.
     
     Args:
         output_folder: Base output folder
         iteration: Iteration number (None = highest available)
+        sh_degree: Spherical harmonics degree (default: 3)
     
     Returns:
-        Tuple of (positions, scales, rotations, opacities)
+        GaussianModel instance with loaded data
     """
     # Find iteration
     point_cloud_dir = output_folder / "point_cloud"
@@ -87,45 +92,19 @@ def load_gaussian_data(
     ply_path = point_cloud_dir / f"iteration_{iteration}" / "point_cloud.ply"
     print(f"Loading Gaussian data from: {ply_path}")
     
-    plydata = PlyData.read(str(ply_path))
+    # Create GaussianModel and load from ply
+    gaussian_model = GaussianModel(sh_degree=sh_degree)
+    gaussian_model.load_ply(str(ply_path))
     
-    
-    ply_path = point_cloud_dir / f"iteration_{iteration}" / "point_cloud.ply"
-    print(f"Loading Gaussian data from: {ply_path}")
-    
-    plydata = PlyData.read(str(ply_path))
-    
-    # Extract positions
-    xyz = np.stack((
-        np.asarray(plydata.elements[0]["x"]),
-        np.asarray(plydata.elements[0]["y"]),
-        np.asarray(plydata.elements[0]["z"])
-    ), axis=1)
-    
-    # Extract scales (stored as log scales in PLY)
-    scales = np.stack((
-        np.asarray(plydata.elements[0]["scale_0"]),
-        np.asarray(plydata.elements[0]["scale_1"]),
-        np.asarray(plydata.elements[0]["scale_2"])
-    ), axis=1)
-    scales = np.exp(scales)  # Convert from log space
-    
-    # Extract rotations (quaternions)
-    rotations = np.stack((
-        np.asarray(plydata.elements[0]["rot_0"]),
-        np.asarray(plydata.elements[0]["rot_1"]),
-        np.asarray(plydata.elements[0]["rot_2"]),
-        np.asarray(plydata.elements[0]["rot_3"])
-    ), axis=1)
-    
-    # Extract opacities
-    opacities = np.asarray(plydata.elements[0]["opacity"])
+    # Get basic stats
+    xyz = gaussian_model.get_xyz.detach().cpu().numpy()
+    scales = gaussian_model.get_scaling.detach().cpu().numpy()
     
     print(f"  Loaded {len(xyz)} Gaussians")
     print(f"  Position range: [{xyz.min():.4f}, {xyz.max():.4f}]")
     print(f"  Scale range: [{scales.min():.4f}, {scales.max():.4f}]")
     
-    return xyz, scales, rotations, opacities
+    return gaussian_model
 
 
 def load_ground_truth_mesh(
@@ -169,4 +148,57 @@ def load_ground_truth_mesh(
     print(f"    Z: [{vertices[:, 2].min():.4f}, {vertices[:, 2].max():.4f}]")
     
     return vertices, faces
+
+
+def extract_surface_and_texture_from_path(path: Path) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extract surface name and texture information from dataset path.
+    
+    Expected path patterns:
+    - .../blue_texture/Saddle/level_02/output/...
+    - .../Polynomial/SyntheticColmapData/red_texture/Paraboloid/...
+    - .../output/polynomial/Paraboloid
+    
+    Args:
+        path: Path to parse
+    
+    Returns:
+        Tuple of (surface_name, texture) or (None, None) if not found
+    """
+    parts = path.parts
+    surface_name = None
+    texture = None
+    
+    # Common surface names to look for
+    surface_names = ['Paraboloid', 'Saddle', 'HyperbolicParaboloid', 'Sphere', 'Torus']
+    
+    # Look for surface name in path parts
+    for i, part in enumerate(parts):
+        # Check if this part is a known surface name
+        if part in surface_names:
+            surface_name = part
+            
+            # Look backwards for texture (usually 1-2 parts before surface)
+            for j in range(max(0, i-3), i):
+                if 'texture' in parts[j].lower():
+                    texture = parts[j]
+                    break
+            break
+    
+    # If not found by exact match, try to infer from path structure
+    if surface_name is None:
+        # Look for patterns like "polynomial/Paraboloid" or "output/Saddle"
+        for i, part in enumerate(parts):
+            if part.lower() in ['polynomial', 'synthetic', 'syntheticcolmapdata']:
+                # Next capitalized word might be the surface
+                for j in range(i+1, min(len(parts), i+4)):
+                    if parts[j] and parts[j][0].isupper():
+                        surface_name = parts[j]
+                        break
+    
+    # Use last part as fallback for surface name
+    if surface_name is None and len(parts) > 0:
+        surface_name = parts[-1]
+    
+    return surface_name, texture
 

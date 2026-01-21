@@ -42,10 +42,16 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 3. for adding the cuda toolkit headers:
 ```
 conda install nvidia/label/cuda-12.1.1::cuda-toolkit -c nvidia/label/cuda-12.1.1
-```
-or
-```
-conda install -c nvidia/label/cuda-12.1.105 cuda-toolkit
+conda install -c conda-forge cudatoolkit-dev
+#export TORCH_CUDA_ARCH_LIST="8.6, 7.7"
+#conda install -c "nvidia/label/cuda-12.1.1" cuda-toolkit
+conda install nvidia::cuda-nvcc==12.1.105
+conda install conda-forge::ninja
+# Install CUDA 12.1 toolkit (includes dev headers - do NOT install cudatoolkit-dev)
+#pip install --no-build-isolation git+https://github.com/unlimblue/KNN_CUDA.git
+conda install -c conda-forge gcc=12 gxx=12
+
+
 ```
 ```
 pip install -r requirements.txt
@@ -56,7 +62,15 @@ pip install -r requirements.txt
 3. install submodules
 ```
 pip install --no-build-isolation submodules/diff-gaussian-rasterization
-pip install --no-build-isolation submodules/simple-knn/
+#to do: solve knn isue
+#pip install --no-build-isolation submodules/simple-knn/
+#pip install --upgrade https://github.com/unlimblue/KNN_CUDA/releases/download/0.#2/KNN_CUDA-0.#2-py3-none-any.whl
+
+git clone https://github.com/unlimblue/KNN_CUDA.git
+cd KNN_CUDA
+make && make install
+
+
 
 # tetra-nerf for Marching Tetrahedra
 cd submodules/tetra_triangulation

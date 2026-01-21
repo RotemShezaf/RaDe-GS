@@ -6,7 +6,7 @@ This script creates training patches by:
 1. Loading Gaussian splat data (positions, scales, rotations)
 2. Computing neighborhood rings using Mahalanobis or Euclidean distance
 3. Loading ground truth geodesic distances from precomputed data
-4. Generating training examples with neighbor features and target distances
+4. Generating patches training examples with neighbor features and target distances
 
 The training examples can be used to train a neural network to predict geodesic distances
 from local neighborhood information on Gaussian splats.
@@ -16,14 +16,16 @@ import os
 import sys
 import argparse
 import json
+import yaml
 import numpy as np
 from pathlib import Path
 from numpy import linalg as LA
 from typing import Dict, Tuple, Optional
 from tqdm import tqdm
 from datetime import datetime
-from utils.load_utils import find_available_iterations, load_gaussian_data
-
+from utils.load_utils import load_gaussian_data, extract_surface_and_texture_from_path
+from utils.data_generation_utils import build_rotation
+from utils.data_transformation_utils import get_masked_entry
 # Add project root to path
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
@@ -38,6 +40,95 @@ from plyfile import PlyData
 from scene.gaussian_model import GaussianModel
 
 
+def load_config(config_path: Path) -> Dict:
+    """
+    Load configuration from YAML file.
+    
+    Args:
+        config_path: Path to YAML configuration file
+    
+    Returns:
+        Dictionary with configuration parameters
+    """
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+def merge_config_with_args(config: Dict, args: argparse.Namespace) -> argparse.Namespace:
+    """
+    Merge configuration file with command-line arguments.
+    Command-line arguments take precedence over config file.
+    
+    Args:
+        config: Configuration dictionary from YAML file
+        args: Parsed command-line arguments
+    
+    Returns:
+        Updated arguments namespace
+    """
+    # Map config keys to argument names
+    config_mapping = {
+        'gaussian_output': 'gaussian_output',
+        'geodesic_data': 'geodesic_data',
+        'output_dir': 'output_dir',
+        'iteration': 'iteration',
+        'num_iterations': 'num_iterations',
+        'num_sources': 'num_sources',
+        'num_train_points': 'num_train_points',
+        'seed': 'seed',
+        'use_mahalanobis': 'use_mahalanobis',
+        'use_r1_min_val': 'use_r1_min_val',
+        'n_neighbors': 'n_neighbors',
+        'rings': 'rings',
+        'attributes': 'attributes',
+        'constant_val': 'constant_val',
+        'mask_attributes': 'mask_attributes',
+        'mask_constant': 'mask_constant',
+        'normalize_per_patch': 'normalize_per_patch'
+    }
+    
+    # Get default values from parser to detect which args were explicitly set
+    parser = argparse.ArgumentParser()
+    defaults = {}
+    for action in parser._actions:
+        if action.dest != 'help':
+            defaults[action.dest] = action.default
+    
+    # Apply config values only if not explicitly set via command line
+    for config_key, arg_name in config_mapping.items():
+        if config_key in config and config[config_key] is not None:
+            current_value = getattr(args, arg_name, None)
+            
+            # For paths and iteration, only use config if command-line arg is None or not set
+            if arg_name in ['gaussian_output', 'geodesic_data', 'output_dir', 'iteration']:
+                if current_value is None:
+                    setattr(args, arg_name, config[config_key])
+            # Check if argument has default value (wasn't set on command line)
+            elif arg_name == 'rings' and current_value == [2, 3]:
+                setattr(args, arg_name, config[config_key])
+            elif arg_name == 'attributes' and current_value == ['xyz']:
+                setattr(args, arg_name, config[config_key])
+            elif arg_name == 'mask_attributes' and current_value == []:
+                setattr(args, arg_name, config[config_key])
+            elif arg_name in ['num_iterations', 'num_sources', 'num_train_points', 'seed', 'n_neighbors', 'constant_val', 'mask_constant']:
+                # For numeric values, we can't easily detect if they were set explicitly
+                # So we use a convention: if config exists and arg seems like default, use config
+                setattr(args, arg_name, config[config_key])
+            elif arg_name in ['use_mahalanobis', 'use_r1_min_val'] and not current_value:
+                setattr(args, arg_name, config[config_key])
+    
+    # Store ring_size_mapping if present
+    if 'ring_size_mapping' in config:
+        args.ring_size_mapping = config['ring_size_mapping']
+    
+    # Store dataset info if present
+    if 'dataset' in config:
+        args.dataset_info = config['dataset']
+    
+    return args
+
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -45,10 +136,17 @@ def parse_args():
     )
     
     parser.add_argument(
+        "--config",
+        type=str,
+        default="GenerateData/configs/saddle.yaml",
+        help="Path to YAML dataset configuration file (command-line args override config)"
+    )
+    parser.add_argument(
         "--gaussian_output",
         type=str,
-        required=True,
-        help="Path to Gaussian splatting output folder"
+        required=False,
+        default=None,
+        help="Path to Gaussian splatting output folder (can be set in config file)"
     )
     parser.add_argument(
         "--iteration",
@@ -65,8 +163,9 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        required=True,
-        help="Directory to save training examples"
+        required=False,
+        default=None,
+        help="Directory to save training examples (can be set in config file)"
     )
     parser.add_argument(
         "--num_iterations",
@@ -92,6 +191,11 @@ def parse_args():
         help="Use Mahalanobis distance for neighborhood computation"
     )
     parser.add_argument(
+        "--use_r1_min_val",
+        action="store_true",
+        help="Include ring-1 minimum distance value in training examples (for dropout augmentation)"
+    )
+    parser.add_argument(
         "--n_neighbors",
         type=int,
         default=22,
@@ -105,23 +209,48 @@ def parse_args():
         help="Ring levels to generate examples for (e.g., 2 3)"
     )
     parser.add_argument(
+        "--attributes",
+        type=str,
+        nargs="+",
+        default=["xyz"],
+        choices=["xyz", "scale", "opacity", "rotation", "sh", "normals", "euclidean_distances"],
+        help="Attributes to include for each neighbor (in order). Options: xyz, opacity, rotation, sh, normals, euclidean_distances"
+    )
+    parser.add_argument(
         "--add_normals",
         action="store_true",
-        help="Include normal information in features"
+        help="[DEPRECATED] Use --attributes normals instead. Include normal information in features"
     )
     parser.add_argument(
         "--add_euclidean_distance",
         action="store_true",
-        help="Include Euclidean distance to neighbors in features"
+        help="[DEPRECATED] Use --attributes euclidean_distances instead. Include Euclidean distance to neighbors in features"
     )
     parser.add_argument(
-        "--constant_val",
+        "--nn_mean",
         type=float,
-        default=-10.0,
+        default=1.0,
         help="Constant value for padding"
     )
     parser.add_argument(
-        "--seed",
+        "--normalize_per_patch",
+        action="store_true",
+        help="Normalize each patch by its own nearest neighbor distance instead of global mean"
+    )
+    parser.add_argument(        "--mask_attributes",
+        type=str,
+        nargs="+",
+        default=[],
+        choices=["xyz", "opacity", "rotation", "scale", "sh", "normals", "euclidean_distances", "geodesic_distance"],
+        help="Attributes to mask for invalid neighbors (where neighbor distance > point distance)"
+    )
+    parser.add_argument(
+        "--mask_constant",
+        type=float,
+        default=-10.0,
+        help="Constant value to use for masking invalid neighbors"
+    )
+    parser.add_argument(        "--seed",
         type=int,
         default=42,
         help="Random seed for reproducibility"
@@ -130,59 +259,6 @@ def parse_args():
     return parser.parse_args()
 
 
-
-
-def extract_surface_and_texture_from_path(path: Path) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Extract surface name and texture information from dataset path.
-    
-    Expected path patterns:
-    - .../blue_texture/Saddle/level_02/output/...
-    - .../Polynomial/SyntheticColmapData/red_texture/Paraboloid/...
-    - .../output/polynomial/Paraboloid
-    
-    Args:
-        path: Path to parse
-    
-    Returns:
-        Tuple of (surface_name, texture) or (None, None) if not found
-    """
-    parts = path.parts
-    surface_name = None
-    texture = None
-    
-    # Common surface names to look for
-    surface_names = ['Paraboloid', 'Saddle', 'HyperbolicParaboloid', 'Sphere', 'Torus']
-    
-    # Look for surface name in path parts
-    for i, part in enumerate(parts):
-        # Check if this part is a known surface name
-        if part in surface_names:
-            surface_name = part
-            
-            # Look backwards for texture (usually 1-2 parts before surface)
-            for j in range(max(0, i-3), i):
-                if 'texture' in parts[j].lower():
-                    texture = parts[j]
-                    break
-            break
-    
-    # If not found by exact match, try to infer from path structure
-    if surface_name is None:
-        # Look for patterns like "polynomial/Paraboloid" or "output/Saddle"
-        for i, part in enumerate(parts):
-            if part.lower() in ['polynomial', 'synthetic', 'syntheticcolmapdata']:
-                # Next capitalized word might be the surface
-                for j in range(i+1, min(len(parts), i+4)):
-                    if parts[j] and parts[j][0].isupper():
-                        surface_name = parts[j]
-                        break
-    
-    # Use last part as fallback for surface name
-    if surface_name is None and len(parts) > 0:
-        surface_name = parts[-1]
-    
-    return surface_name, texture
 
 
 def compute_gaussian_normals(
@@ -200,26 +276,11 @@ def compute_gaussian_normals(
     Returns:
         (N, 3) array of normal vectors
     """
-    num_gaussians = len(scales)
-    normals = np.zeros((num_gaussians, 3))
+    R = build_rotation(rotations)
     
-    for i in range(num_gaussians):
-        # Convert quaternion to rotation matrix
-        q = rotations[i]
-        q = q / np.linalg.norm(q)
-        
-        # Assume [x, y, z, w] format (common in Gaussian splatting)
-        x, y, z, w = q
-        
-        R = np.array([
-            [1 - 2*(y*y + z*z),     2*(x*y - w*z),     2*(x*z + w*y)],
-            [    2*(x*y + w*z), 1 - 2*(x*x + z*z),     2*(y*z - w*x)],
-            [    2*(x*z - w*y),     2*(y*z + w*x), 1 - 2*(x*x + y*y)]
-        ])
-        
-        # Get the axis corresponding to the smallest scale (most compressed direction)
-        min_scale_idx = np.argmin(scales[i])
-        normals[i] = R[:, min_scale_idx]
+    # Get the axis corresponding to the smallest scale (most compressed direction)
+    min_scale_idx = np.argmin(scales, axis=1)
+    normals = R[:, min_scale_idx]
     
     return normals
 
@@ -306,9 +367,11 @@ def save_metadata(
         'features': {
             'include_normals': args.add_normals,
             'include_euclidean_distance': args.add_euclidean_distance,
+            'use_r1_min_val': args.use_r1_min_val,
             'normalization_factor': scale_stats['mean'],
-            'constant_val': args.constant_val,
-            'description': 'Normals computed from Gaussian principal axes' if args.add_normals else 'Position-based features only'
+            'nn_mean': args.nn_mean,            'mask_attributes': args.mask_attributes,
+            'mask_constant': args.mask_constant,            'description': 'Normals computed from Gaussian principal axes' if args.add_normals else 'Position-based features only',
+            'normalize_per_patch': args.normalize_per_patch,  'description': 'Each patch normalized by its own nearest neighbor distance' if args.normalize_per_patch else 'Global normalization factor used'
         },
         'output_files': examples_info,
         'texture': {
@@ -367,7 +430,7 @@ def save_metadata(
         f.write(f"  Include normals: {metadata['features']['include_normals']}\n")
         f.write(f"  Include Euclidean distances: {metadata['features']['include_euclidean_distance']}\n")
         f.write(f"  Normalization factor: {metadata['features']['normalization_factor']:.6f}\n")
-        f.write(f"  Constant value (padding): {metadata['features']['constant_val']}\n\n")
+        f.write(f"  Mean wanted nearest neighbor distance: {metadata['features']['nn_mean']:.6f}\n\n")
         
         f.write("OUTPUT FILES:\n")
         f.write("-" * 40 + "\n")
@@ -386,7 +449,7 @@ def save_metadata(
     print(f"README saved to: {readme_path}")
 
 
-def get_ring_size_mapping(ring: int, use_mahalanobis: bool) -> int:
+def get_ring_size_mapping(ring: int, use_mahalanobis: bool, custom_mapping: Optional[Dict] = None) -> int:
     """
     Get expected maximum number of neighbors for a given ring.
     These are empirical estimates based on typical Gaussian splat densities.
@@ -394,10 +457,17 @@ def get_ring_size_mapping(ring: int, use_mahalanobis: bool) -> int:
     Args:
         ring: Ring number (1-4)
         use_mahalanobis: Whether Mahalanobis distance is used
+        custom_mapping: Optional custom ring size mapping from config file
     
     Returns:
         Maximum number of neighbors
     """
+    if custom_mapping:
+        method = 'mahalanobis' if use_mahalanobis else 'euclidean'
+        if method in custom_mapping and ring in custom_mapping[method]:
+            return custom_mapping[method][ring]
+    
+    # Default mappings
     if use_mahalanobis:
         # Mahalanobis tends to have more variable neighborhood sizes
         mapping = {1: 25, 2: 90, 3: 250, 4: 600}
@@ -417,9 +487,19 @@ def create_train_example(
     ring1_nbrs: Dict[int, np.ndarray],
     ring: int,
     normalization_factor: float,
-    constant_val: float,
-    add_normals: bool,
-    add_euclidean_distance: bool
+    nn_mean: float,
+    attributes: list,
+    scales: Optional[np.ndarray] = None,
+    rotations: Optional[np.ndarray] = None,
+    opacities: Optional[np.ndarray] = None,
+    sh_features: Optional[np.ndarray] = None,
+    use_mahalanobis: bool = False,
+    use_r1_min_val: bool = True,
+    mask_attributes: list = [],
+    mask_constant: float = -10.0,
+    ring_size_mapping: Optional[Dict] = None,
+    normalize_per_patch: bool = False,
+    per_point_nn_distances: Optional[np.ndarray] = None
 ) -> Optional[np.ndarray]:
     """
     Create a single training example for a point.
@@ -433,14 +513,17 @@ def create_train_example(
         ring1_nbrs: Dictionary of ring-1 neighbors
         ring: Ring level
         normalization_factor: Factor for normalizing coordinates
-        constant_val: Value for padding
-        add_normals: Whether to include normals
-        add_euclidean_distance: Whether to include Euclidean distances
+        nn_mean: wanted mean distance for nearest neighbor
+        attributes: List of attributes to include ['xyz', 'opacity', 'rotation', 'sh', 'normals', 'euclidean_distances']
+        scales: (N, 3) Gaussian scales (optional)
+        rotations: (N, 4) Gaussian rotations (optional)
+        opacities: (N, 1) Gaussian opacities (optional)
+        sh_features: (N, K) Spherical harmonics features (optional)
     
     Returns:
         Training example array or None if invalid
     """
-    max_num_nbrs = get_ring_size_mapping(ring, False)  # Conservative estimate
+    max_num_nbrs = get_ring_size_mapping(ring, use_mahalanobis, ring_size_mapping)
     
     # Get neighbors
     nbrs = ring_nbrs[point_idx]
@@ -460,98 +543,141 @@ def create_train_example(
     r1_nbrs_euclidean_distances = LA.norm(r1_nbrs_xyz, axis=1)
     r1_nbrs_u = geodesic_distances[r1_nbrs]
     
-    # Build feature arrays
-    if add_normals and normals is not None:
-        nbrs_normals = normals[nbrs]
-        r1_nbrs_normals = normals[r1_nbrs]
-        
-        if add_euclidean_distance:
-            input_data = np.concatenate((
-                nbrs_normals,
-                nbrs_xyz,
-                np.expand_dims(nbrs_euclidean_distances, axis=1),
-                np.expand_dims(nbrs_u, axis=1)
-            ), axis=1)
-            r1_input_data = np.concatenate((
-                r1_nbrs_normals,
-                r1_nbrs_xyz,
-                np.expand_dims(r1_nbrs_euclidean_distances, axis=1),
-                np.expand_dims(r1_nbrs_u, axis=1)
-            ), axis=1)
-        else:
-            input_data = np.concatenate((
-                nbrs_normals,
-                nbrs_xyz,
-                np.expand_dims(nbrs_u, axis=1)
-            ), axis=1)
-            r1_input_data = np.concatenate((
-                r1_nbrs_normals,
-                r1_nbrs_xyz,
-                np.expand_dims(r1_nbrs_u, axis=1)
-            ), axis=1)
-    else:
-        if add_euclidean_distance:
-            input_data = np.concatenate((
-                nbrs_xyz,
-                np.expand_dims(nbrs_euclidean_distances, axis=1),
-                np.expand_dims(nbrs_u, axis=1)
-            ), axis=1)
-            r1_input_data = np.concatenate((
-                r1_nbrs_xyz,
-                np.expand_dims(r1_nbrs_euclidean_distances, axis=1),
-                np.expand_dims(r1_nbrs_u, axis=1)
-            ), axis=1)
-        else:
-            input_data = np.concatenate((
-                nbrs_xyz,
-                np.expand_dims(nbrs_u, axis=1)
-            ), axis=1)
-            r1_input_data = np.concatenate((
-                r1_nbrs_xyz,
-                np.expand_dims(r1_nbrs_u, axis=1)
-            ), axis=1)
+    # Build feature arrays based on attributes
+    nbrs_features = []
+    r1_nbrs_features = []
+    p_fetures = []
+    if "xyz" in attributes:
+        # Add relative positions
+        nbrs_features.append(nbrs_xyz)
+        r1_nbrs_features.append(r1_nbrs_xyz)
+        p_fetures.append(np.zeros((3,)))  # Point relative position is zero
+    if "opacity" in attributes:
+        if opacities is None:
+            raise ValueError("opacities data required for 'opacity' attribute")
+        nbrs_features.append(opacities[nbrs])
+        r1_nbrs_features.append(opacities[r1_nbrs])
+        p_fetures.append(opacities[point_idx])
+    if "scale" in attributes:
+        if scales is None:
+            raise ValueError("scales data required for 'scale' attribute")
+        nbrs_features.append(scales[nbrs])
+        r1_nbrs_features.append(scales[r1_nbrs])
+        p_fetures.append(scales[point_idx])  
+    if "rotation" in attributes:
+        if rotations is None:
+            raise ValueError("rotations data required for 'rotation' attribute")
+        nbrs_features.append(rotations[nbrs])
+        r1_nbrs_features.append(rotations[r1_nbrs])
+        p_fetures.append(rotations[point_idx])
+    if "sh" in attributes:
+        if sh_features is None:
+            raise ValueError("sh_features data required for 'sh' attribute")
+        nbrs_features.append(sh_features[nbrs])
+        r1_nbrs_features.append(sh_features[r1_nbrs])
+        p_fetures.append(sh_features[point_idx])
+    if "normals" in attributes:
+        if normals is None:
+            raise ValueError("normals data required for 'normals' attribute")
+        nbrs_features.append(normals[nbrs])
+        r1_nbrs_features.append(normals[r1_nbrs])
+        p_fetures.append(normals[point_idx])
+    if "euclidean_distances" in attributes:
+        nbrs_features.append(np.expand_dims(nbrs_euclidean_distances, axis=1))
+        r1_nbrs_features.append(np.expand_dims(r1_nbrs_euclidean_distances, axis=1))
+        p_fetures.append(np.array([0.0]))  # Point to itself distance is zero
+    
+    # Add geodesic distances at the end (always included)
+    nbrs_features.append(np.expand_dims(nbrs_u, axis=1))
+    r1_nbrs_features.append(np.expand_dims(r1_nbrs_u, axis=1))
+    
+    # Concatenate all features
+    neighborhood = np.concatenate(nbrs_features, axis=1)
+    r1_neighborhood = np.concatenate(r1_nbrs_features, axis=1)
+    p_fetures = np.concatenate(p_fetures, axis=0) if p_fetures else np.array([])
+    
     
     # Filter: only keep neighbors with distance <= current point
-    input_data = input_data[input_data[:, -1] <= p_u]
-    r1_input_data = r1_input_data[r1_input_data[:, -1] > p_u]
+    neighborhood = neighborhood[neighborhood[:, -1] <= p_u]
+    #r1_neighborhood= r1_neighborhood[r1_neighborhood[:, -1] > p_u]
     
-    # Track which neighbors are closer (for masking)
-    min1_vals = input_data[:, -1] > p_u
     
-    if input_data.shape[0] > max_num_nbrs:
-        print(f"Warning: ring size > max ({input_data.shape[0]} > {max_num_nbrs})")
+    if neighborhood.shape[0] > max_num_nbrs:
+        print(f"Warning: ring size > max ({neighborhood.shape[0]} > {max_num_nbrs})")
         return None
     
     # Get ring-1 minimum for dropout augmentation
     r1_min_val = r1_nbrs_u.min() if len(r1_nbrs_u) > 0 else p_u
     
-    # Normalize: shift to zero minimum
-    min_input = input_data[:, -1].min() if len(input_data) > 0 else p_u
-    input_data[:, -1] = input_data[:, -1] - min_input
+    # Normalize: shift to zero minimum the geodesin distances
+    min_input = neighborhood[:, -1].min() if len(neighborhood) > 0 else p_u
+    neighborhood[:, -1] = neighborhood[:, -1] - min_input
     p_u = p_u - min_input
     r1_min_val = r1_min_val - min_input
     
-    # Normalize coordinates and distances
-    nn_mean = -1 * constant_val
-    if add_normals and normals is not None:
-        input_data[:, 3:] = (input_data[:, 3:] / normalization_factor) * nn_mean
+    # Determine normalization factor: per-patch or global
+    if normalize_per_patch and per_point_nn_distances is not None:
+        current_normalization = per_point_nn_distances[nbrs].mean() if len(nbrs) > 0 else normalization_factor
     else:
-        input_data = (input_data / normalization_factor) * nn_mean
+        current_normalization = normalization_factor
     
-    p_u = (p_u / normalization_factor) * nn_mean
-    r1_min_val = (r1_min_val / normalization_factor) * nn_mean
+    # Normalize coordinates and distances (skip normals, opacity, rotation, sh at the beginning)
+    #nn is the wanted mean distaice for nearens neighbors
     
-    # Apply masking
-    input_data[min1_vals, -1] = constant_val
+    #
     
-    # Pad to fixed size
-    const_rows = np.ones((max_num_nbrs - input_data.shape[0], input_data.shape[1])) * (2 * constant_val)
-    input_data = np.vstack([input_data, const_rows])
+    #normalize required coordinates
+    attr_index = 0
+    for i, attr in enumerate(attributes):
+        if attr in ["xyz"]:
+            neighborhood[:, attr_index:attr_index+3] = (neighborhood[:, attr_index:attr_index+3] / current_normalization) * nn_mean
+            r1_neighborhood[:, attr_index:attr_index+3] = (r1_neighborhood[:, attr_index:attr_index+3] / current_normalization) * nn_mean
+            attr_index += 3
+        elif attr == "scale":
+            #alse normelize scales
+            neighborhood[:, attr_index:attr_index+3] = (neighborhood[:, attr_index:attr_index+3] / current_normalization) * nn_mean
+            r1_neighborhood[:, attr_index:attr_index+3] = (r1_neighborhood[:, attr_index:attr_index+3] / current_normalization) * nn_mean
+            p_fetures[attr_index:attr_index+3] = (p_fetures[attr_index:attr_index+3] / current_normalization) * nn_mean
+            attr_index += 3
+        elif attr == "normals":
+            attr_index += 3
+        elif attr == "opacity":
+            attr_index += 1
+        elif attr == "rotation":
+            attr_index += 4
+        elif attr == "sh":
+            attr_index += sh_features.shape[1] if sh_features is not None else 0
+        elif attr == "euclidean_distances":
+            neighborhood[:, attr_index:attr_index+1] = (neighborhood[:, attr_index:attr_index+1] / current_normalization) * nn_mean
+            r1_neighborhood[:, attr_index:attr_index+1] = (r1_neighborhood[:, attr_index:attr_index+1] / current_normalization) * nn_mean
+            attr_index += 1
     
-    # Construct final example
-    example = np.append(input_data.flatten(), p_u)
-    example = np.append(example, r1_min_val)
+
+        # Normalize geodesic distances
+        neighborhood[:, -1] = (neighborhood[:, -1] / current_normalization) * nn_mean
     
+
+    p_u = (p_u / current_normalization) * nn_mean
+    r1_min_val = (r1_min_val / current_normalization) * nn_mean
+    
+    # Create masked entry for padding (same shape as a single neighbor)
+    masked_entry = get_masked_entry(attributes, mask_constant).detach().cpu().numpy()
+  
+    # Pad to fixed size using masked entries
+    pad_num = max_num_nbrs - neighborhood.shape[0]
+    if pad_num > 0:
+        padding = np.tile(masked_entry, (pad_num, 1))
+        neighborhood = np.vstack([neighborhood, padding])
+    
+    assert neighborhood.shape[0] == max_num_nbrs, f"Expected {max_num_nbrs} neighbors, got {neighborhood.shape[0]}"
+    # Construct final example: [neighborhood_features..., target, r1_min_val?]
+    if use_r1_min_val:
+        example = np.append(neighborhood.flatten(), p_fetures.flatten())
+        example = np.append(example, r1_min_val)
+        example = np.append(example, p_u) 
+    else:
+        example = np.append(neighborhood.flatten(), p_fetures.flatten())
+        example = np.append(example, p_u)
     return example
 
 
@@ -566,9 +692,19 @@ def generate_training_examples(
     num_sources: int,
     num_train_points: int,
     normalization_factor: float,
-    constant_val: float,
-    add_normals: bool,
-    add_euclidean_distance: bool,
+    nn_mean: float,
+    attributes: list,
+    scales: Optional[np.ndarray] = None,
+    rotations: Optional[np.ndarray] = None,
+    opacities: Optional[np.ndarray] = None,
+    sh_features: Optional[np.ndarray] = None,
+    use_mahalanobis: bool = False,
+    use_r1_min_val: bool = True,
+    mask_attributes: list = [],
+    mask_constant: float = -10.0,
+    ring_size_mapping: Optional[Dict] = None,
+    normalize_per_patch: bool = False,
+    per_point_nn_distances: Optional[np.ndarray] = None,
     seed: int = 42
 ) -> np.ndarray:
     """
@@ -589,6 +725,7 @@ def generate_training_examples(
     print(f"  Iterations: {num_iterations}")
     print(f"  Sources per iteration: {num_sources}")
     print(f"  Train points per iteration: {num_train_points}")
+    print(f"  Attributes: {', '.join(attributes)}")
     
     for i in tqdm(range(num_iterations), desc="Generating examples"):
         # Randomly select sources from available precomputed sources
@@ -630,9 +767,19 @@ def generate_training_examples(
                 ring1_nbrs,
                 ring,
                 normalization_factor,
-                constant_val,
-                add_normals,
-                add_euclidean_distance
+                nn_mean,
+                attributes,
+                scales,
+                rotations,
+                opacities,
+                sh_features,
+                use_mahalanobis,
+                use_r1_min_val,
+                mask_attributes,
+                mask_constant,
+                ring_size_mapping,
+                normalize_per_patch,
+                per_point_nn_distances
             )
             
             if example is not None:
@@ -647,8 +794,32 @@ def generate_training_examples(
 def main():
     args = parse_args()
     
+    # Load config if provided
+    if args.config:
+        config_path = Path(args.config)
+        if not config_path.exists():
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+        print(f"Loading configuration from: {config_path}")
+        config = load_config(config_path)
+        args = merge_config_with_args(config, args)
+        print(f"Configuration loaded successfully")
+    
+    # Validate required arguments
+    if args.gaussian_output is None:
+        raise ValueError("--gaussian_output must be specified either via command line or config file")
+    if args.output_dir is None:
+        raise ValueError("--output_dir must be specified either via command line or config file")
+    
     # Set random seed
     np.random.seed(args.seed)
+    
+    # Handle deprecated arguments
+    if args.add_normals and "normals" not in args.attributes:
+        print("Warning: --add_normals is deprecated. Use --attributes normals instead.")
+        args.attributes.append("normals")
+    if args.add_euclidean_distance and "euclidean_distances" not in args.attributes:
+        print("Warning: --add_euclidean_distance is deprecated. Use --attributes euclidean_distances instead.")
+        args.attributes.append("euclidean_distances")
     
     # Create output directory
     output_dir = Path(args.output_dir)
@@ -657,13 +828,24 @@ def main():
     print("="*80)
     print("Gaussian Training Example Generation")
     print("="*80)
+    if hasattr(args, 'dataset_info') and args.dataset_info:
+        print(f"\nDataset: {args.dataset_info.get('name', 'Unknown')}")
+        if 'description' in args.dataset_info:
+            print(f"Description: {args.dataset_info['description']}")
+    print(f"\nAttributes to include: {', '.join(args.attributes)}")
     
     # Load Gaussian data
     output_folder = Path(args.gaussian_output)
-    positions, scales, rotations, opacities = load_gaussian_data(
+    gaussian_model = load_gaussian_data(
         output_folder,
         args.iteration
     )
+    
+    # Extract attributes from GaussianModel
+    positions = gaussian_model.get_xyz.detach().cpu().numpy()
+    scales = gaussian_model.get_scaling.detach().cpu().numpy()
+    rotations = gaussian_model.get_rotation.detach().cpu().numpy()
+    opacities = gaussian_model.get_opacity.detach().cpu().numpy()
     
     # Extract surface name and texture from path
     surface_name, texture = extract_surface_and_texture_from_path(output_folder)
@@ -673,9 +855,19 @@ def main():
     
     # Compute normals if needed
     normals = None
-    if args.add_normals:
+    if "normals" in args.attributes:
         print("\nComputing Gaussian normals...")
         normals = compute_gaussian_normals(scales, rotations)
+    
+    # Load SH features if needed
+    sh_features = None
+    if "sh" in args.attributes:
+        print("\nLoading spherical harmonics features...")
+        # Get all SH features (DC + rest)
+        sh_features = gaussian_model.get_features.detach().cpu().numpy()
+        # Flatten to (N, K) where K = 3 * (degree+1)^2
+        sh_features = sh_features.reshape(sh_features.shape[0], -1)
+        print(f"  SH features shape: {sh_features.shape}")
     
     # Determine geodesic data path
     if args.geodesic_data is None:
@@ -702,8 +894,7 @@ def main():
     mean_scale = scales.mean()
     min_scale = scales.min()
     max_scale = scales.max()
-    normalization_factor = mean_scale
-    print(f"\nNormalization factor (mean scale): {normalization_factor:.6f}")
+    
     
     # Collect scale statistics for metadata
     scale_stats = {
@@ -718,13 +909,16 @@ def main():
     print(f"  Using {'Mahalanobis' if args.use_mahalanobis else 'Euclidean'} distance")
     print(f"  Ring-1 neighbors: {args.n_neighbors}")
     
-    ring1_nbrs, ring2_nbrs, ring3_nbrs, ring4_nbrs = get_all_points_nbrs_all_rings(
+    ring1_nbrs, ring2_nbrs, ring3_nbrs, ring4_nbrs,\
+    mean_dist, per_point_dist = get_all_points_nbrs_all_rings(
         positions,
         use_mahalanobis=args.use_mahalanobis,
         gaussian_scales=scales if args.use_mahalanobis else None,
         gaussian_rotations=rotations if args.use_mahalanobis else None,
         n_neighbors_ring1=args.n_neighbors
     )
+
+    normalization_factor = mean_dist
     
     ring_nbrs_dict = {
         1: ring1_nbrs,
@@ -752,9 +946,19 @@ def main():
             args.num_sources,
             args.num_train_points,
             normalization_factor,
-            args.constant_val,
-            args.add_normals,
-            args.add_euclidean_distance,
+            args.nn_mean,
+            args.attributes,
+            scales,
+            rotations,
+            opacities,
+            sh_features,
+            args.use_mahalanobis,
+            args.use_r1_min_val,
+            args.mask_attributes,
+            args.mask_constant,
+            getattr(args, 'ring_size_mapping', None),
+            args.normalize_per_patch,
+            per_point_dist,
             args.seed + ring  # Different seed per ring
         )
         
@@ -772,7 +976,8 @@ def main():
             'filename': output_name,
             'num_examples': len(examples),
             'shape': str(examples.shape),
-            'size_mb': examples.nbytes / 1e6
+            'size_mb': examples.nbytes / 1e6,
+            'attributes': args.attributes
         }
     
     # Save metadata

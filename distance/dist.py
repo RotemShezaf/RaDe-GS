@@ -194,12 +194,14 @@ def geodesic_via_fmm_vertex_distance(v, f, src_vi, sources_are_disjoint):
 
 def exact_geodesic_via_gdist_vertex_distance(v, f, src_vi, sources_are_disjoint):
     import gdist as gd
+    v =  np.asarray(v, dtype=np.float64)
+    f = np.asarray(f, dtype=np.int32)
     if sources_are_disjoint:
         D = np.zeros((len(src_vi), v.shape[0]))
         for i, vi in enumerate(tqdm(src_vi, desc="Computing exact geodesics (gdist)")):
-            D[i, :] = gd.compute_gdist(v, f.astype('int32'), np.array([vi], dtype=np.int32))
+            D[i, :] = gd.compute_gdist(v, f, np.array([vi], dtype=np.int32))
         return D
-    return gd.compute_gdist(v, f.astype('int32'), np.array(src_vi, dtype=np.int32))
+    return gd.compute_gdist(v, f, np.array(src_vi, dtype=np.int32))
 
 
 def exact_geodesic_via_vtp_vertex_distance(v, f, src_vi, sources_are_disjoint):
@@ -207,9 +209,10 @@ def exact_geodesic_via_vtp_vertex_distance(v, f, src_vi, sources_are_disjoint):
     if sources_are_disjoint:
         D = np.zeros((len(src_vi), v.shape[0]))
         for i, vi in enumerate(tqdm(src_vi, desc="Computing exact geodesics (VTP)")):
-            D[i, :] = vtp.geodesic_distance(v, f.astype('int32'), vi)
+            D[i, :] = vtp.geodesic_distance(np.asarray(v, dtype=np.float64),
+                                             f.astype('int32'), np.array([vi], dtype=np.int32))
         return D
-    return vtp.geodesic_distance(v.astype('float64'), f.astype('int32'), np.array(src_vi, dtype=np.int32))
+    return vtp.geodesic_distance(np.asarray(v, dtype=np.float64), f.astype('int32'), np.array(src_vi, dtype=np.int32))
 
 
 def graph_vertex_distance(v, f, src_vi, weight_cls=None):

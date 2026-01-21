@@ -9,6 +9,9 @@ import trimesh
 import pygeodesic.geodesic as geodesic
 from typing import Tuple, Optional
 import open3d as o3d
+from tqdm import tqdm
+from joblib import Parallel, delayed
+import multiprocessing
 
 
 def load_ply(path: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -64,33 +67,43 @@ def build_geodesic_mesh(vertices: np.ndarray, faces: np.ndarray) -> geodesic.PyG
 
 def compute_exact_geodesic(vertices: np.ndarray,
                            faces: np.ndarray,
-                           source_id: int,
-                           target_ids: Optional[list] = None) -> np.ndarray:
+                           sources_id: int,
+                           sources_are_disjoint: bool = True,
+                           target_ids: Optional[list] = None,
+                           ) -> np.ndarray:
     """
     Compute exact geodesic distances using the MMP algorithm.
 
     Args:
         vertices: (N, 3) array of vertex coordinates
         faces: (M, 3) array of triangle indices
-        source_id: Index of the source vertex
+        sources_id: Indexes of the sources vertexes
         target_ids: Optional list of target vertex indices. If None, computes to all vertices.
-
+        sources_are_disjoint: If True, computing distances for best source
     Returns:
         Array of geodesic distances from source to all/specified vertices
     """
-    points = vertices.tolist()
-    faces_flat = faces.tolist()
+    points = np.asarray(vertices, dtype=np.float64).tolist()
+    faces_flat = np.asarray(faces, dtype=np.int32).tolist()
+    if sources_id.__class__ != list:
+        sources_id = np.array(sources_id, dtype=np.int32).tolist()
+    sources_id = np.array(sources_id, dtype=np.int32).tolist()
+    
+    # Pre-allocate distance array
+    num_targets = len(vertices) if target_ids is None else len(target_ids)
+    distances = np.zeros((len(sources_id), num_targets), dtype=np.float64)
     geoalg = geodesic.PyGeodesicAlgorithmExact(points, faces_flat)
-
-    if target_ids is not None and len(target_ids) == 1:
-        # Compute geodesic distance and path between source and single target
-        distance, path = geoalg.geodesicDistance(source_id, target_ids[0])
-        return np.array([distance])
-    else:
-        # Compute distances from source to all/specified vertices
-        source_indices = [source_id]
-        distances, _ = geoalg.geodesicDistances(source_indices, target_ids)
-        return np.array(distances)
+    if sources_are_disjoint:
+        for i, src_id in enumerate(tqdm(sources_id, desc="Computing exact geodesics")):
+            dist, _ = geoalg.geodesicDistances([src_id], target_ids)
+            distances[i, :] = dist
+     
+        return distances
+    
+    # Non-disjoint sources - compute all at once
+    geoalg = geodesic.PyGeodesicAlgorithmExact(points, faces_flat)
+    dist, _ = geoalg.geodesicDistances(sources_id, target_ids)
+    return np.array(dist)
 
 
 def compute_fmm_geodesic(vertices: np.ndarray,

@@ -21,4 +21,5 @@ gdown
 gdist
 pyvista
 joblib
+pytest
 #export PYOPENGL_PLATFORM=egl

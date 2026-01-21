@@ -88,12 +88,12 @@ project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from distance.dist import exact_geodesic_via_vtp_vertex_distance, vertex_dist
+from distance.dist import exact_geodesic_via_vtp_vertex_distance, vertex_dist, exact_geodesic_via_gdist_vertex_distance
 from plyfile import PlyData
 from utils.geodesic_utils import load_ply
 from GenerateData.GenerateRawPolynomialMesh import generate_surface_mesh
 from GenerateData.utils.load_utils import load_ground_truth_mesh, find_available_iterations, load_gaussian_data
-
+from utils.geodesic_utils import compute_exact_geodesic
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
@@ -308,19 +308,31 @@ def compute_geodesic_distances_for_sources(
     
     num_sources = len(source_indices)
     num_vertices = len(vertices)
+    if num_sources == 0:
+        print(f"\n  No new sources to compute. Skipping geodesic computation.")
+        return np.array([]).reshape(0, num_vertices)
     #distances = np.zeros((num_sources, num_vertices), dtype=np.float32)
     
     #vertices_for_laybary = vertices.tolist()
     #faces_for_laybary = faces.tolist()
     # Compute distances with progress bar
-    
     distances =exact_geodesic_via_vtp_vertex_distance(
         v=vertices,
         f=faces,
         src_vi=source_indices.tolist(),
         sources_are_disjoint=True
     )
-    #breakpoint()
+    #if vtp bug use regular mmp
+    valid_mask = distances.max(axis = 1 ) > 10000
+    valid_indices = source_indices[valid_mask]
+    distances_fix = compute_exact_geodesic(
+        vertices=vertices,
+        faces=faces,
+        sources_id=valid_indices,
+        sources_are_disjoint=True
+    )
+
+    distances[valid_mask,:] = distances_fix
     
     print(f"\n  Distance statistics:")
     print(f"    Min: {distances.min():.6f}")
@@ -477,7 +489,29 @@ def merge_geodesic_data(
     print(f"Merging Geodesic Data")
     print(f"{'='*80}")
     
-    # Concatenate
+    # Handle empty arrays
+    existing_empty = len(existing_source_indices) == 0
+    new_empty = len(new_source_indices) == 0
+    
+    if existing_empty and new_empty:
+        # Both empty - return empty arrays with proper shapes
+        print(f"  Warning: Both existing and new data are empty")
+        num_vertices = 0
+        return (np.array([]), 
+                np.array([]).reshape(0, 3), 
+                np.array([]).reshape(0, num_vertices))
+    
+    if existing_empty:
+        # Only existing is empty - return new data
+        print(f"  No existing data, using only new data ({len(new_source_indices)} sources)")
+        return new_source_indices, new_source_positions, new_geodesic_distances
+    
+    if new_empty:
+        # Only new is empty - return existing data
+        print(f"  No new data, using only existing data ({len(existing_source_indices)} sources)")
+        return existing_source_indices, existing_source_positions, existing_geodesic_distances
+    
+    # Both have data - concatenate
     merged_source_indices = np.concatenate([existing_source_indices, new_source_indices])
     merged_source_positions = np.concatenate([existing_source_positions, new_source_positions])
     merged_geodesic_distances = np.concatenate([existing_geodesic_distances, new_geodesic_distances], axis=0)
@@ -489,6 +523,7 @@ def merge_geodesic_data(
     merged_geodesic_distances = merged_geodesic_distances[sort_order]
     
     print(f"  Merged total sources: {len(merged_source_indices)}")
+    print(f"    Existing: {len(existing_source_indices)}, New: {len(new_source_indices)}")
     
     return merged_source_indices, merged_source_positions, merged_geodesic_distances
 
@@ -865,8 +900,12 @@ def main() -> None:
     
     
     # Load Gaussian splat
-    gaussian_positions, gaussian_scales, gaussian_rotations, gaussian_opacities \
-        = load_gaussian_data(output_folder, args.iteration)
+    gaussian_model = load_gaussian_data(output_folder, args.iteration)
+    
+    gaussian_positions = gaussian_model.get_xyz.detach().cpu().numpy()
+    gaussian_scales = gaussian_model.get_scaling.detach().cpu().numpy()
+    gaussian_rotations = gaussian_model.get_rotation.detach().cpu().numpy()
+    gaussian_opacities = gaussian_model.get_opacity.detach().cpu().numpy()
     
     # Step 2: Load ground truth mesh
     data_root = Path(args.data_root)
@@ -902,62 +941,34 @@ def main() -> None:
         if result is not None:
             existing_mesh_geodesic_data = result
 
-    
-    # Determine which sources need to be computed
-    if existing_mesh_geodesic_data is not None:
-        existing_source_indices, existing_source_positions, existing_geodesic_distances = existing_mesh_geodesic_data
         
-        # Find missing sources
-        missing_source_indices, missing_mask = find_missing_sources(
-            all_source_indices=all_source_indices,
-            existing_source_indices=existing_source_indices
-        )
-        
-        if len(missing_source_indices) == 0:
-            print(f"\n  All sources already computed! Using existing data.")
-            mesh_geodesic_distances = existing_geodesic_distances
-            source_indices = all_source_indices
-            source_positions_for_mesh = all_source_positions
-        else:
-            # Compute only for missing sources
-            print(f"\n  Will compute geodesic distances for {len(missing_source_indices)} missing sources")
-            source_indices_to_compute = missing_source_indices
-            source_positions_to_compute = all_source_positions[missing_mask]
-    else:
-        # No existing data, compute for all sources
-        print(f"\n  No existing mesh geodesic data. Computing for all sources.")
-        source_indices_to_compute = all_source_indices
-        source_positions_to_compute = all_source_positions
-    
     # Determine source range for this run
     if args.source_start is not None and args.source_end is not None:
         source_start = args.source_start
         source_end = min(args.source_end, len(all_source_indices))
         source_indices = all_source_indices[source_start:source_end]
         source_positions_subset = all_source_positions[source_start:source_end]
-        
-        # If loading, filter to only compute missing ones in this range
-        if existing_mesh_geodesic_data is not None and len(missing_source_indices) > 0:
-            # Find which sources in our range are missing
-            range_mask = (source_indices_to_compute >= source_start) & (source_indices_to_compute < source_end)
-            source_indices = source_indices_to_compute[range_mask]
-            source_positions_subset = source_positions_to_compute[range_mask]
-        
-        print(f"\n  Processing source range: [{source_start}, {source_end}) = {len(source_indices)} sources")
     else:
         source_start = 0
-        source_end = len(all_source_indices)
-        
-        # Use the computed list (either all or missing)
-        if existing_mesh_geodesic_data is not None and len(missing_source_indices) > 0:
-            source_indices = source_indices_to_compute
-            source_positions_subset = source_positions_to_compute
-        else:
-            source_indices = all_source_indices
-            source_positions_subset = all_source_positions
-        
-        print(f"\n  Processing all {len(source_indices)} sources")
+        source_end = len(all_source_indices) 
+        source_indices = all_source_indices
+        source_positions_subset = all_source_positions
 
+    # Determine which sources need to be computed
+    if existing_mesh_geodesic_data is not None:
+        existing_source_indices, existing_source_positions, existing_geodesic_distances\
+              = existing_mesh_geodesic_data
+        # Find missing sources
+        missing_source_indices, missing_mask = find_missing_sources(
+            all_source_indices=source_indices,
+            existing_source_indices=existing_source_indices
+        )
+        source_positions_subset = source_positions_subset[missing_mask]
+        
+        print(f"\n  Sources to compute in mesh in this run: {len(missing_source_indices)}")
+    else:
+        existing_source_indices, existing_source_positions, existing_geodesic_distances = np.array([]), np.array([]), np.array([])
+        missing_source_indices = source_indices
 
     # Map source indices to Gaussian indices (sources on mesh -> Gaussians)
     print(f"\n  Mapping source mesh indices to Gaussian indices...")
@@ -981,33 +992,25 @@ def main() -> None:
         gaussian_rotations=gaussian_rotations if args.use_mahalanobis else None
     )
 
-    
     # Step 6: Compute geodesic distances on mesh
-    if len(source_indices) > 0:
-        mesh_geodesic_distances_new = compute_geodesic_distances_for_sources(
-            vertices=mesh_vertices,
-            faces=mesh_faces,
-            source_indices=source_indices,
-            verbose=args.verbose
-        )
-        
-        # Merge with existing data if applicable
-        if existing_mesh_geodesic_data is not None and len(missing_source_indices) > 0:
-            existing_source_indices, existing_source_positions, existing_geodesic_distances = existing_mesh_geodesic_data
-            source_indices_for_mesh, source_positions_for_mesh, mesh_geodesic_distances = merge_geodesic_data(
-                existing_source_indices=existing_source_indices,
-                existing_source_positions=existing_source_positions,
-                existing_geodesic_distances=existing_geodesic_distances,
-                new_source_indices=source_indices,
-                new_source_positions=source_positions_subset,
-                new_geodesic_distances=mesh_geodesic_distances_new
-            )
-        else:
-            source_indices_for_mesh = source_indices
-            source_positions_for_mesh = source_positions_subset
-            mesh_geodesic_distances = mesh_geodesic_distances_new
-        
-
+    mesh_geodesic_distances_new = compute_geodesic_distances_for_sources(
+        vertices=mesh_vertices,
+        faces=mesh_faces,
+        source_indices=missing_source_indices,
+        verbose=args.verbose
+    )
+    # Merge with existing data if applicable
+    source_indices_for_mesh, source_positions_for_mesh, mesh_geodesic_distances = merge_geodesic_data(
+        existing_source_indices=existing_source_indices,
+        existing_source_positions=existing_source_positions,
+        existing_geodesic_distances=existing_geodesic_distances,
+        new_source_indices=missing_source_indices,
+        new_source_positions=source_positions_subset,
+        new_geodesic_distances=mesh_geodesic_distances_new
+    )
+    
+    if len(missing_source_indices) == 0:
+        print(f"\n  No new sources were computed. Using existing mesh geodesic data.")
         # Save mesh geodesic ground truth
         save_mesh_geodesic_gt(
             data_root=data_root,
@@ -1018,25 +1021,14 @@ def main() -> None:
             geodesic_distances=mesh_geodesic_distances,
             mesh_vertices=mesh_vertices
         )
+
         
-        # For Gaussian computation, use only the current range
-        mesh_geodesic_distances_for_gaussians = mesh_geodesic_distances_new
-    else:
-        print(f"\n  No new sources to compute. Skipping geodesic computation.")
-        # Use existing data for this range
-        if existing_mesh_geodesic_data is not None:
-            existing_source_indices, existing_source_positions, existing_geodesic_distances = existing_mesh_geodesic_data
-            # Find indices in existing data that match our range
-            if args.source_start is not None:
-                range_mask = (existing_source_indices >= source_start) & (existing_source_indices < source_end)
-                source_indices = existing_source_indices[range_mask]
-                source_positions_subset = existing_source_positions[range_mask]
-                mesh_geodesic_distances_for_gaussians = existing_geodesic_distances[range_mask]
-            else:
-                source_indices = existing_source_indices
-                source_positions_subset = existing_source_positions
-                mesh_geodesic_distances_for_gaussians = existing_geodesic_distances
-            print(f"  Using {len(source_indices)} sources from existing data")
+    #use range mask on indexes
+    
+    range_mask = np.isin(source_indices_for_mesh, source_indices)
+    source_indices = source_indices_for_mesh[range_mask]
+    source_positions_subset = source_positions_for_mesh[range_mask]
+    mesh_geodesic_distances_for_gaussians = mesh_geodesic_distances[range_mask]
 
 
 

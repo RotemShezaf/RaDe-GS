@@ -15,6 +15,7 @@ import trimesh
 import os
 from pathlib import Path
 import argparse
+from scipy.spatial import Delaunay
 
 
 def evaluate_polynomial_normal(x, y, surface_type):
@@ -196,21 +197,10 @@ def generate_surface_mesh(surface_type, nx, ny, x_range, y_range, adaptive=False
     # Analytical normals
     normals = evaluate_polynomial_normal(X, Y, surface_type).reshape(-1, 3)
     
-    # Create triangular faces (two triangles per grid cell)
-    faces = []
-    for i in range(ny - 1):
-        for j in range(nx - 1):
-            # Vertex indices for current quad
-            v0 = i * nx + j
-            v1 = i * nx + (j + 1)
-            v2 = (i + 1) * nx + j
-            v3 = (i + 1) * nx + (j + 1)
-            
-            # Two triangles per quad
-            faces.append([v0, v1, v2])
-            faces.append([v1, v3, v2])
-    
-    faces = np.array(faces)
+    # Create Delaunay triangulation on 2D (x, y) coordinates
+    xy_coords = np.column_stack([X.flatten(), Y.flatten()])
+    delaunay = Delaunay(xy_coords)
+    faces = delaunay.simplices
     
     # Create mesh
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, vertex_normals=normals, process=False)
@@ -332,10 +322,10 @@ def main():
     parser.add_argument('--base_resolution', type=int, default=1000, help='Highest resolution grid size (default: 1000)')
     parser.add_argument('--num_levels', type=int, default=6, help='Number of resolution levels (default: 6)')
     parser.add_argument('--output_dir', type=str, default='TrainData/Polynomial/raw', help='Output directory (default: TrainData/raw)')
-    parser.add_argument('--x_min', type=float, default=-0.6, help='Minimum x value (default: -1.0)')
-    parser.add_argument('--x_max', type=float, default=0.6, help='Maximum x value (default: 1.0)')
-    parser.add_argument('--y_min', type=float, default=-0.6, help='Minimum y value (default: -1.0)')
-    parser.add_argument('--y_max', type=float, default=0.6, help='Maximum y value (default: 1.0)')
+    parser.add_argument('--x_min', type=float, default=-0.8, help='Minimum x value (default: -1.0)')
+    parser.add_argument('--x_max', type=float, default=0.8, help='Maximum x value (default: 1.0)')
+    parser.add_argument('--y_min', type=float, default=-0.8, help='Minimum y value (default: -1.0)')
+    parser.add_argument('--y_max', type=float, default=0.8, help='Maximum y value (default: 1.0)')
     parser.add_argument('--adaptive', action='store_true', help='Use adaptive sampling for uniform arc length spacing')
     args = parser.parse_args()
 
