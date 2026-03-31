@@ -805,6 +805,163 @@ class TestGridMesh:
         assert _count_mesh_holes(f3) == 0
 
 
+# ── TestLocalRefinement ──────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("surface_type", ["Paraboloid", "Saddle", "HyperbolicParaboloid"])
+class TestLocalRefinement:
+    """Tests for local per-triangle Gaussian insertion."""
+
+    def _build_grid(self, surface_type, target_edge=0.15, x_range=(-1, 1),
+                    y_range=(-1, 1)):
+        return build_surface_grid(
+            surface_type=surface_type,
+            x_range=x_range, y_range=y_range,
+            target_edge_length=target_edge,
+        )
+
+    # ── Basic properties ─────────────────────────────────────────────
+
+    def test_all_gaussians_present(self, surface_type):
+        """All Gaussians become mesh vertices after local insertion."""
+        verts, faces = self._build_grid(surface_type)
+        gauss_pts = _make_surface_points(surface_type, n=50, seed=123,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        assert len(gi) == 50
+        used = set(f2.ravel().tolist())
+        for gv in gi:
+            assert int(gv) in used, f"Gaussian vertex {gv} not in any face"
+
+    def test_faces_valid(self, surface_type):
+        """Face indices remain valid after local insertion."""
+        verts, faces = self._build_grid(surface_type)
+        gauss_pts = _make_surface_points(surface_type, n=30, seed=99,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        assert f2.min() >= 0
+        assert f2.max() < len(v2)
+
+    def test_vertex_count(self, surface_type):
+        """Vertex count = grid + Gaussians (no extra vertices added)."""
+        verts, faces = self._build_grid(surface_type)
+        n_grid = len(verts)
+        n_gauss = 40
+        gauss_pts = _make_surface_points(surface_type, n=n_gauss, seed=77,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        assert len(v2) == n_grid + n_gauss
+
+    def test_no_holes(self, surface_type):
+        """No holes after local Gaussian insertion."""
+        verts, faces = self._build_grid(surface_type)
+        gauss_pts = _make_surface_points(surface_type, n=30, seed=55,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        assert _count_mesh_holes(f2) == 0, "Holes after local insertion"
+
+    def test_vertices_on_surface(self, surface_type):
+        """All vertices lie on the analytical surface."""
+        verts, faces = self._build_grid(surface_type)
+        gauss_pts = _make_surface_points(surface_type, n=20, seed=88,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        z_expected = evaluate_polynomial(v2[:, 0], v2[:, 1], surface_type)
+        np.testing.assert_allclose(v2[:, 2], z_expected, atol=1e-10)
+
+    def test_zero_gaussians(self, surface_type):
+        """Inserting zero Gaussians returns grid unchanged."""
+        verts, faces = self._build_grid(surface_type)
+        empty = np.empty((0, 3), dtype=np.float64)
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, empty, surface_type,
+            local_refinement=True,
+        )
+        assert len(gi) == 0
+        np.testing.assert_array_equal(f2, faces)
+
+    def test_no_degenerate_faces(self, surface_type):
+        """No zero-area faces after local insertion."""
+        verts, faces = self._build_grid(surface_type)
+        gauss_pts = _make_surface_points(surface_type, n=50, seed=42,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        v0 = v2[f2[:, 0]]
+        v1 = v2[f2[:, 1]]
+        v2_ = v2[f2[:, 2]]
+        cross = np.cross(v1 - v0, v2_ - v0)
+        areas = 0.5 * np.linalg.norm(cross, axis=1)
+        assert (areas > 1e-15).all(), "Local insertion created degenerate face"
+
+    def test_quality_bounded(self, surface_type):
+        """Local insertion should not produce excessive bad triangles."""
+        verts, faces = self._build_grid(surface_type)
+        gauss_pts = _make_surface_points(surface_type, n=50, seed=42,
+                                         x_range=(-0.8, 0.8))
+        v_l, f_l, _ = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        ar_l, ma_l, _ = _triangle_quality(v_l, f_l)
+        bad_l = ((ar_l > 5.0) | (ma_l < 10.0)).sum()
+        # Bad triangles should be a small fraction of total faces
+        bad_frac = bad_l / len(f_l)
+        assert bad_frac < 0.15, (
+            f"Local has {bad_l}/{len(f_l)} bad triangles ({bad_frac:.1%})"
+        )
+
+    def test_face_count_increases(self, surface_type):
+        """Inserting Gaussians locally should increase face count."""
+        verts, faces = self._build_grid(surface_type)
+        n_gauss = 30
+        gauss_pts = _make_surface_points(surface_type, n=n_gauss, seed=42,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        # Each Gaussian inside a triangle adds 2 extra faces (1→3)
+        assert len(f2) > len(faces)
+
+    def test_pipeline_local_insert_then_refine(self, surface_type):
+        """Full pipeline: grid → local insert → refine → quality."""
+        verts, faces = self._build_grid(surface_type)
+        gauss_pts = _make_surface_points(surface_type, n=50, seed=42,
+                                         x_range=(-0.8, 0.8))
+        v2, f2, gi = insert_gaussians_into_grid_mesh(
+            verts, faces, gauss_pts, surface_type,
+            local_refinement=True,
+        )
+        v3, f3, gi3 = refine_bad_triangles(
+            v2, f2, surface_type,
+            max_edge_length=0.5,
+            gaussian_vertex_indices=gi,
+            max_iterations=3,
+        )
+        assert len(gi3) >= len(gauss_pts) * 0.9
+        ar, ma, _ = _triangle_quality(v3, f3)
+        pct_good = float(np.mean(ar < 5) * 100)
+        assert pct_good > 60, f"Only {pct_good:.1f}% good after refine"
+        assert _count_mesh_holes(f3) == 0
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 3-D Delaunay tests
 # ═══════════════════════════════════════════════════════════════════════════

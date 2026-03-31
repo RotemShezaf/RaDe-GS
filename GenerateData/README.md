@@ -70,7 +70,7 @@ After training Gaussian splats on the synthetic datasets, these scripts compute 
 |--------|--------|--------|
 | `compute_gaussian_geodesic_distances.py` | Polynomial surfaces | Projects Gaussians onto the nearest face of the GT mesh, then uses **barycentric interpolation** of face-vertex geodesic distances (MMP/VTP algorithm) for O(h²) accuracy. Supports batch processing with partial computation and merging. |
 | `compute_gaussian_geodesic_distances_tosca.py` | TOSCA shapes | Same approach but for TOSCA meshes. Supports **Gaussian embedding** (`--embed_gaussians`): each Gaussian is projected onto the mesh surface and inserted as a new vertex, eliminating barycentric interpolation error. Uses **normal-guided projection** by default: instead of orthogonal closest-point projection, each Gaussian is ray-cast along the interpolated vertex normal at the initial projection point, giving more geometrically faithful placement on curved surfaces (falls back to orthogonal projection when the ray misses the triangle). Source vertices are selected via **farthest-point sampling** on embedded Gaussian mesh vertices (when embedding is enabled) or proximity-filtered mesh vertices (legacy mode). Supports both GT and reconstructed meshes. Partial results are merged with automatic deduplication of overlapping source ranges. |
-| `compute_geodesic_mesh_for_gaussians.py` | Polynomial surfaces | Alternative approach: inserts Gaussian positions **directly as mesh vertices** (zero transfer error) by projecting (x,y) onto the analytical surface and Delaunay-triangulating. |
+| `compute_geodesic_mesh_for_gaussians.py` | Polynomial surfaces | Alternative approach: inserts Gaussian positions **directly as mesh vertices** (zero transfer error) by projecting (x,y) onto the analytical surface. Supports two insertion modes: global Delaunay (default) and **local per-triangle refinement** (`--local_refinement`), which preserves the grid topology and sub-triangulates only within each grid face containing Gaussians. |
 
 **Output structure:**
 ```
@@ -100,7 +100,7 @@ Each `.npz` file contains:
 | `lighting.py` | Lighting presets for rendering — standard, 5 light-ID presets, and 10 decoupled appearance groups for appearance diversity training. |
 | `io_utils.py` | COLMAP binary/text I/O (cameras, images, points3D), texture loading, dataset validation. |
 | `load_utils.py` | Load Gaussian splat PLY files, find available training iterations. |
-| `geodesic_mesh_utils.py` | Project Gaussians onto polynomial surfaces, Poisson-disk surface sampling, Delaunay triangulation in (u,v) parameter space. |
+| `geodesic_mesh_utils.py` | Project Gaussians onto polynomial surfaces, Poisson-disk surface sampling, Delaunay triangulation in (u,v) parameter space. Supports **local per-triangle refinement** (`local_refinement=True`): Gaussians are embedded into the grid mesh by sub-triangulating only the grid faces that contain them, preserving the original grid structure. |
 | `data_generation_utils.py` | KNN computation (Euclidean and Mahalanobis), neighborhood ring extraction. Supports knn_cuda, simple-knn, and CPU fallbacks. Includes **adaptive kNN** (`adaptive_ring1_neighbors`) for per-point k adjustment so that a target ring-k count is reached. |
 | `compute_gaussian_geodesic_distances_helper.py` | Core helpers for geodesic computation: source mesh generation, barycentric interpolation, partial result merging with automatic deduplication, multiprocessing geodesic solvers. |
 

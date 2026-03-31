@@ -190,6 +190,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    # Local per-triangle refinement (grid method only)
+    parser.add_argument(
+        "--local_refinement",
+        action="store_true",
+        help=(
+            "Use local per-triangle Gaussian insertion instead of global "
+            "Delaunay when mesh_method='grid'.  Keeps grid topology intact "
+            "and sub-triangulates only within each grid face."
+        ),
+    )
+
     # Steiner-point insertion
     parser.add_argument(
         "--steiner",
@@ -239,6 +250,16 @@ def parse_args() -> argparse.Namespace:
             "Higher values concentrate more points near curvature."
         ),
     )
+    parser.add_argument(
+        "--gaussian_density_alpha",
+        type=float,
+        default=0.0,
+        help=(
+            "Strength of Gaussian-density grid adaptation (default: 0 = off). "
+            "When > 0, the grid is denser near Gaussian clusters and "
+            "coarser where Gaussians are sparse. Values 2-5 typical."
+        ),
+    )
 
     # Bad-triangle refinement
     parser.add_argument(
@@ -253,14 +274,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_max_aspect_ratio",
         type=float,
-        default=5.0,
-        help="Aspect-ratio threshold for bad triangles (default: 5.0).",
+        default=1e6,
+        help="Aspect-ratio threshold for bad triangles (default: 1e6 = disabled).",
     )
     parser.add_argument(
         "--refine_min_angle",
         type=float,
-        default=10.0,
-        help="Min-angle threshold (degrees) for bad triangles (default: 10.0).",
+        default=20.0,
+        help="Min-angle threshold (degrees) for bad triangles (default: 20.0).",
     )
     parser.add_argument(
         "--refine_max_area_factor",
@@ -271,19 +292,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_gauss_max_aspect_ratio",
         type=float,
-        default=None,
+        default=1e6,
         help=(
-            "Harsher AR threshold for triangles touching a Gaussian vertex. "
-            "Default: 0.6 × refine_max_aspect_ratio (i.e. 3.0)."
+            "AR threshold for triangles touching a Gaussian vertex. "
+            "Default: 1e6 (disabled — angle threshold is sufficient)."
         ),
     )
     parser.add_argument(
         "--refine_gauss_min_angle",
         type=float,
-        default=None,
+        default=20.0,
         help=(
-            "Harsher min-angle threshold for Gaussian-touching triangles. "
-            "Default: 1.5 × refine_min_angle (i.e. 15.0)."
+            "Min-angle threshold for Gaussian-touching triangles. "
+            "Default: 20.0° (matches general threshold for balanced quality)."
         ),
     )
     parser.add_argument(
@@ -309,8 +330,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_iterations",
         type=int,
-        default=20,
-        help="Maximum refinement passes (default: 20).",
+        default=1,
+        help="Maximum refinement passes (default: 1 — ring+flip is sufficient).",
     )
     parser.add_argument(
         "--refine_warmup_iterations",
@@ -332,6 +353,16 @@ def parse_args() -> argparse.Namespace:
             "If set, run ring-based support-point insertion around every "
             "Gaussian in a bad triangle before the main refinement loop "
             "(Stage 0). Off by default."
+        ),
+    )
+    parser.add_argument(
+        "--refine_ring_fix_iterations",
+        type=int,
+        default=1,
+        help=(
+            "Number of ring insertion passes. Each pass halves the ring "
+            "radius and targets Gaussians still in bad triangles. "
+            "Default: 1."
         ),
     )
 
@@ -374,6 +405,15 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Number of Laplacian smoothing passes per refinement iteration. "
             "Default: 3."
+        ),
+    )
+    parser.add_argument(
+        "--refine_delaunay_flip",
+        action="store_true",
+        default=False,
+        help=(
+            "If set, apply Delaunay edge-flipping as a post-refinement "
+            "quality polish pass. Improves angles without adding vertices."
         ),
     )
 
@@ -453,6 +493,8 @@ def main() -> None:
             target_edge_length=grid_edge,
             curvature_adaptive=args.curvature_adaptive,
             curvature_alpha=args.curvature_alpha,
+            gaussian_xy=projected[:, :2] if args.gaussian_density_alpha > 0 else None,
+            gaussian_density_alpha=args.gaussian_density_alpha,
         )
         mode_str = "curvature-adaptive" if args.curvature_adaptive else "arc-length uniform"
         print(f"        → grid: {len(grid_verts)} vertices, "
@@ -463,6 +505,7 @@ def main() -> None:
         print(f"\n  [4/6] Inserting {n_gauss} Gaussians into grid mesh ...")
         vertices, faces, gaussian_vertex_indices = insert_gaussians_into_grid_mesh(
             grid_verts, grid_faces, projected, args.surface,
+            local_refinement=args.local_refinement,
             verbose=args.verbose,
         )
         print(f"        → {len(vertices)} vertices, {len(faces)} faces "
@@ -637,12 +680,14 @@ def main() -> None:
             gauss_max_area_factor=args.refine_gauss_max_area_factor,
             warmup_iterations=args.refine_warmup_iterations,
             ring_fix_invalid_gaussians=args.refine_ring_fix,
+            ring_fix_iterations=args.refine_ring_fix_iterations,
             surface_aware=args.refine_surface_aware,
             patience=args.refine_patience,
             max_iterations=args.refine_iterations,
             max_edge_length=max_edge_threshold,
             gaussian_vertex_indices=gaussian_vertex_indices,
             use_3d_delaunay=(args.mesh_method == "delaunay_3d"),
+            delaunay_flip_polish=args.refine_delaunay_flip,
             verbose=True,
         )
         n_delta_verts = len(vertices) - n_verts_before

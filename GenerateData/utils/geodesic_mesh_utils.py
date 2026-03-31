@@ -1006,6 +1006,8 @@ def build_surface_grid(
     target_edge_length: float = 0.05,
     curvature_adaptive: bool = False,
     curvature_alpha: float = 2.0,
+    gaussian_xy: Optional[np.ndarray] = None,
+    gaussian_density_alpha: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Build a structured grid mesh on a polynomial surface.
 
@@ -1014,6 +1016,11 @@ def build_surface_grid(
     ``√(1 + f_x² + f_y²)`` so that edges have roughly equal 3-D
     length.  When *curvature_adaptive* is ``True``, the grid is
     further refined in high-curvature regions.
+
+    When *gaussian_xy* is provided and *gaussian_density_alpha* > 0,
+    the grid is additionally refined in regions with high Gaussian
+    density, placing more vertices where Gaussians are clustered and
+    fewer where they are sparse.
 
     Each quad cell is split into two triangles along the shorter 3-D
     diagonal for better triangle quality.
@@ -1030,6 +1037,13 @@ def build_surface_grid(
         If ``True``, place denser vertices near high-curvature regions.
     curvature_alpha : float
         Strength of curvature adaptation (default 2.0).
+    gaussian_xy : ndarray ``(N, 2)``, optional
+        2-D projected positions of Gaussians. Used with
+        *gaussian_density_alpha* to make the grid denser near
+        Gaussian clusters.
+    gaussian_density_alpha : float
+        Strength of Gaussian-density adaptation (default 0 = off).
+        Values around 2–5 are typical.
 
     Returns
     -------
@@ -1062,6 +1076,17 @@ def build_surface_grid(
         )
         metric_x = metric_x * np.sqrt(1.0 + curvature_alpha * absK / K_ref)
 
+    # Gaussian-density adaptation along x
+    if gaussian_xy is not None and gaussian_density_alpha > 0:
+        from scipy.stats import gaussian_kde
+        gx = gaussian_xy[:, 0]
+        gx_in = gx[(gx >= x_min) & (gx <= x_max)]
+        if len(gx_in) > 10:
+            kde_x = gaussian_kde(gx_in, bw_method='silverman')
+            density_x = kde_x(x_dense)
+            density_x = density_x / max(float(np.median(density_x[density_x > 0])), 1e-30)
+            metric_x = metric_x * np.sqrt(1.0 + gaussian_density_alpha * density_x)
+
     dx_param = (x_max - x_min) / (n_dense - 1)
     cumul_x = np.concatenate([[0.0], np.cumsum(metric_x[:-1] * dx_param)])
     total_sx = cumul_x[-1]
@@ -1088,6 +1113,17 @@ def build_surface_grid(
             1e-6,
         )
         metric_y = metric_y * np.sqrt(1.0 + curvature_alpha * absK / K_ref_y)
+
+    # Gaussian-density adaptation along y
+    if gaussian_xy is not None and gaussian_density_alpha > 0:
+        from scipy.stats import gaussian_kde
+        gy = gaussian_xy[:, 1]
+        gy_in = gy[(gy >= y_min) & (gy <= y_max)]
+        if len(gy_in) > 10:
+            kde_y = gaussian_kde(gy_in, bw_method='silverman')
+            density_y = kde_y(y_dense)
+            density_y = density_y / max(float(np.median(density_y[density_y > 0])), 1e-30)
+            metric_y = metric_y * np.sqrt(1.0 + gaussian_density_alpha * density_y)
 
     dy_param = (y_max - y_min) / (n_dense - 1)
     cumul_y = np.concatenate([[0.0], np.cumsum(metric_y[:-1] * dy_param)])
@@ -1132,32 +1168,37 @@ def insert_gaussians_into_grid_mesh(
     surface_type: str,
     *,
     max_flip_passes: int = 20,
+    local_refinement: bool = False,
     verbose: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Insert Gaussian vertices into an existing mesh by triangle splitting.
+    """Insert Gaussian vertices into an existing grid mesh.
 
-    For each Gaussian:
+    Two modes:
 
-    1. Locate the triangle whose 2-D projection contains (or is nearest
-       to) the Gaussian's ``(x, y)`` position.
-    2. Connect the Gaussian to all three vertices of that triangle,
-       splitting it into three sub-triangles (i.e. add edges between the
-       Gaussian and every edge of the original triangle).
+    * **Global Delaunay** (``local_refinement=False``, default):
+      Merge grid and Gaussian vertices and run a single 2-D Delaunay
+      triangulation on the ``(x, y)`` projection.
 
-    After all insertions, Lawson edge-flipping passes restore the local
-    Delaunay property, guaranteeing well-shaped triangles.
+    * **Local per-triangle refinement** (``local_refinement=True``):
+      Keep the grid topology intact.  For each grid triangle, find
+      which Gaussians fall inside it and build a local Delaunay
+      sub-triangulation of just those points + the 3 corner vertices.
+      Triangles with no interior Gaussians are kept unchanged.  This
+      avoids the topological artefacts of global Delaunay (long skinny
+      triangles bridging distant regions) and is the recommended mode
+      for grid meshes.
 
     Parameters
     ----------
     grid_vertices : ndarray ``(V, 3)``
-        Existing mesh vertices (e.g. from ``build_surface_grid``).
     grid_faces : ndarray ``(F, 3)``
-        Existing mesh faces.
     gaussian_3d : ndarray ``(G, 3)``
-        Gaussian positions projected onto the surface.
     surface_type : str
     max_flip_passes : int
-        Maximum Lawson edge-flip passes (default 20).
+        Unused (kept for API compat).
+    local_refinement : bool
+        If ``True``, use per-triangle local insertion instead of global
+        Delaunay.  Default ``False`` for backward compatibility.
     verbose : bool
 
     Returns
@@ -1165,7 +1206,6 @@ def insert_gaussians_into_grid_mesh(
     vertices : ndarray ``(V + G, 3)``
     faces : ndarray ``(F', 3)``
     gaussian_vertex_indices : ndarray ``(G,)``
-        Indices of Gaussian vertices in the output vertex array.
     """
     n_grid = len(grid_vertices)
     n_gauss = len(gaussian_3d)
@@ -1185,182 +1225,322 @@ def insert_gaussians_into_grid_mesh(
         vertices[:, 0], vertices[:, 1], surface_type,
     )
 
-    # ── Batch point location via KDTree on centroids ──────────────────
-    faces_arr = np.asarray(grid_faces, dtype=np.int32)
-    tri_xy0 = vertices[faces_arr[:, 0], :2]
-    tri_xy1 = vertices[faces_arr[:, 1], :2]
-    tri_xy2 = vertices[faces_arr[:, 2], :2]
-    centroids = (tri_xy0 + tri_xy1 + tri_xy2) / 3.0
+    # ── Snap Gaussians that coincide with existing grid vertices ─────
+    # If a projected Gaussian is within 1e-6 of a grid vertex in (x,y),
+    # replace the grid vertex with the Gaussian's projected position and
+    # remove the Gaussian vertex (remap its index to that grid vertex).
+    # Edge case: if two Gaussians compete for the same grid vertex,
+    # only the closest one wins; the other stays as a separate vertex.
+    grid_kd_2d = KDTree(vertices[:n_grid, :2])
+    snap_dist, snap_idx = grid_kd_2d.query(vertices[n_grid:, :2], k=1)
+    snap_tol = 1e-6
+    snapped_to = np.where(snap_dist < snap_tol, snap_idx, -1)  # -1 = not snapped
 
-    gauss_xy = vertices[n_grid : n_grid + n_gauss, :2]
+    # Resolve conflicts: when multiple Gaussians snap to the same grid
+    # vertex, keep only the closest one; un-snap the rest.
+    if (snapped_to >= 0).any():
+        grid_best_gi: dict[int, int] = {}   # grid_idx → best gaussian_idx
+        grid_best_d: dict[int, float] = {}  # grid_idx → best distance
+        for gi in range(n_gauss):
+            gv = int(snapped_to[gi])
+            if gv < 0:
+                continue
+            d = float(snap_dist[gi])
+            if gv not in grid_best_gi or d < grid_best_d[gv]:
+                # Un-snap previous winner (if any)
+                if gv in grid_best_gi:
+                    snapped_to[grid_best_gi[gv]] = -1
+                grid_best_gi[gv] = gi
+                grid_best_d[gv] = d
+            else:
+                # This Gaussian loses — un-snap it
+                snapped_to[gi] = -1
 
-    centroid_tree = KDTree(centroids)
-    # Query k neighbours – enough to find the containing triangle
-    k = min(8, len(centroids))
-    _, nn_indices = centroid_tree.query(gauss_xy, k=k)
-    if nn_indices.ndim == 1:
-        nn_indices = nn_indices[:, np.newaxis]
+    if (snapped_to >= 0).any():
+        # Replace grid vertex positions with the winning Gaussian positions
+        for gi in range(n_gauss):
+            if snapped_to[gi] >= 0:
+                vertices[int(snapped_to[gi])] = vertices[n_grid + gi]
 
-    # Vectorised barycentric containment test over all (Gaussian, candidate) pairs
-    gauss_to_face = np.full(n_gauss, -1, dtype=np.int64)
-
-    # Flatten: (G, k) -> (G*k,) — test all candidates at once
-    gi_flat = np.repeat(np.arange(n_gauss), k)        # which Gaussian
-    fi_flat = nn_indices.ravel()                        # which face
-
-    gx = gauss_xy[gi_flat, 0]
-    gy = gauss_xy[gi_flat, 1]
-    ax = tri_xy0[fi_flat, 0]; ay = tri_xy0[fi_flat, 1]
-    bx = tri_xy1[fi_flat, 0]; by = tri_xy1[fi_flat, 1]
-    cx = tri_xy2[fi_flat, 0]; cy = tri_xy2[fi_flat, 1]
-
-    denom = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
-    safe_denom = np.where(np.abs(denom) < 1e-15, 1.0, denom)
-    w0 = ((by - cy) * (gx - cx) + (cx - bx) * (gy - cy)) / safe_denom
-    w1 = ((cy - ay) * (gx - cx) + (ax - cx) * (gy - cy)) / safe_denom
-    w2 = 1.0 - w0 - w1
-
-    inside = (w0 >= -1e-10) & (w1 >= -1e-10) & (w2 >= -1e-10) & (np.abs(denom) >= 1e-15)
-    inside_2d = inside.reshape(n_gauss, k)
-
-    # For each Gaussian, pick the first candidate that contains it
-    has_hit = inside_2d.any(axis=1)
-    first_hit = np.argmax(inside_2d, axis=1)  # first True per row
-    gauss_to_face[has_hit] = nn_indices[
-        np.where(has_hit)[0], first_hit[has_hit]
-    ]
-
-    # Fallback: Gaussians not inside any candidate → nearest centroid
-    miss = ~has_hit
-    if miss.any():
-        gauss_to_face[miss] = nn_indices[miss, 0]
-
-    # ── Vectorised triangle splitting ────────────────────────────────
-    # Group Gaussians by target face. The common case (1 per face) is
-    # fully vectorised; multi-Gaussian faces use local Delaunay.
-    gauss_vidx = np.arange(n_grid, n_grid + n_gauss, dtype=np.int64)
-    valid = gauss_to_face >= 0
-    g_face = gauss_to_face[valid]
-    g_vidx = gauss_vidx[valid]
-
-    # Count how many Gaussians land in each face
-    face_counts = np.zeros(len(faces_arr), dtype=np.int32)
-    np.add.at(face_counts, g_face, 1)
-
-    # Faces with exactly 1 Gaussian → vectorised 1-to-3 split
-    single_mask = face_counts == 1
-    # Build mapping: for single-Gaussian faces, which Gaussian index?
-    single_gauss_map = np.empty(len(faces_arr), dtype=np.int64)
-    single_gauss_map[g_face] = g_vidx  # last-write-wins, fine for count==1
-
-    single_fi = np.where(single_mask)[0]
-    if len(single_fi) > 0:
-        a = faces_arr[single_fi, 0].astype(np.int64)
-        b = faces_arr[single_fi, 1].astype(np.int64)
-        c = faces_arr[single_fi, 2].astype(np.int64)
-        p = single_gauss_map[single_fi]
-        # Each face → 3 sub-faces: (p,a,b), (p,b,c), (p,c,a)
-        split1 = np.column_stack([p, a, b])
-        split2 = np.column_stack([p, b, c])
-        split3 = np.column_stack([p, c, a])
-        single_new = np.vstack([split1, split2, split3])  # (3*S, 3)
+        # Build remapped gaussian_vertex_indices: snapped ones point to
+        # the (now-updated) grid vertex; unsnapped keep new indices.
+        new_verts_list = [vertices[:n_grid]]
+        new_gauss_indices = np.full(n_gauss, -1, dtype=np.int32)
+        next_idx = n_grid
+        for gi in range(n_gauss):
+            if snapped_to[gi] >= 0:
+                new_gauss_indices[gi] = int(snapped_to[gi])
+            else:
+                new_gauss_indices[gi] = next_idx
+                next_idx += 1
+                new_verts_list.append(vertices[n_grid + gi : n_grid + gi + 1])
+        vertices = np.vstack(new_verts_list)
+        gaussian_vertex_indices = new_gauss_indices
     else:
-        single_new = np.empty((0, 3), dtype=np.int64)
+        gaussian_vertex_indices = np.arange(n_grid, n_grid + n_gauss, dtype=np.int32)
 
-    # Faces with >1 Gaussian → local Delaunay (rare)
-    multi_mask = face_counts > 1
-    multi_fi = np.where(multi_mask)[0]
-    multi_new_list: list = []
-    if len(multi_fi) > 0:
-        # Build face → [gauss_vidx] mapping for multi-faces only
-        from collections import defaultdict
-        multi_map: dict = defaultdict(list)
-        # Only iterate over Gaussians that hit multi-faces
-        multi_gauss_sel = multi_mask[g_face]
-        for gf, gv in zip(g_face[multi_gauss_sel], g_vidx[multi_gauss_sel]):
-            multi_map[int(gf)].append(int(gv))
+    if local_refinement:
+        faces_out = _insert_gaussians_local(
+            vertices, n_grid, grid_faces, gaussian_vertex_indices,
+            verbose=verbose,
+        )
+        return vertices, faces_out, gaussian_vertex_indices
 
-        for fi in multi_fi:
-            gverts = multi_map[int(fi)]
-            a = int(faces_arr[fi, 0])
-            b = int(faces_arr[fi, 1])
-            c = int(faces_arr[fi, 2])
-            local_verts = [a, b, c] + gverts
-            local_xy = vertices[local_verts, :2]
-            try:
-                sub_tri = Delaunay(local_xy)
-                for simplex in sub_tri.simplices:
-                    multi_new_list.append([
-                        local_verts[simplex[0]],
-                        local_verts[simplex[1]],
-                        local_verts[simplex[2]],
-                    ])
-            except Exception:
-                # Fallback: cascade split (1 Gaussian at a time)
-                tris = [[a, b, c]]
-                for p in gverts:
-                    px, py = float(vertices[p, 0]), float(vertices[p, 1])
-                    next_tris: list = []
-                    inserted = False
-                    for tri in tris:
-                        if inserted:
-                            next_tris.append(tri)
-                            continue
-                        ta, tb, tc = tri
-                        tax = float(vertices[ta, 0]); tay = float(vertices[ta, 1])
-                        tbx = float(vertices[tb, 0]); tby = float(vertices[tb, 1])
-                        tcx = float(vertices[tc, 0]); tcy = float(vertices[tc, 1])
-                        d = (tby - tcy) * (tax - tcx) + (tcx - tbx) * (tay - tcy)
-                        if abs(d) < 1e-15:
-                            next_tris.append(tri)
-                            continue
-                        w0 = ((tby - tcy) * (px - tcx) + (tcx - tbx) * (py - tcy)) / d
-                        w1 = ((tcy - tay) * (px - tcx) + (tax - tcx) * (py - tcy)) / d
-                        w2 = 1.0 - w0 - w1
-                        if w0 >= -1e-10 and w1 >= -1e-10 and w2 >= -1e-10:
-                            next_tris.append([p, ta, tb])
-                            next_tris.append([p, tb, tc])
-                            next_tris.append([p, tc, ta])
-                            inserted = True
-                        else:
-                            next_tris.append(tri)
-                    if not inserted:
-                        tri0 = next_tris[0]
-                        next_tris[0:1] = [
-                            [p, tri0[0], tri0[1]],
-                            [p, tri0[1], tri0[2]],
-                            [p, tri0[2], tri0[0]],
-                        ]
-                    tris = next_tris
-                multi_new_list.extend(tris)
+    # ── Global 2-D Delaunay on all vertices ──────────────────────────
+    import time as _time
+    t0 = _time.time()
+    xy = vertices[:, :2].copy()
+    tri = Delaunay(xy)
+    faces_arr = tri.simplices.astype(np.int32)
+    dt_delaunay = _time.time() - t0
 
-    if multi_new_list:
-        multi_new = np.array(multi_new_list, dtype=np.int64)
-    else:
-        multi_new = np.empty((0, 3), dtype=np.int64)
+    if verbose:
+        print(f"          Delaunay: {len(faces_arr)} faces from "
+              f"{len(vertices)} verts ({dt_delaunay:.1f}s)")
 
-    # Unsplit faces (no Gaussians landed in them)
-    unsplit = faces_arr[face_counts == 0]
-    n_unsplit = len(unsplit)
-
-    faces_arr = np.vstack([
-        unsplit.astype(np.int64),
-        single_new,
-        multi_new,
-    ])
-
-    # ── Local Lawson edge-flipping (only near inserted Gaussians) ────
-    # Suspect faces = everything after the unsplit block
-    suspect_fi = np.arange(n_unsplit, len(faces_arr), dtype=np.int64)
-    xy = vertices[:, :2]
-    _lawson_flip_local(
-        xy, faces_arr, suspect_fi,
-        n_grid_verts=n_grid, verbose=verbose,
-    )
+    # ── Measure bad-triangle percentage ──────────────────────────────
+    ar, min_angle_deg, longest_edge = _triangle_quality(xy, faces_arr)
+    bad_ar = ar > 2.0
+    bad_angle = min_angle_deg < 20.0
+    bad = bad_ar | bad_angle
+    pct_bad = 100.0 * bad.sum() / len(faces_arr)
+    if verbose:
+        print(f"          bad triangles: {bad.sum()}/{len(faces_arr)} "
+              f"({pct_bad:.1f}%)")
+        print(f"          AR: median={np.median(ar):.3f}, "
+              f"p95={np.percentile(ar, 95):.3f}, "
+              f"worst={ar.max():.3f}")
+        print(f"          min angle: min={min_angle_deg.min():.1f}°, "
+              f"median={np.median(min_angle_deg):.1f}°")
 
     faces_out = faces_arr.astype(np.int32)
-    gaussian_vertex_indices = np.arange(n_grid, n_grid + n_gauss, dtype=np.int32)
     return vertices, faces_out, gaussian_vertex_indices
+
+
+def _insert_gaussians_local(
+    vertices: np.ndarray,
+    n_grid: int,
+    grid_faces: np.ndarray,
+    gaussian_vertex_indices: np.ndarray,
+    *,
+    verbose: bool = False,
+) -> np.ndarray:
+    """Per-triangle local Gaussian insertion (internal helper).
+
+    For each grid face, locates which Gaussians fall inside it and
+    builds a local Delaunay sub-triangulation.  Grid triangles with
+    no interior Gaussians are kept unchanged.
+
+    Uses O(1) structured-grid point location when the mesh comes from
+    ``build_surface_grid`` (searchsorted on grid coords + vectorised
+    barycentric test), falling back to matplotlib ``TrapezoidMapTriFinder``
+    for unstructured grids.
+
+    Parameters
+    ----------
+    vertices : ndarray ``(V_total, 3)``
+        Combined vertex array (grid first, then Gaussians).
+    n_grid : int
+        Number of grid vertices (first *n_grid* rows are grid verts).
+    grid_faces : ndarray ``(F, 3)``
+        Original grid triangle connectivity.
+    gaussian_vertex_indices : ndarray ``(G,)``
+        Global vertex indices of Gaussian vertices in *vertices*.
+    verbose : bool
+
+    Returns
+    -------
+    faces : ndarray ``(F', 3)`` int32
+    """
+    import time as _time
+
+    t0 = _time.time()
+    n_gauss = len(gaussian_vertex_indices)
+    gauss_xy = vertices[gaussian_vertex_indices, :2]
+
+    # ── Detect structured grid and use O(1) lookup ───────────────────
+    n_outside = 0
+    use_structured = False
+    grid_y = vertices[:n_grid, 1]
+    if n_grid >= 4:
+        y0 = grid_y[0]
+        tol = 1e-10 * max(abs(float(grid_y.max() - grid_y.min())), 1e-15)
+        diffs = np.abs(grid_y[1:min(n_grid, 100_000)] - y0)
+        n_x = int(np.argmax(diffs > tol)) + 1
+        if n_x >= 2:
+            n_y = n_grid // n_x
+            expected_faces = 2 * (n_x - 1) * (n_y - 1)
+            use_structured = (
+                n_x * n_y == n_grid
+                and n_y >= 2
+                and len(grid_faces) == expected_faces
+            )
+
+    if use_structured:
+        x_coords = vertices[:n_x, 0]          # first row x values
+        y_coords = vertices[::n_x, 1][:n_y]   # every n_x-th y value
+
+        # searchsorted → grid cell (ix, iy) for each Gaussian
+        ix = np.searchsorted(x_coords, gauss_xy[:, 0]) - 1
+        iy = np.searchsorted(y_coords, gauss_xy[:, 1]) - 1
+        ix = np.clip(ix, 0, n_x - 2)
+        iy = np.clip(iy, 0, n_y - 2)
+
+        # Cell → face pair: faces at 2*cell and 2*cell+1
+        cell_idx = iy * (n_x - 1) + ix
+        face_base = 2 * cell_idx  # index of first face in cell
+
+        # Vectorised barycentric test to pick which of the 2 faces
+        f0_a = grid_faces[face_base, 0]
+        f0_b = grid_faces[face_base, 1]
+        f0_c = grid_faces[face_base, 2]
+
+        ax = vertices[f0_a, 0]; ay = vertices[f0_a, 1]
+        bx = vertices[f0_b, 0]; by = vertices[f0_b, 1]
+        cx = vertices[f0_c, 0]; cy = vertices[f0_c, 1]
+        gx = gauss_xy[:, 0]; gy = gauss_xy[:, 1]
+
+        denom = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+        denom = np.where(np.abs(denom) < 1e-30, 1e-30, denom)
+        u = ((by - cy) * (gx - cx) + (cx - bx) * (gy - cy)) / denom
+        v = ((cy - ay) * (gx - cx) + (ax - cx) * (gy - cy)) / denom
+
+        bary_eps = -1e-8
+        in_first = (u >= bary_eps) & (v >= bary_eps) & (u + v <= 1.0 - bary_eps)
+        gauss_face_ids = np.where(in_first, face_base, face_base + 1).astype(
+            np.int64,
+        )
+
+        if verbose:
+            t_loc = _time.time() - t0
+            print(f"          Structured grid {n_x}×{n_y}: point location "
+                  f"for {n_gauss} Gaussians in {t_loc:.3f}s")
+    else:
+        # ── Fallback: matplotlib trifinder (unstructured grids) ──────
+        from matplotlib.tri import Triangulation
+
+        grid_tri = Triangulation(
+            vertices[:n_grid, 0], vertices[:n_grid, 1], grid_faces,
+        )
+        finder = grid_tri.get_trifinder()
+        gauss_face_ids = finder(gauss_xy[:, 0], gauss_xy[:, 1]).astype(np.int64)
+
+        outside_mask = gauss_face_ids == -1
+        n_outside = int(outside_mask.sum())
+        if n_outside > 0:
+            grid_kd = KDTree(vertices[:n_grid, :2])
+            _, nearest_grid_v = grid_kd.query(gauss_xy[outside_mask])
+            vert_to_face = np.full(n_grid, -1, dtype=np.int64)
+            for col in range(3):
+                mask = vert_to_face[grid_faces[:, col]] == -1
+                vert_to_face[grid_faces[:, col][mask]] = np.where(mask)[0]
+            gauss_face_ids[outside_mask] = vert_to_face[nearest_grid_v]
+            if verbose:
+                print(f"          {n_outside} Gaussians outside grid → "
+                      f"snapped to nearest face")
+
+    # ── Group Gaussians by face ──────────────────────────────────────
+    sort_order = np.argsort(gauss_face_ids)
+    sorted_face_ids = gauss_face_ids[sort_order]
+    sorted_gauss_global = gaussian_vertex_indices[sort_order]
+
+    change_idx = np.where(np.diff(sorted_face_ids) != 0)[0] + 1
+    group_starts = np.concatenate([[0], change_idx])
+    group_ends = np.concatenate([change_idx, [n_gauss]])
+    group_face_ids = sorted_face_ids[group_starts]
+
+    faces_with_gauss = set(group_face_ids.tolist())
+    n_faces = len(grid_faces)
+
+    # ── Faces with 0 Gaussians: keep unchanged ──────────────────────
+    no_gauss_mask = np.ones(n_faces, dtype=bool)
+    no_gauss_mask[list(faces_with_gauss)] = False
+    out_parts: list = [grid_faces[no_gauss_mask]]
+
+    n_kept = int(no_gauss_mask.sum())
+    n_fan = 0
+    n_delaunay = 0
+    n_fan_faces = 0
+    n_delaunay_faces = 0
+
+    # ── Separate 1-Gaussian (vectorised fan) vs 2+ (local Delaunay) ─
+    group_sizes = group_ends - group_starts
+    one_mask = group_sizes == 1
+    one_fi = group_face_ids[one_mask].astype(np.int64)
+    one_gi = sorted_gauss_global[group_starts[one_mask]].astype(np.int64)
+
+    multi_idx = np.where(~one_mask)[0]
+
+    # ── Vectorised fan for 1-Gaussian faces ──────────────────────────
+    if len(one_fi) > 0:
+        A = grid_faces[one_fi, 0].astype(np.int64)
+        B = grid_faces[one_fi, 1].astype(np.int64)
+        C = grid_faces[one_fi, 2].astype(np.int64)
+        P = one_gi
+
+        # If Gaussian was snapped to a corner vertex, P==A/B/C and the fan
+        # produces degenerate triangles.  For those faces just keep the
+        # original triangle (P is already a corner, so the grid mesh is fine).
+        snapped_mask = (P == A) | (P == B) | (P == C)
+        if snapped_mask.any():
+            # Keep original face for snapped cases
+            kept_fan = np.stack([A[snapped_mask], B[snapped_mask], C[snapped_mask]], axis=1)
+            out_parts.append(kept_fan)
+            # Only fan-split for un-snapped cases
+            keep = ~snapped_mask
+            A, B, C, P, one_fi = A[keep], B[keep], C[keep], P[keep], one_fi[keep]
+
+        if len(one_fi) > 0:
+            fan = np.empty((3 * len(one_fi), 3), dtype=np.int64)
+            fan[0::3, 0] = P; fan[0::3, 1] = A; fan[0::3, 2] = B
+            fan[1::3, 0] = P; fan[1::3, 1] = B; fan[1::3, 2] = C
+            fan[2::3, 0] = P; fan[2::3, 1] = C; fan[2::3, 2] = A
+            out_parts.append(fan)
+        n_fan = len(one_fi)
+        n_fan_faces = n_fan * 3
+
+    # ── Local Delaunay for 2+-Gaussian faces ─────────────────────────
+    if len(multi_idx) > 0:
+        # Pre-allocate list for multi-Gaussian faces
+        multi_faces_list: list = []
+        for mi in multi_idx:
+            fi = int(group_face_ids[mi])
+            gi_slice = sorted_gauss_global[group_starts[mi]:group_ends[mi]]
+            corners = grid_faces[fi].astype(np.int64)
+            local_global = np.concatenate([corners, gi_slice.astype(np.int64)])
+            local_xy = vertices[local_global, :2]
+            local_tri = Delaunay(local_xy)
+            multi_faces_list.append(local_global[local_tri.simplices])
+        combined = np.vstack(multi_faces_list)
+        out_parts.append(combined)
+        n_delaunay = len(multi_idx)
+        n_delaunay_faces = len(combined)
+
+    faces_out = np.vstack(out_parts).astype(np.int32)
+    dt = _time.time() - t0
+
+    if verbose:
+        print(f"          Local insertion: {len(faces_out)} faces from "
+              f"{len(vertices)} verts ({dt:.1f}s)")
+        print(f"            {n_kept} grid faces unchanged, "
+              f"{n_fan} fan (1-Gaussian, {n_fan_faces} faces), "
+              f"{n_delaunay} local Delaunay (2+, {n_delaunay_faces} faces)")
+        if n_outside > 0:
+            print(f"            {n_outside} Gaussians outside grid snapped")
+        # Quality report
+        ar, min_angle_deg, longest = _triangle_quality(
+            vertices[:, :2], faces_out,
+        )
+        bad = (ar > 2.0) | (min_angle_deg < 20.0)
+        print(f"          bad triangles: {bad.sum()}/{len(faces_out)} "
+              f"({100.0 * bad.sum() / len(faces_out):.1f}%)")
+        print(f"          AR: median={np.median(ar):.3f}, "
+              f"p95={np.percentile(ar, 95):.3f}, "
+              f"worst={ar.max():.3f}")
+        print(f"          min angle: min={min_angle_deg.min():.1f}°, "
+              f"median={np.median(min_angle_deg):.1f}°")
+
+    return faces_out
 
 
 # ── Vectorised face splitting with edge midpoints ──────────────────────────
@@ -3118,6 +3298,7 @@ def _fix_invalid_gaussians_with_rings(
     gauss_ar_threshold: float,
     gauss_angle_threshold: float,
     gauss_edge_threshold: Optional[float] = None,
+    max_ring_steps: int = 1,
     verbose: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Add support rings around Gaussian vertices in bad triangles.
@@ -3131,6 +3312,12 @@ def _fix_invalid_gaussians_with_rings(
     KDTree so that nearby rings share vertices — keeping the insertion
     count minimal.
 
+    Multiple steps can be run (``max_ring_steps > 1``): each step
+    re-evaluates which Gaussians are still in bad triangles and adds
+    fresh rings with a **halved radius** so that successive passes
+    fill in finer detail.  The loop exits early if no new ring points
+    are generated.
+
     Parameters
     ----------
     vertices : ndarray ``(V, 3)``
@@ -3140,11 +3327,53 @@ def _fix_invalid_gaussians_with_rings(
     surface_type : str
     gauss_ar_threshold, gauss_angle_threshold : float
     gauss_edge_threshold : float or None
+    max_ring_steps : int
+        Number of ring insertion passes (default 1).
     verbose : bool
 
     Returns
     -------
     vertices, faces, is_gaussian : updated arrays
+    """
+    radius_scale = 1.0  # shrinks each step
+
+    for step in range(max(max_ring_steps, 1)):
+        n_before = len(vertices)
+        vertices, faces, is_gaussian = _ring_fix_single_pass(
+            vertices, faces, is_gaussian, max_edge_length, surface_type,
+            gauss_ar_threshold, gauss_angle_threshold, gauss_edge_threshold,
+            radius_scale=radius_scale, verbose=verbose, step=step,
+        )
+        n_inserted = len(vertices) - n_before
+        if n_inserted == 0:
+            if verbose:
+                print(f"          [ring fix] step {step}: no new points — done")
+            break
+        radius_scale *= 0.5  # halve radius for next pass
+
+    return vertices, faces, is_gaussian
+
+
+def _ring_fix_single_pass(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    is_gaussian: np.ndarray,
+    max_edge_length: float,
+    surface_type: str,
+    gauss_ar_threshold: float,
+    gauss_angle_threshold: float,
+    gauss_edge_threshold: Optional[float] = None,
+    radius_scale: float = 1.0,
+    verbose: bool = False,
+    step: int = 0,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Single pass of ring-based support-point insertion (internal).
+
+    Uses **adaptive per-Gaussian ring radius** based on the distance
+    to the nearest Gaussian neighbour.  Gaussians in dense clusters
+    get small, tightly-spaced rings; isolated Gaussians get larger
+    rings. This produces far more surviving points after deduplication
+    than a single global radius.
     """
     # ── 1. Identify Gaussian-touching bad triangles ────────────────────
     ar, min_angle, longest_edge = _triangle_quality(vertices, faces)
@@ -3174,48 +3403,85 @@ def _fix_invalid_gaussians_with_rings(
     if len(invalid_gauss_indices) == 0:
         return vertices, faces, is_gaussian
 
-    # ── 3. Compute per-Gaussian ring radius (surface metric aware) ─────
-    target_r_3d = max_edge_length * 0.65
+    # ── 3. Adaptive per-Gaussian ring radius ───────────────────────────
     eps = max_edge_length * 0.01
-
-    # Vectorised local scale: sqrt(1 + (dz/dx)^2 + (dz/dy)^2)
     gxy = vertices[invalid_gauss_indices, :2]  # (K, 2)
     gz = vertices[invalid_gauss_indices, 2]    # (K,)
+
+    # Local surface metric scale
     zx = evaluate_polynomial(gxy[:, 0] + eps, gxy[:, 1], surface_type)
     zy = evaluate_polynomial(gxy[:, 0], gxy[:, 1] + eps, surface_type)
     dzdx = (zx - gz) / eps
     dzdy = (zy - gz) / eps
     scale = np.sqrt(1.0 + dzdx ** 2 + dzdy ** 2)
+
+    # Find nearest-Gaussian-neighbour distance for each invalid Gaussian.
+    # All Gaussian vertices (not just invalid ones) are reference points.
+    all_gauss_xy = vertices[is_gaussian, :2]
+    kd_gauss = KDTree(all_gauss_xy)
+    # k=2 because the nearest neighbour of a point in the set is itself
+    dd_gauss, _ = kd_gauss.query(gxy, k=min(2, len(all_gauss_xy)))
+    if dd_gauss.ndim == 1:
+        nn_dist = dd_gauss
+    else:
+        nn_dist = dd_gauss[:, 1]  # second-nearest = true nearest neighbour
+
+    # Adaptive 3D ring radius: proportional to local Gaussian spacing,
+    # clamped between a sensible min and max.
+    r_max_3d = max_edge_length * 0.65 * radius_scale
+    median_edge = float(np.median(longest_edge))
+    r_min_3d = median_edge * 0.5
+
+    # Target: 2× nearest-neighbour distance — large enough to create a
+    # well-spaced ring that doesn't overlap with neighbouring Gaussians.
+    target_r_3d = np.clip(nn_dist * 2.0, r_min_3d, r_max_3d)  # (K,)
+
+    # Convert to 2D parameter-space radius accounting for surface metric
     ring_r_2d = target_r_3d / np.maximum(scale, 1e-6)  # (K,)
 
-    # ── 4. Generate all ring points (6 per Gaussian) ───────────────────
-    angles = np.linspace(0, 2 * np.pi, 7)[:-1]  # 6 angles
-    # Broadcast: (K, 6, 2) ring offsets
-    cos_a = np.cos(angles)  # (6,)
-    sin_a = np.sin(angles)  # (6,)
-    offsets_x = ring_r_2d[:, None] * cos_a[None, :]  # (K, 6)
-    offsets_y = ring_r_2d[:, None] * sin_a[None, :]  # (K, 6)
-    ring_xy = np.empty((len(invalid_gauss_indices), 6, 2))
+    # ── 4. Generate ring points (8 per Gaussian for better coverage) ───
+    n_ring = 8
+    angles = np.linspace(0, 2 * np.pi, n_ring + 1)[:-1]
+    cos_a = np.cos(angles)  # (n_ring,)
+    sin_a = np.sin(angles)  # (n_ring,)
+    offsets_x = ring_r_2d[:, None] * cos_a[None, :]  # (K, n_ring)
+    offsets_y = ring_r_2d[:, None] * sin_a[None, :]  # (K, n_ring)
+    ring_xy = np.empty((len(invalid_gauss_indices), n_ring, 2))
     ring_xy[:, :, 0] = gxy[:, 0:1] + offsets_x
     ring_xy[:, :, 1] = gxy[:, 1:2] + offsets_y
-    ring_xy_flat = ring_xy.reshape(-1, 2)  # (K*6, 2)
+    ring_xy_flat = ring_xy.reshape(-1, 2)  # (K*n_ring, 2)
+    # Track which ring radius each point came from for adaptive dedup
+    ring_r_per_pt = np.repeat(target_r_3d, n_ring)  # (K*n_ring,)
 
-    # ── 5. Deduplicate ring points (shared between adjacent Gaussians) ─
-    # Use a spacing proportional to the ring radius so that overlapping
-    # rings from neighbouring Gaussians share vertices.
-    dedup_spacing = target_r_3d * 0.4  # ~40 % of ring radius
-    if len(ring_xy_flat) > 1:
-        # Self-dedup: keep only unique ring points
-        rounded = np.round(ring_xy_flat / max(dedup_spacing, 1e-15)).astype(np.int64)
+    # ── 5. Deduplicate — adaptive spacing per point ────────────────────
+    # Dedup spacing is 25% of the *local* ring radius (not global).
+    # Use the minimum radius of nearby candidates so dense clusters
+    # keep their fine-grained points.
+    local_dedup = ring_r_per_pt * 0.25
+    # Use a global minimum dedup spacing to avoid creating near-
+    # degenerate edges.
+    global_min_dedup = max(r_min_3d * 0.2, 1e-7)
+    local_dedup = np.maximum(local_dedup, global_min_dedup)
+
+    # Grid-based self-dedup using the *median* local dedup spacing.
+    # After the grid dedup, we do a fine-grained KDTree pass.
+    median_dedup = float(np.median(local_dedup))
+    if len(ring_xy_flat) > 1 and median_dedup > 0:
+        rounded = np.round(ring_xy_flat / median_dedup).astype(np.int64)
         _, unique_idx = np.unique(rounded, axis=0, return_index=True)
-        ring_xy_flat = ring_xy_flat[np.sort(unique_idx)]
+        unique_idx = np.sort(unique_idx)
+        ring_xy_flat = ring_xy_flat[unique_idx]
+        ring_r_per_pt = ring_r_per_pt[unique_idx]
+        local_dedup = local_dedup[unique_idx]
 
-    # Dedup against existing vertices
-    min_spacing_existing = max_edge_length * 0.01
+    # Dedup against existing vertices — keep points far enough from
+    # any existing vertex, using a fraction of local ring radius.
+    min_spacing_existing = local_dedup * 0.8
     if len(ring_xy_flat) > 0:
         kd_existing = KDTree(vertices[:, :2])
         dd, _ = kd_existing.query(ring_xy_flat)
-        ring_xy_flat = ring_xy_flat[dd > min_spacing_existing]
+        keep = dd > min_spacing_existing
+        ring_xy_flat = ring_xy_flat[keep]
 
     if len(ring_xy_flat) == 0:
         return vertices, faces, is_gaussian
@@ -3224,21 +3490,140 @@ def _fix_invalid_gaussians_with_rings(
     ring_z = evaluate_polynomial(ring_xy_flat[:, 0], ring_xy_flat[:, 1], surface_type)
     ring_pts = np.column_stack([ring_xy_flat, ring_z])
 
-    if verbose:
-        print(
-            f"          [ring fix] {len(invalid_gauss_indices)} invalid Gaussian(s), "
-            f"inserting {len(ring_pts)} ring points"
-        )
+    # ── 7. Local face-split insertion ──────────────────────────────────
+    # Instead of a global Delaunay rebuild (which creates long-range
+    # slivers), insert each ring point into its containing face locally:
+    # fan-split for 1-point faces, local Delaunay for multi-point faces.
+    # Lawson flips then restore the Delaunay property at boundaries.
 
-    # ── 7. Add ring points and re-triangulate ──────────────────────────
+    # --- Point-location: find each ring point's containing face ---
+    xy_v = vertices[:, :2]
+    centroids = (
+        xy_v[faces[:, 0]] + xy_v[faces[:, 1]] + xy_v[faces[:, 2]]
+    ) / 3.0
+    cent_kd = KDTree(centroids)
+    k_check = min(12, len(faces))
+    _, nearest_fi = cent_kd.query(ring_pts[:, :2], k=k_check)
+    if nearest_fi.ndim == 1:
+        nearest_fi = nearest_fi[:, None]
+
+    containing = np.full(len(ring_pts), -1, dtype=np.int64)
+    _px = ring_pts[:, 0]
+    _py = ring_pts[:, 1]
+    for j in range(nearest_fi.shape[1]):
+        still = containing < 0
+        if not still.any():
+            break
+        fi_j = nearest_fi[still, j]
+        a = faces[fi_j, 0]; b = faces[fi_j, 1]; c = faces[fi_j, 2]
+        ax, ay = xy_v[a, 0], xy_v[a, 1]
+        bx, by = xy_v[b, 0], xy_v[b, 1]
+        cx, cy = xy_v[c, 0], xy_v[c, 1]
+        v0x = cx - ax; v0y = cy - ay
+        v1x = bx - ax; v1y = by - ay
+        v2x = _px[still] - ax; v2y = _py[still] - ay
+        d00 = v0x * v0x + v0y * v0y
+        d01 = v0x * v1x + v0y * v1y
+        d02 = v0x * v2x + v0y * v2y
+        d11 = v1x * v1x + v1y * v1y
+        d12 = v1x * v2x + v1y * v2y
+        inv = 1.0 / (d00 * d11 - d01 * d01 + 1e-30)
+        u = (d11 * d02 - d01 * d12) * inv
+        v = (d00 * d12 - d01 * d02) * inv
+        inside = (u >= -1e-6) & (v >= -1e-6) & ((u + v) <= 1.0 + 1e-6)
+        idx = np.where(still)[0]
+        containing[idx[inside]] = fi_j[inside]
+
+    # Keep only ring points that fall inside an existing face
+    valid = containing >= 0
+    ring_pts = ring_pts[valid]
+    ring_face_ids = containing[valid]
+
+    if len(ring_pts) == 0:
+        return vertices, faces, is_gaussian
+
     n_new = len(ring_pts)
+    V0 = len(vertices)
     vertices = np.vstack([vertices, ring_pts])
     is_gaussian = np.concatenate([is_gaussian, np.zeros(n_new, dtype=bool)])
+    xy = vertices[:, :2]
 
-    tri = Delaunay(vertices[:, :2])
-    faces = tri.simplices.astype(np.int32)
+    ring_global = np.arange(V0, V0 + n_new, dtype=np.int64)
+
+    if verbose:
+        print(
+            f"          [ring fix] step {step}: {len(invalid_gauss_indices)} invalid Gaussian(s), "
+            f"inserting {n_new} ring points "
+            f"(radius_scale={radius_scale:.2f}, "
+            f"r_median={float(np.median(target_r_3d)):.5f}, "
+            f"r_range=[{float(target_r_3d.min()):.5f}, {float(target_r_3d.max()):.5f}])"
+        )
+
+    # Group ring points by their containing face
+    sort_order = np.argsort(ring_face_ids)
+    sorted_face_ids = ring_face_ids[sort_order]
+    sorted_ring_global = ring_global[sort_order]
+
+    change_idx = np.where(np.diff(sorted_face_ids) != 0)[0] + 1
+    group_starts = np.concatenate([[0], change_idx])
+    group_ends = np.concatenate([change_idx, [len(sorted_face_ids)]])
+    group_face_ids = sorted_face_ids[group_starts]
+
+    faces_with_ring = set(group_face_ids.tolist())
+    n_faces = len(faces)
+
+    # Faces with no ring points: keep unchanged
+    no_ring_mask = np.ones(n_faces, dtype=bool)
+    for fi in faces_with_ring:
+        no_ring_mask[fi] = False
+    out_parts: list = [faces[no_ring_mask]]
+
+    # Separate 1-point faces (vectorised fan) vs 2+ (local Delaunay)
+    group_sizes = group_ends - group_starts
+    one_mask = group_sizes == 1
+    one_fi = group_face_ids[one_mask].astype(np.int64)
+    one_ri = sorted_ring_global[group_starts[one_mask]].astype(np.int64)
+    multi_idx = np.where(~one_mask)[0]
+
+    # Vectorised fan for 1-point faces: [A,B,C]+P → [P,A,B],[P,B,C],[P,C,A]
+    if len(one_fi) > 0:
+        A = faces[one_fi, 0].astype(np.int64)
+        B = faces[one_fi, 1].astype(np.int64)
+        C = faces[one_fi, 2].astype(np.int64)
+        P = one_ri
+        fan = np.empty((3 * len(one_fi), 3), dtype=np.int64)
+        fan[0::3, 0] = P; fan[0::3, 1] = A; fan[0::3, 2] = B
+        fan[1::3, 0] = P; fan[1::3, 1] = B; fan[1::3, 2] = C
+        fan[2::3, 0] = P; fan[2::3, 1] = C; fan[2::3, 2] = A
+        out_parts.append(fan)
+
+    # Local Delaunay for multi-point faces
+    if len(multi_idx) > 0:
+        for mi in multi_idx:
+            fi = int(group_face_ids[mi])
+            ri_slice = sorted_ring_global[group_starts[mi]:group_ends[mi]]
+            corners = faces[fi].astype(np.int64)
+            local_global = np.concatenate([corners, ri_slice])
+            local_xy = xy[local_global]
+            local_tri = Delaunay(local_xy)
+            out_parts.append(local_global[local_tri.simplices])
+
+    faces = np.vstack(out_parts).astype(np.int32)
+
     # Reproject z for consistency
     vertices[:, 2] = evaluate_polynomial(vertices[:, 0], vertices[:, 1], surface_type)
+
+    # Lawson flips to restore Delaunay property at subdivision boundaries
+    faces_i64 = faces.astype(np.int64)
+    total_flips = 0
+    for _ in range(10):
+        nf = _lawson_flip_pass(xy, faces_i64)
+        total_flips += nf
+        if nf == 0:
+            break
+    faces = faces_i64.astype(np.int32)
+    if verbose and total_flips > 0:
+        print(f"          [ring local insertion] {total_flips} Lawson flips")
 
     # Filter convex-hull artifacts
     if max_edge_length > 0:
@@ -3246,6 +3631,254 @@ def _fix_invalid_gaussians_with_rings(
             vertices, faces, max_edge_length,
             surface_type=surface_type, is_3d=False,
         )
+
+    return vertices, faces, is_gaussian
+
+
+def _circumcenter_steiner_pass(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    is_gaussian: np.ndarray,
+    max_edge_length: float,
+    surface_type: str,
+    gauss_ar_threshold: float,
+    gauss_angle_threshold: float,
+    max_iterations: int = 3,
+    verbose: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Insert circumcenters of bad Gaussian triangles (Ruppert-style).
+
+    For each bad triangle touching a Gaussian vertex, computes the
+    circumcenter in the 2-D (x, y) plane.  For obtuse triangles
+    where the circumcenter falls outside, an *off-center* point is
+    used instead — placed on the perpendicular bisector of the
+    shortest edge at a distance that guarantees good angles.
+
+    Insertion uses the same local face-split + Lawson flip strategy
+    as ring insertion, avoiding global Delaunay rebuilds.
+
+    Parameters
+    ----------
+    vertices, faces, is_gaussian : current mesh state
+    max_edge_length : float
+    surface_type : str
+    gauss_ar_threshold, gauss_angle_threshold : float
+        Thresholds for identifying bad Gaussian triangles.
+    max_iterations : int
+        Maximum circumcenter insertion rounds (default 3).
+    verbose : bool
+    """
+    for iteration in range(max_iterations):
+        ar, min_angle, _ = _triangle_quality(vertices, faces)
+        touches_gauss = (
+            is_gaussian[faces[:, 0]]
+            | is_gaussian[faces[:, 1]]
+            | is_gaussian[faces[:, 2]]
+        )
+        bad_gauss = touches_gauss & (
+            (ar > gauss_ar_threshold) | (min_angle < gauss_angle_threshold)
+        )
+        n_bad = int(bad_gauss.sum())
+        if n_bad == 0:
+            break
+
+        bad_f = faces[bad_gauss]
+        xy = vertices[:, :2]
+
+        # Circumcenters
+        ax, ay = xy[bad_f[:, 0], 0], xy[bad_f[:, 0], 1]
+        bx, by = xy[bad_f[:, 1], 0], xy[bad_f[:, 1], 1]
+        cx, cy = xy[bad_f[:, 2], 0], xy[bad_f[:, 2], 1]
+        sx, sy = _circumcenter_2d(ax, ay, bx, by, cx, cy)
+
+        # Check if circumcenter is inside its triangle (barycentric test)
+        v0x, v0y = cx - ax, cy - ay
+        v1x, v1y = bx - ax, by - ay
+        v2x, v2y = sx - ax, sy - ay
+        d00 = v0x * v0x + v0y * v0y
+        d01 = v0x * v1x + v0y * v1y
+        d02 = v0x * v2x + v0y * v2y
+        d11 = v1x * v1x + v1y * v1y
+        d12 = v1x * v2x + v1y * v2y
+        inv_denom = 1.0 / (d00 * d11 - d01 * d01 + 1e-30)
+        u = (d11 * d02 - d01 * d12) * inv_denom
+        v = (d00 * d12 - d01 * d02) * inv_denom
+        inside = (u >= -1e-6) & (v >= -1e-6) & ((u + v) <= 1.0 + 1e-6)
+
+        # For obtuse triangles: use off-center on the longest edge
+        # perpendicular bisector, at sqrt(2)× half the shortest edge
+        # from the midpoint — guarantees min angle ~26.6°.
+        outside = ~inside
+        if outside.any():
+            # Compute edge lengths
+            e01 = np.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
+            e12 = np.sqrt((cx - bx) ** 2 + (cy - by) ** 2)
+            e20 = np.sqrt((ax - cx) ** 2 + (ay - cy) ** 2)
+            edges = np.column_stack([e01, e12, e20])
+            longest_idx = np.argmax(edges, axis=1)
+
+            # For obtuse triangles, use centroid as the off-center
+            # (always inside, creates reasonable sub-triangles)
+            cen_x = (ax + bx + cx) / 3.0
+            cen_y = (ay + by + cy) / 3.0
+            sx[outside] = cen_x[outside]
+            sy[outside] = cen_y[outside]
+
+        # Project onto surface
+        sz = evaluate_polynomial(sx, sy, surface_type)
+        steiner_pts = np.column_stack([sx, sy, sz])
+
+        # Deduplicate against existing vertices
+        if len(steiner_pts) > 0:
+            kd = KDTree(vertices[:, :2])
+            dd, _ = kd.query(steiner_pts[:, :2])
+            el = np.concatenate([
+                np.linalg.norm(vertices[faces[:, 1], :2] - vertices[faces[:, 0], :2], axis=1),
+                np.linalg.norm(vertices[faces[:, 2], :2] - vertices[faces[:, 1], :2], axis=1),
+                np.linalg.norm(vertices[faces[:, 0], :2] - vertices[faces[:, 2], :2], axis=1),
+            ])
+            min_spacing = float(np.median(el)) * 0.15
+            keep = dd > min_spacing
+            steiner_pts = steiner_pts[keep]
+
+        # Self-dedup via grid
+        if len(steiner_pts) > 1:
+            rounded = np.round(steiner_pts[:, :2] / max(min_spacing, 1e-15)).astype(np.int64)
+            _, unique_idx = np.unique(rounded, axis=0, return_index=True)
+            steiner_pts = steiner_pts[np.sort(unique_idx)]
+
+        if len(steiner_pts) == 0:
+            if verbose:
+                print(f"          [steiner] iter {iteration}: all circumcenters deduped — done")
+            break
+
+        # ── Local face-split insertion (same as ring insertion) ─────
+        centroids = (
+            xy[faces[:, 0]] + xy[faces[:, 1]] + xy[faces[:, 2]]
+        ) / 3.0
+        cent_kd = KDTree(centroids)
+        k_check = min(12, len(faces))
+        _, nearest_fi = cent_kd.query(steiner_pts[:, :2], k=k_check)
+        if nearest_fi.ndim == 1:
+            nearest_fi = nearest_fi[:, None]
+
+        containing = np.full(len(steiner_pts), -1, dtype=np.int64)
+        _px, _py = steiner_pts[:, 0], steiner_pts[:, 1]
+        for j in range(nearest_fi.shape[1]):
+            still = containing < 0
+            if not still.any():
+                break
+            fi_j = nearest_fi[still, j]
+            a = faces[fi_j, 0]; b = faces[fi_j, 1]; c = faces[fi_j, 2]
+            _ax, _ay = xy[a, 0], xy[a, 1]
+            _bx, _by = xy[b, 0], xy[b, 1]
+            _cx, _cy = xy[c, 0], xy[c, 1]
+            _v0x = _cx - _ax; _v0y = _cy - _ay
+            _v1x = _bx - _ax; _v1y = _by - _ay
+            _v2x = _px[still] - _ax; _v2y = _py[still] - _ay
+            _d00 = _v0x * _v0x + _v0y * _v0y
+            _d01 = _v0x * _v1x + _v0y * _v1y
+            _d02 = _v0x * _v2x + _v0y * _v2y
+            _d11 = _v1x * _v1x + _v1y * _v1y
+            _d12 = _v1x * _v2x + _v1y * _v2y
+            _inv = 1.0 / (_d00 * _d11 - _d01 * _d01 + 1e-30)
+            _u = (_d11 * _d02 - _d01 * _d12) * _inv
+            _v = (_d00 * _d12 - _d01 * _d02) * _inv
+            _inside = (_u >= -1e-6) & (_v >= -1e-6) & ((_u + _v) <= 1.0 + 1e-6)
+            idx = np.where(still)[0]
+            containing[idx[_inside]] = fi_j[_inside]
+
+        valid = containing >= 0
+        steiner_pts = steiner_pts[valid]
+        steiner_face_ids = containing[valid]
+
+        if len(steiner_pts) == 0:
+            if verbose:
+                print(f"          [steiner] iter {iteration}: no points located — done")
+            break
+
+        n_new = len(steiner_pts)
+        V0 = len(vertices)
+        vertices = np.vstack([vertices, steiner_pts])
+        is_gaussian = np.concatenate([is_gaussian, np.zeros(n_new, dtype=bool)])
+        xy = vertices[:, :2]
+        new_global = np.arange(V0, V0 + n_new, dtype=np.int64)
+
+        # Group by face and fan-split / local Delaunay
+        sort_order = np.argsort(steiner_face_ids)
+        sorted_fids = steiner_face_ids[sort_order]
+        sorted_globals = new_global[sort_order]
+
+        change_idx = np.where(np.diff(sorted_fids) != 0)[0] + 1
+        group_starts = np.concatenate([[0], change_idx])
+        group_ends = np.concatenate([change_idx, [len(sorted_fids)]])
+        group_fids = sorted_fids[group_starts]
+
+        faces_with_pts = set(group_fids.tolist())
+        no_pts_mask = np.ones(len(faces), dtype=bool)
+        for fi in faces_with_pts:
+            no_pts_mask[fi] = False
+        out_parts: list = [faces[no_pts_mask]]
+
+        group_sizes = group_ends - group_starts
+        one_mask = group_sizes == 1
+        one_fi = group_fids[one_mask].astype(np.int64)
+        one_pi = sorted_globals[group_starts[one_mask]].astype(np.int64)
+        multi_idx = np.where(~one_mask)[0]
+
+        if len(one_fi) > 0:
+            A = faces[one_fi, 0].astype(np.int64)
+            B = faces[one_fi, 1].astype(np.int64)
+            C = faces[one_fi, 2].astype(np.int64)
+            P = one_pi
+            fan = np.empty((3 * len(one_fi), 3), dtype=np.int64)
+            fan[0::3, 0] = P; fan[0::3, 1] = A; fan[0::3, 2] = B
+            fan[1::3, 0] = P; fan[1::3, 1] = B; fan[1::3, 2] = C
+            fan[2::3, 0] = P; fan[2::3, 1] = C; fan[2::3, 2] = A
+            out_parts.append(fan)
+
+        if len(multi_idx) > 0:
+            for mi in multi_idx:
+                fi = int(group_fids[mi])
+                pi_slice = sorted_globals[group_starts[mi]:group_ends[mi]]
+                corners = faces[fi].astype(np.int64)
+                local_global = np.concatenate([corners, pi_slice])
+                local_xy = xy[local_global]
+                local_tri = Delaunay(local_xy)
+                out_parts.append(local_global[local_tri.simplices])
+
+        faces = np.vstack(out_parts).astype(np.int32)
+
+        # Reproject z
+        vertices[:, 2] = evaluate_polynomial(
+            vertices[:, 0], vertices[:, 1], surface_type
+        )
+
+        # Lawson flips
+        faces_i64 = faces.astype(np.int64)
+        total_flips = 0
+        for _ in range(10):
+            nf = _lawson_flip_pass(xy, faces_i64)
+            total_flips += nf
+            if nf == 0:
+                break
+        faces = faces_i64.astype(np.int32)
+
+        if verbose:
+            ar2, ma2, _ = _triangle_quality(vertices[:, :2], faces)
+            bad2 = (ar2 > gauss_ar_threshold) | (ma2 < gauss_angle_threshold)
+            print(
+                f"          [steiner] iter {iteration}: {n_bad} bad Gauss tri → "
+                f"inserted {n_new} circumcenters → {bad2.sum()} bad total "
+                f"({total_flips} flips)"
+            )
+
+        # Filter convex-hull artifacts
+        if max_edge_length > 0:
+            faces, _ = _filter_convex_hull_artifacts(
+                vertices, faces, max_edge_length,
+                surface_type=surface_type, is_3d=False,
+            )
 
     return vertices, faces, is_gaussian
 
@@ -3267,11 +3900,16 @@ def refine_bad_triangles(
     gauss_max_area_factor: Optional[float] = None,
     warmup_iterations: int = 0,
     ring_fix_invalid_gaussians: bool = False,
+    ring_fix_iterations: int = 1,
     surface_aware: bool = False,
     patience: int = 3,
     max_splits_per_iter: int = 50000,
     smoothing_passes: int = 3,
     use_3d_delaunay: bool = False,
+    delaunay_flip_polish: bool = False,
+    max_flip_passes: int = 20,
+    steiner_fix_gaussians: bool = False,
+    steiner_max_iterations: int = 3,
     verbose: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Iteratively improve mesh quality by **smoothing** and **splitting**.
@@ -3432,6 +4070,7 @@ def refine_bad_triangles(
             gauss_ar_threshold=gauss_max_aspect_ratio,
             gauss_angle_threshold=gauss_min_angle_deg,
             gauss_edge_threshold=gauss_max_edge_length,
+            max_ring_steps=ring_fix_iterations,
             verbose=verbose,
         )
         # Rebuild cached structures after ring insertion
@@ -3508,12 +4147,60 @@ def refine_bad_triangles(
                 f"(worst AR={ar.max():.2f}, min angle={min_angle.min():.2f}°)"
             )
 
-        # ── Longest-edge splitting ─────────────────────────────────────
-        # Split the longest edge of each bad triangle.  A single smoothing
-        # polish runs after the loop.
-        #
-        # Vertex-budget gate: stop splitting if we've already tripled
-        # the initial vertex count to prevent runaway mesh growth.
+        # ── Stage 1: Smooth ALL non-Gaussian vertices globally ─────────
+        # Let the entire mesh relax so grid vertices can redistribute
+        # to accommodate inserted Gaussians.
+        movable = ~is_gaussian
+
+        n_bad_before_smooth = n_bad
+        if int(movable.sum()) > 0:
+            _w_cache = None
+            for _sp in range(smoothing_passes):
+                if surface_aware:
+                    _, _w_cache = _metric_weighted_laplacian_smooth(
+                        vertices, faces, movable, surface_type,
+                        damping=0.3, _W_cache=_w_cache,
+                    )
+                else:
+                    _, _w_cache = _uniform_laplacian_smooth(
+                        vertices, faces, movable, surface_type,
+                        damping=0.3, _adj_cache=_w_cache,
+                    )
+
+            # Re-evaluate quality after smoothing
+            ar, min_angle, longest_edge = _triangle_quality(vertices, faces)
+            bad_mask, touches_gauss = _bad_mask_with_gauss(
+                ar, min_angle, faces, longest_edge,
+            )
+            # Re-apply area and warmup criteria
+            if median_area > 0:
+                areas_2d = 0.5 * np.abs(
+                    (vertices[faces[:, 0], 0] - vertices[faces[:, 2], 0])
+                    * (vertices[faces[:, 1], 1] - vertices[faces[:, 2], 1])
+                    - (vertices[faces[:, 1], 0] - vertices[faces[:, 2], 0])
+                    * (vertices[faces[:, 0], 1] - vertices[faces[:, 2], 1])
+                )
+                large_mask = (
+                    (~touches_gauss & (areas_2d > median_area * max_area_factor))
+                    | (touches_gauss & (areas_2d > median_area * eff_gauss_area_factor))
+                )
+                bad_mask = bad_mask | large_mask
+            if iteration < warmup_iterations:
+                bad_mask = bad_mask & touches_gauss
+
+            n_bad = int(bad_mask.sum())
+            if verbose:
+                print(
+                    f"          [smooth] {n_bad_before_smooth} → {n_bad} bad "
+                    f"after {smoothing_passes} passes"
+                )
+
+        if n_bad == 0:
+            if verbose:
+                print(f"          → all fixed by smoothing — done.")
+            break
+
+        # ── Stage 2: Split only triangles still bad after smoothing ────
         remaining_budget = max_total_verts - len(vertices)
         if remaining_budget <= 0:
             if verbose:
@@ -3526,8 +4213,6 @@ def refine_bad_triangles(
         bad_idx = np.where(bad_mask)[0]
 
         # Prioritise shape-bad triangles (AR/angle) over edge-length-only.
-        # Edge-length-only bad triangles cause exponential growth when
-        # gauss_max_edge_length << grid edge length.
         shape_bad = (ar[bad_idx] > gauss_max_aspect_ratio) | (
             min_angle[bad_idx] < gauss_min_angle_deg
         )
@@ -3670,6 +4355,41 @@ def refine_bad_triangles(
                     )
 
     gaussian_vertex_indices = np.where(is_gaussian)[0].astype(np.int32)
+
+    # ── Circumcenter Steiner insertion for stubborn Gaussian triangles ─
+    if steiner_fix_gaussians and gauss_max_aspect_ratio is not None:
+        # Use the general quality thresholds (not the permissive Gaussian-
+        # specific ones) so the Steiner pass targets the same triangles
+        # the user considers "bad".
+        steiner_ar = min(max_aspect_ratio, 2.0)
+        steiner_angle = max(min_angle_deg, 20.0)
+        vertices, faces, is_gaussian = _circumcenter_steiner_pass(
+            vertices, faces, is_gaussian,
+            max_edge_length=max_edge_length,
+            surface_type=surface_type,
+            gauss_ar_threshold=steiner_ar,
+            gauss_angle_threshold=steiner_angle,
+            max_iterations=steiner_max_iterations,
+            verbose=verbose,
+        )
+        gaussian_vertex_indices = np.where(is_gaussian)[0].astype(np.int32)
+
+    # ── Delaunay flip polish pass ─────────────────────────────────────
+    if delaunay_flip_polish:
+        xy = vertices[:, :2].copy()
+        faces_i64 = faces.astype(np.int64)
+        total_flips = 0
+        for _fp in range(max_flip_passes):
+            n_flips = _lawson_flip_pass(xy, faces_i64)
+            total_flips += n_flips
+            if n_flips == 0:
+                break
+        faces = faces_i64.astype(np.int32)
+        if verbose:
+            print(
+                f"        [flip polish] {total_flips} flips in "
+                f"{_fp + 1} passes"
+            )
 
     if verbose:
         ar_final, ma_final, _ = _triangle_quality(vertices, faces)
