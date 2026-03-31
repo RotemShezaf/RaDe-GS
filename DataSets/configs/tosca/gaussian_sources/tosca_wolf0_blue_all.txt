@@ -1,0 +1,3 @@
+# Gaussian output paths for TOSCA shape: wolf0, texture: blue
+# Resolutions: high_res, lighting: decoupled_appearance
+TrainData/TOSCA/SyntheticColmapData/blue_texture/wolf0/high_res/decoupled_appearance/output

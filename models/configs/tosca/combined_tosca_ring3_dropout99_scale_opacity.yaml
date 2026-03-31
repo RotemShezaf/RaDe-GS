@@ -1,0 +1,79 @@
+# Training config: Combined TOSCA Animals – Ring 3
+# Variant: high dropout (0.99) + xyz + scale + opacity attributes
+#
+# Key differences from combined_tosca_ring3_dropout99.yaml:
+#   - dataset_config: combined_tosca_all_scale_opacity.yaml  (scale+opacity patches)
+#   - attributes: [xyz, scale, opacity]  (richer per-neighbor features)
+#
+# Trains GaussianPatchTransformer on the combined TOSCA dataset
+# (9 animal types filtered to high_res available meshes, 17 poses).
+#
+# Prerequisites – generate scale+opacity patches first:
+#   bash scripts/tosca/generate_patches_tmux.sh --scale_opacity
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/tosca/combined_tosca_ring3_dropout99_scale_opacity.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/tosca/combined_tosca_all_scale_opacity.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  attributes:
+    - xyz
+    - scale
+    - opacity
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: GaussianPatchDropout
+      max_dropout_ratio: 0.99
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.05
+  attn_dropout: 0.05
+  drop_path_rate: 0.0
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 150
+  batch_size: 512
+  learning_rate: 3.0e-4
+  min_learning_rate: 1.0e-6
+  warmup_epochs: 3
+  weight_decay: 1.0e-4
+  loss_type: huber
+  huber_delta: 1.0
+  gradient_clip_norm: 1.0
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 8
+  min_delta: 1.0e-5
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/combined_tosca_ring3_dropout99_scale_opacity
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: combined-tosca-ring3-dropout99-scale-opacity
+  log_file: ./checkpoints/combined_tosca_ring3_dropout99_scale_opacity/train.log

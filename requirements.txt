@@ -22,4 +22,7 @@ gdist
 pyvista
 joblib
 pytest
+torch_geometric
+logging
+#git+https://github.com/unique1i/pointnet2_pytorch.git
 #export PYOPENGL_PLATFORM=egl

@@ -65,10 +65,56 @@ pip install --no-build-isolation submodules/diff-gaussian-rasterization
 #to do: solve knn isue
 #pip install --no-build-isolation submodules/simple-knn/
 #pip install --upgrade https://github.com/unlimblue/KNN_CUDA/releases/download/0.#2/KNN_CUDA-0.#2-py3-none-any.whl
-
+# that how i solved
 git clone https://github.com/unlimblue/KNN_CUDA.git
 cd KNN_CUDA
 make && make install
+
+
+
+# tetra-nerf for Marching Tetrahedra
+cd submodules/tetra_triangulation
+conda install -c conda-forge cmake=3.26
+conda install conda-forge::gmp
+conda install conda-forge::cgal
+cmake .
+# you can specify your own cuda path
+# export CPATH=/usr/local/cuda-11.3/targets/x86_64-linux/include:$CPATH
+make 
+pip install -e .
+#setup dintance calculation 
+cd distance/external/fmm
+ python setup.py build_ext --inplace
+cd  distance/external/vtp
+python setup.py build_ext --inplace
+```
+
+## Install dependencies new.
+1. create an environment
+```
+conda create -f env.yaml
+conda activate geo_splat
+pip install requirements.txt
+```
+
+
+
+2. install submodules
+```
+pip install submodules/diff-gaussian-rasterization
+pip install  submodules/simple-knn/
+#to do: solve KNN issue
+#conda install -c conda-forge gcc=11 gxx=11
+
+# IMPORTANT: Set GPU architecture before compiling (REQUIRED!)
+# Find your GPU's compute capability: https://developer.nvidia.com/cuda-gpus
+# Common values: RTX 3090/3080=8.6, RTX 4090=8.9, A100=8.0, V100=7.0
+#for finding
+nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader | head -1
+export TORCH_CUDA_ARCH_LIST="8.6"  # Change to YOUR GPU's compute capability
+export TORCH_CUDA_ARCH_LIST="6.1;7.0;7.5;8.0;8.6;8.9"#for gidpeep
+
+pip install git+https://github.com/unlimblue/KNN_CUDA.git
 
 
 

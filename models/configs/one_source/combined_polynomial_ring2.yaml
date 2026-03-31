@@ -1,0 +1,69 @@
+# Training config: Combined Polynomial Surfaces – Ring 2 (one source)
+# Variant: one geodesic source per training example
+#
+# Trains GaussianPatchTransformer on the combined polynomial dataset
+# (Paraboloid + Saddle + HyperbolicParaboloid, all levels & lights)
+# with num_sources=1 patches.
+#
+# Prerequisites – generate one-source patches first:
+#   bash scripts/polynomial/generate_patches_one_source_tmux.sh
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/one_source/combined_polynomial_ring2.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/combined_polynomial_all_one_source.yaml
+  ring: 2
+  train_split: 0.8
+  use_r1_min: true
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: GaussianPatchDropout
+      max_dropout_ratio: 0.5
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 6
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.1
+  attn_dropout: 0.1
+  drop_path_rate: 0.1
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 100
+  batch_size: 512
+  learning_rate: 3.0e-4
+  min_learning_rate: 1.0e-6
+  weight_decay: 1.0e-4
+  loss_type: mse
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 10
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/one_source/combined_polynomial_ring2
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: combined-polynomial-ring2-one-source
+  log_file: ./checkpoints/one_source/combined_polynomial_ring2/train.log

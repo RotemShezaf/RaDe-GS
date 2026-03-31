@@ -1,0 +1,82 @@
+# Training config: Combined Polynomial Surfaces – Ring 3 (new_dataset)
+# Variant: directed surface perturbation via _aug_normals + GeodesicNoiseAugmentation
+#
+# Based on: new_dataset/combined_polynomial_ring3_noisy_geo.yaml
+# Changes:
+#   - Dataset config points to aug_normals variant (includes _aug_normals attribute)
+#   - GaussianPatchSurfacePerturb now uses analytical normals stored at data
+#     generation time for directed (along-normal) perturbation instead of
+#     isotropic noise.
+
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/new_dataset/combined_polynomial_ring3_noisy_geo_aug_normals.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/new_dataset/combined_polynomial_all_one_source_aug_normals.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: SparseContextDropout
+      min_valid: 1
+      max_valid_ratio: 1.00
+      p: 0.8
+      p_dropout: 0.3
+      max_dropout_ratio: 0.99
+    - name: GeodesicNoiseAugmentation
+      max_noise: 0.001
+      p: 0.5
+      max_ratio: 0.5
+    - name: GaussianPatchSurfacePerturb
+      max_offset: 0.005
+      p: 0.3
+      max_ratio: 0.5
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.0003
+  attn_dropout: 0.0003
+  drop_path_rate: 0.0003
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 150
+  batch_size: 256
+  learning_rate: 2.0e-4
+  min_learning_rate: 1.0e-5
+  weight_decay: 5.0e-5
+  loss_type: blended_mse
+  gradient_clip_norm: 1
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 12
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/new_dataset/combined_polynomial_ring3_noisy_geo_aug_normals
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: new-dataset-combined-ring3-noisy-geo-aug-normals
+  log_file: ./checkpoints/new_dataset/combined_polynomial_ring3_noisy_geo_aug_normals/train.log

@@ -1,0 +1,68 @@
+# Configuration for HyperbolicParaboloid surface - ALL levels and lighting conditions
+# Variant: xyz + scale + opacity attributes, one source (num_sources=1)
+#
+# Combines 15 Gaussian outputs (3 levels × 5 lights) from blue_texture HyperbolicParaboloid.
+# Each training example uses exactly 1 geodesic source.
+#
+# Usage:
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/hyperbolic_paraboloid_all_scale_opacity_one_source.yaml
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Paths
+gaussian_output: "DataSets/configs/polynomial/gaussian_sources/hyperbolic_paraboloid_blue_all.txt"
+geodesic_data: null
+output_dir: "TrainData/datasets/gaussian_patches/hyperbolic_paraboloid_all_scale_opacity_one_source"
+iteration: null
+
+# Data generation parameters
+num_iterations: 1000
+num_sources: 1
+num_train_points: 50
+seed: 42
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 12
+# Adaptive kNN
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 20
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 8
+normalize_per_patch: false
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+  mahalanobis:
+    2: 90
+    3: 250
+    4: 600
+
+# Feature attributes
+attributes:
+  - xyz
+  - scale
+  - opacity
+
+# Outlier filtering
+disable_outlier_filtering: true
+
+# Normalization and padding
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -10.0
+
+# Dataset info
+dataset:
+  name: "HyperbolicParaboloid (all levels & lights, xyz+scale+opacity, one source)"
+  type: "Polynomial"
+  description: "Training examples for HyperbolicParaboloid surface across all colmap levels (02,03,04) and lighting conditions (0-4), with scale and opacity attributes, num_sources=1"

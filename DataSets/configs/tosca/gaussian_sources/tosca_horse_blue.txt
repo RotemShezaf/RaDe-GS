@@ -1,0 +1,4 @@
+# Gaussian output paths for TOSCA horse - blue_texture, high_res, decoupled_appearance
+# 17 poses, mesh diagonal ~330.0
+# 1 pose available in high_res with geodesic data (horse0)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/horse0/high_res/decoupled_appearance/output

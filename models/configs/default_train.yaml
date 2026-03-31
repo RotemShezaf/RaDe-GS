@@ -1,0 +1,92 @@
+# Default training configuration for GaussianPatchTransformer
+#
+# This file mirrors the built-in defaults in models/args.py.
+# Copy and modify for your own experiments.
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/default_train.yaml \
+#       --dataset_config DataSets/configs/saddle_all.yaml \
+#       --ring 2
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: null    # Path to dataset YAML (required at CLI or here)
+  ring: 2
+  train_split: 0.8
+  use_r1_min: false
+  # Data augmentation transforms applied to each training example.
+  # Each entry: {name: <ClassName>, **kwargs}  (kwargs are optional – defaults are used).
+  # Available (see models/const.py for full registry):
+  #   GaussianPatchRotate          – random SO(3) rotation of xyz / normals / quaternions
+  #   GaussianPatchDropout         – geodesic-distance-based dropout (requires use_r1_min)
+  #   GaussianPatchRandomFlip      – random axis flip
+  #   GaussianPatchCanonicalRotate – deterministic centre-of-mass alignment
+  #   PointcloudRandomInputDropout – uniform random neighbor dropout
+  transforms: []  # no augmentation by default
+  # Subset controls – limit loaded examples to speed up iteration.
+  # max_examples takes precedence over subset_fraction.  null = full dataset.
+  max_examples: null        # e.g. 500000
+  subset_fraction: null     # e.g. 0.25
+  subset_seed: 42
+  # transforms:
+  #   - name: GaussianPatchRotate
+  #   - name: GaussianPatchRandomFlip
+  #     flip_prob: 0.5
+  #   - name: GaussianPatchDropout
+  #     max_dropout_ratio: 0.3
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 64
+  encoder_depth: 6
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.1
+  attn_dropout: 0.1
+  drop_path_rate: 0.1
+  point_attributes: null  # null = use all attributes; [] = no point token
+  # Pooling strategy for aggregating neighbor tokens before the prediction head.
+  # max      – masked max-pool (default)
+  # mean     – masked mean-pool
+  # max_mean – concat max and mean (doubles pool contribution; head input is 3×embed_dim)
+  pool: max
+  # pos_encoding_type: index | spatial | relative_bias
+  #   index   – sinusoidal on sorted-neighbour order (default)
+  #   spatial – sinusoidal on relative 3-D XYZ position (requires xyz in attributes)
+  pos_encoding_type: index
+  # encoder_type: conv | linear | residual
+  #   conv     – Conv1d PointNet-style with global context injection (default)
+  #   linear   – MLP (Linear + LayerNorm + GELU), original implementation
+  #   residual – MLP with residual block, no LayerNorm, LeakyReLU
+  encoder_type: conv
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 100
+  batch_size: 64
+  learning_rate: 1.0e-4
+  min_learning_rate: 1.0e-6
+  weight_decay: 1.0e-4
+  loss_type: mse          # mse | l1 | smooth_l1 | log_mse | log_l1
+                          # log_* variants: loss computed on log(distance), penalises relative error equally
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 10
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints
+  save_every: 10
+  num_workers: 4
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: null
+  log_file: null            # e.g. ./checkpoints/train.log

@@ -1,0 +1,77 @@
+# Training config: Combined Polynomial Surfaces – Ring 3 (new_dataset)
+# Variant: linear encoder + index positional encoding, one geodesic source
+#
+# Changes from one_source/combined_polynomial_ring3.yaml:
+#   - Dataset config: new_dataset (updated KNN params + near-source oversampling)
+#   - Transforms: added SparseContextDropout + GaussianPatchSurfacePerturb (null = no-op for combined)
+#   - Loss: blended_mse (50/50 linear + log-space MSE)
+#
+# Prerequisites – generate new_dataset patches first:
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/new_dataset/paraboloid_all_one_source.yaml
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/new_dataset/saddle_all_one_source.yaml
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/new_dataset/hyperbolic_paraboloid_all_one_source.yaml
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/new_dataset/combined_polynomial_ring3.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/new_dataset/combined_polynomial_all_one_source.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: SparseContextDropout
+      min_valid: 1
+      max_valid_ratio: 1.00
+      p: 1
+      p_dropout: 1
+      max_dropout_ratio: 0.99
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.0015
+  attn_dropout: 0.0015
+  drop_path_rate: 0.0015
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 100
+  batch_size: 256
+  learning_rate: 3.0e-4
+  min_learning_rate: 1.0e-6
+  weight_decay: 5.0e-5
+  loss_type: mse
+  gradient_clip_norm: 1.0
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 8
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/new_dataset/combined_polynomial_ring3
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: new-dataset-combined-polynomial-ring3
+  log_file: ./checkpoints/new_dataset/combined_polynomial_ring3/train.log

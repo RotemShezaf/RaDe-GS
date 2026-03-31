@@ -1,0 +1,17 @@
+# Gaussian output paths for Saddle - all levels and lighting conditions
+# blue_texture, levels: 02, 03, 04, lights: 0-4
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_0/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_1/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_2/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_3/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_4/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_0/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_1/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_2/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_3/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_4/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_0/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_1/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_2/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_3/output
+TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_4/output

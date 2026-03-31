@@ -1,0 +1,940 @@
+No CUDA runtime is found, using CUDA_HOME='/home/rotem.shezaf/miniconda3/envs/geo_splat'
+Warning: Neither knn_cuda nor simple-knn available, falling back to CPU implementation
+
+######################################################################
+#  TOSCA Ring Neighbor Analysis
+######################################################################
+
+======================================================================
+  Analyzing: TOSCA/cat0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/cat0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/cat0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 46594 Gaussians
+  Position range: [-78.3158, 121.2631]
+  Scale range: [0.0053, 12.6015]
+  Opacity range: [0.0025, 1.0000]
+  Rotation (normalized) range: [-0.9434, 1.0000]
+  Num Gaussians: 46594
+  Num sources in geodesic data: 97
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.427581
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.3  std=7.2
+    min=12  p50=30  p90=39  p95=43  p99=58  max=76
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=88.07  median=55.33  std=146.45
+    p90=170.98  p95=253.78  p99=585.51  max=6234.93
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8359/ 94300 nbrs removed ( 8.86%),  2766/ 3000 points affected (92.2%)
+      3.0× median:    3270/ 94300 nbrs removed ( 3.47%),  1997/ 3000 points affected (66.6%)
+      5.0× median:    1077/ 94300 nbrs removed ( 1.14%),   898/ 3000 points affected (29.9%)
+      7.0× median:     522/ 94300 nbrs removed ( 0.55%),   471/ 3000 points affected (15.7%)
+     10.0× median:     240/ 94300 nbrs removed ( 0.25%),   229/ 3000 points affected (7.6%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.8  std=7.3
+    min=12  p50=30  p90=39  p95=42  p99=57  max=83
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=68.5  std=25.3
+    min=12  p50=65  p90=91  p95=109  p99=179  max=329
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=58.15  median=37.18  std=95.84
+    p90=114.66  p95=167.08  p99=369.02  max=10729.36
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18822/208018 nbrs removed ( 9.05%),  2960/ 3000 points affected (98.7%)
+      3.0× median:    7230/208018 nbrs removed ( 3.48%),  2670/ 3000 points affected (89.0%)
+      5.0× median:    2245/208018 nbrs removed ( 1.08%),  1541/ 3000 points affected (51.4%)
+      7.0× median:    1047/208018 nbrs removed ( 0.50%),   853/ 3000 points affected (28.4%)
+     10.0× median:     486/208018 nbrs removed ( 0.23%),   440/ 3000 points affected (14.7%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=67.4  std=23.9
+    min=12  p50=63  p90=89  p95=106  p99=173  max=308
+
+======================================================================
+  Analyzing: TOSCA/cat2
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/cat2/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/cat2/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 36755 Gaussians
+  Position range: [-61.8309, 78.2931]
+  Scale range: [0.0027, 9.8249]
+  Opacity range: [0.0030, 1.0000]
+  Rotation (normalized) range: [-0.9797, 1.0000]
+  Num Gaussians: 36755
+  Num sources in geodesic data: 96
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.482967
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.4  std=7.2
+    min=11  p50=31  p90=40  p95=44  p99=55  max=74
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=60.68  median=37.57  std=117.70
+    p90=112.10  p95=164.00  p99=426.31  max=4540.67
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8194/ 94301 nbrs removed ( 8.69%),  2810/ 3000 points affected (93.7%)
+      3.0× median:    3135/ 94301 nbrs removed ( 3.32%),  1952/ 3000 points affected (65.1%)
+      5.0× median:    1027/ 94301 nbrs removed ( 1.09%),   838/ 3000 points affected (27.9%)
+      7.0× median:     519/ 94301 nbrs removed ( 0.55%),   454/ 3000 points affected (15.1%)
+     10.0× median:     258/ 94301 nbrs removed ( 0.27%),   234/ 3000 points affected (7.8%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=31.2  std=7.7
+    min=11  p50=30  p90=40  p95=45  p99=55  max=93
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=69.6  std=26.2
+    min=11  p50=65  p90=94  p95=116  p99=169  max=315
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=40.22  median=24.98  std=79.55
+    p90=75.87  p95=110.12  p99=262.79  max=5775.39
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18573/207287 nbrs removed ( 8.96%),  2946/ 3000 points affected (98.2%)
+      3.0× median:    6966/207287 nbrs removed ( 3.36%),  2640/ 3000 points affected (88.0%)
+      5.0× median:    2177/207287 nbrs removed ( 1.05%),  1499/ 3000 points affected (50.0%)
+      7.0× median:    1107/207287 nbrs removed ( 0.53%),   879/ 3000 points affected (29.3%)
+     10.0× median:     491/207287 nbrs removed ( 0.24%),   428/ 3000 points affected (14.3%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=68.8  std=25.8
+    min=14  p50=64  p90=93  p95=118  p99=170  max=274
+
+======================================================================
+  Analyzing: TOSCA/centaur0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 90534 Gaussians
+  Position range: [-85.3770, 186.3404]
+  Scale range: [0.0034, 14.5923]
+  Opacity range: [0.0018, 1.0000]
+  Rotation (normalized) range: [-0.9941, 1.0000]
+  Num Gaussians: 90534
+  Num sources in geodesic data: 96
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.418397
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=30.8  std=7.9
+    min=13  p50=30  p90=39  p95=43  p99=63  max=90
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=136.95  median=84.51  std=282.69
+    p90=284.63  p95=404.74  p99=832.03  max=45534.82
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8310/ 92457 nbrs removed ( 8.99%),  2799/ 3000 points affected (93.3%)
+      3.0× median:    3328/ 92457 nbrs removed ( 3.60%),  2030/ 3000 points affected (67.7%)
+      5.0× median:    1102/ 92457 nbrs removed ( 1.19%),   900/ 3000 points affected (30.0%)
+      7.0× median:     505/ 92457 nbrs removed ( 0.55%),   449/ 3000 points affected (15.0%)
+     10.0× median:     247/ 92457 nbrs removed ( 0.27%),   229/ 3000 points affected (7.6%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.4  std=7.5
+    min=13  p50=30  p90=39  p95=42  p99=58  max=91
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=66.4  std=27.2
+    min=21  p50=62  p90=86  p95=102  p99=190  max=308
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=95.12  median=58.65  std=154.57
+    p90=196.94  p95=284.12  p99=615.01  max=10488.00
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18782/199355 nbrs removed ( 9.42%),  2952/ 3000 points affected (98.4%)
+      3.0× median:    7334/199355 nbrs removed ( 3.68%),  2697/ 3000 points affected (89.9%)
+      5.0× median:    2353/199355 nbrs removed ( 1.18%),  1595/ 3000 points affected (53.2%)
+      7.0× median:    1157/199355 nbrs removed ( 0.58%),   910/ 3000 points affected (30.3%)
+     10.0× median:     511/199355 nbrs removed ( 0.26%),   445/ 3000 points affected (14.8%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=65.4  std=26.2
+    min=15  p50=61  p90=87  p95=103  p99=181  max=300
+
+======================================================================
+  Analyzing: TOSCA/centaur1
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur1/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur1/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 88388 Gaussians
+  Position range: [-48.5696, 228.8717]
+  Scale range: [0.0030, 15.6954]
+  Opacity range: [0.0024, 1.0000]
+  Rotation (normalized) range: [-0.9485, 1.0000]
+  Num Gaussians: 88388
+  Num sources in geodesic data: 96
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.443435
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=30.9  std=7.4
+    min=14  p50=30  p90=39  p95=43  p99=57  max=78
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=118.93  median=78.30  std=270.71
+    p90=233.32  p95=332.80  p99=720.97  max=45158.56
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8362/ 92440 nbrs removed ( 9.05%),  2788/ 3000 points affected (92.9%)
+      3.0× median:    3281/ 92440 nbrs removed ( 3.55%),  1978/ 3000 points affected (65.9%)
+      5.0× median:    1078/ 92440 nbrs removed ( 1.17%),   867/ 3000 points affected (28.9%)
+      7.0× median:     534/ 92440 nbrs removed ( 0.58%),   466/ 3000 points affected (15.5%)
+     10.0× median:     265/ 92440 nbrs removed ( 0.29%),   242/ 3000 points affected (8.1%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.5  std=7.4
+    min=10  p50=30  p90=39  p95=43  p99=57  max=86
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=66.5  std=24.0
+    min=14  p50=63  p90=87  p95=102  p99=178  max=333
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=82.13  median=54.00  std=125.60
+    p90=163.99  p95=236.35  p99=506.44  max=15147.56
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18965/202168 nbrs removed ( 9.38%),  2966/ 3000 points affected (98.9%)
+      3.0× median:    7464/202168 nbrs removed ( 3.69%),  2712/ 3000 points affected (90.4%)
+      5.0× median:    2381/202168 nbrs removed ( 1.18%),  1598/ 3000 points affected (53.3%)
+      7.0× median:    1159/202168 nbrs removed ( 0.57%),   930/ 3000 points affected (31.0%)
+     10.0× median:     550/202168 nbrs removed ( 0.27%),   479/ 3000 points affected (16.0%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=66.5  std=26.2
+    min=13  p50=62  p90=86  p95=108  p99=182  max=332
+
+======================================================================
+  Analyzing: TOSCA/centaur5
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur5/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur5/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 88149 Gaussians
+  Position range: [-49.5339, 208.8144]
+  Scale range: [0.0027, 14.8922]
+  Opacity range: [0.0027, 1.0000]
+  Rotation (normalized) range: [-0.9876, 1.0000]
+  Num Gaussians: 88149
+  Num sources in geodesic data: 96
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.434002
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=30.7  std=7.7
+    min=14  p50=30  p90=39  p95=44  p99=59  max=86
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=149.33  median=88.33  std=239.83
+    p90=317.60  p95=463.32  p99=972.52  max=16125.79
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8336/ 91774 nbrs removed ( 9.08%),  2802/ 3000 points affected (93.4%)
+      3.0× median:    3248/ 91774 nbrs removed ( 3.54%),  2002/ 3000 points affected (66.7%)
+      5.0× median:    1044/ 91774 nbrs removed ( 1.14%),   878/ 3000 points affected (29.3%)
+      7.0× median:     523/ 91774 nbrs removed ( 0.57%),   474/ 3000 points affected (15.8%)
+     10.0× median:     248/ 91774 nbrs removed ( 0.27%),   237/ 3000 points affected (7.9%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.5  std=7.6
+    min=11  p50=30  p90=39  p95=43  p99=57  max=85
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=65.9  std=25.1
+    min=21  p50=62  p90=87  p95=104  p99=175  max=314
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=101.95  median=57.60  std=173.58
+    p90=216.19  p95=315.51  p99=701.11  max=19771.72
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18579/199945 nbrs removed ( 9.29%),  2946/ 3000 points affected (98.2%)
+      3.0× median:    7374/199945 nbrs removed ( 3.69%),  2640/ 3000 points affected (88.0%)
+      5.0× median:    2358/199945 nbrs removed ( 1.18%),  1567/ 3000 points affected (52.2%)
+      7.0× median:    1136/199945 nbrs removed ( 0.57%),   897/ 3000 points affected (29.9%)
+     10.0× median:     539/199945 nbrs removed ( 0.27%),   469/ 3000 points affected (15.6%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=65.7  std=25.5
+    min=19  p50=62  p90=86  p95=105  p99=179  max=303
+
+======================================================================
+  Analyzing: TOSCA/david0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/david0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/david0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 61786 Gaussians
+  Position range: [-81.5118, 166.1817]
+  Scale range: [0.0019, 9.2988]
+  Opacity range: [0.0024, 1.0000]
+  Rotation (normalized) range: [-0.9871, 1.0000]
+  Num Gaussians: 61786
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.332960
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.3  std=7.4
+    min=13  p50=30  p90=40  p95=44  p99=56  max=79
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=125.71  median=66.96  std=423.43
+    p90=236.59  p95=343.65  p99=980.92  max=53842.69
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8109/ 93409 nbrs removed ( 8.68%),  2778/ 3000 points affected (92.6%)
+      3.0× median:    3149/ 93409 nbrs removed ( 3.37%),  1932/ 3000 points affected (64.4%)
+      5.0× median:     995/ 93409 nbrs removed ( 1.07%),   809/ 3000 points affected (27.0%)
+      7.0× median:     485/ 93409 nbrs removed ( 0.52%),   429/ 3000 points affected (14.3%)
+     10.0× median:     221/ 93409 nbrs removed ( 0.24%),   204/ 3000 points affected (6.8%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.8  std=7.7
+    min=11  p50=30  p90=39  p95=44  p99=56  max=80
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=68.9  std=24.6
+    min=14  p50=64  p90=93  p95=114  p99=161  max=264
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=88.79  median=45.33  std=322.44
+    p90=166.32  p95=240.94  p99=706.25  max=33461.67
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18615/206642 nbrs removed ( 9.01%),  2946/ 3000 points affected (98.2%)
+      3.0× median:    7295/206642 nbrs removed ( 3.53%),  2648/ 3000 points affected (88.3%)
+      5.0× median:    2358/206642 nbrs removed ( 1.14%),  1550/ 3000 points affected (51.7%)
+      7.0× median:    1128/206642 nbrs removed ( 0.55%),   878/ 3000 points affected (29.3%)
+     10.0× median:     483/206642 nbrs removed ( 0.23%),   434/ 3000 points affected (14.5%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=68.0  std=26.3
+    min=14  p50=64  p90=91  p95=116  p99=182  max=263
+
+======================================================================
+  Analyzing: TOSCA/dog0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/dog0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/dog0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 54194 Gaussians
+  Position range: [-71.5589, 116.4665]
+  Scale range: [0.0023, 11.3668]
+  Opacity range: [0.0028, 1.0000]
+  Rotation (normalized) range: [-0.9972, 1.0000]
+  Num Gaussians: 54194
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.358380
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.1  std=7.7
+    min=13  p50=30  p90=40  p95=44  p99=58  max=77
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=98.87  median=60.45  std=161.08
+    p90=202.13  p95=296.05  p99=662.44  max=7608.39
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    7985/ 93146 nbrs removed ( 8.57%),  2802/ 3000 points affected (93.4%)
+      3.0× median:    3077/ 93146 nbrs removed ( 3.30%),  1896/ 3000 points affected (63.2%)
+      5.0× median:     955/ 93146 nbrs removed ( 1.03%),   812/ 3000 points affected (27.1%)
+      7.0× median:     445/ 93146 nbrs removed ( 0.48%),   404/ 3000 points affected (13.5%)
+     10.0× median:     197/ 93146 nbrs removed ( 0.21%),   190/ 3000 points affected (6.3%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.6  std=7.8
+    min=10  p50=30  p90=39  p95=44  p99=57  max=85
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=68.1  std=25.0
+    min=16  p50=64  p90=92  p95=117  p99=169  max=256
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=68.09  median=41.35  std=114.89
+    p90=139.20  p95=206.04  p99=464.04  max=13694.78
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18440/202490 nbrs removed ( 9.11%),  2966/ 3000 points affected (98.9%)
+      3.0× median:    7189/202490 nbrs removed ( 3.55%),  2667/ 3000 points affected (88.9%)
+      5.0× median:    2238/202490 nbrs removed ( 1.11%),  1512/ 3000 points affected (50.4%)
+      7.0× median:    1073/202490 nbrs removed ( 0.53%),   845/ 3000 points affected (28.2%)
+     10.0× median:     487/202490 nbrs removed ( 0.24%),   434/ 3000 points affected (14.5%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=67.0  std=25.7
+    min=16  p50=62  p90=93  p95=111  p99=172  max=272
+
+======================================================================
+  Analyzing: TOSCA/gorilla5
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/gorilla5/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/gorilla5/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 51697 Gaussians
+  Position range: [-80.6613, 129.5970]
+  Scale range: [0.0032, 8.3849]
+  Opacity range: [0.0029, 1.0000]
+  Rotation (normalized) range: [-0.9711, 1.0000]
+  Num Gaussians: 51697
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.508160
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.8  std=7.5
+    min=10  p50=31  p90=40  p95=45  p99=61  max=85
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=70.93  median=43.36  std=123.41
+    p90=146.08  p95=207.28  p99=434.89  max=9653.08
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8168/ 95155 nbrs removed ( 8.58%),  2787/ 3000 points affected (92.9%)
+      3.0× median:    3130/ 95155 nbrs removed ( 3.29%),  1929/ 3000 points affected (64.3%)
+      5.0× median:    1023/ 95155 nbrs removed ( 1.08%),   847/ 3000 points affected (28.2%)
+      7.0× median:     478/ 95155 nbrs removed ( 0.50%),   430/ 3000 points affected (14.3%)
+     10.0× median:     239/ 95155 nbrs removed ( 0.25%),   222/ 3000 points affected (7.4%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=31.4  std=7.4
+    min=9  p50=31  p90=40  p95=44  p99=59  max=84
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=69.8  std=24.7
+    min=10  p50=65  p90=93  p95=117  p99=171  max=332
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=50.93  median=31.58  std=99.78
+    p90=102.58  p95=146.21  p99=306.62  max=12519.26
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18807/210263 nbrs removed ( 8.94%),  2950/ 3000 points affected (98.3%)
+      3.0× median:    7116/210263 nbrs removed ( 3.38%),  2636/ 3000 points affected (87.9%)
+      5.0× median:    2157/210263 nbrs removed ( 1.03%),  1484/ 3000 points affected (49.5%)
+      7.0× median:    1029/210263 nbrs removed ( 0.49%),   847/ 3000 points affected (28.2%)
+     10.0× median:     494/210263 nbrs removed ( 0.23%),   443/ 3000 points affected (14.8%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=69.9  std=26.3
+    min=10  p50=65  p90=93  p95=121  p99=178  max=333
+
+======================================================================
+  Analyzing: TOSCA/horse0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/horse0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/horse0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 93566 Gaussians
+  Position range: [-132.2681, 191.2348]
+  Scale range: [0.0007, 19.2178]
+  Opacity range: [0.0024, 1.0000]
+  Rotation (normalized) range: [-0.9769, 1.0000]
+  Num Gaussians: 93566
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.546331
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.3  std=7.8
+    min=13  p50=30  p90=40  p95=46  p99=58  max=82
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=125.55  median=75.78  std=197.10
+    p90=267.47  p95=378.93  p99=788.46  max=12154.29
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8187/ 93457 nbrs removed ( 8.76%),  2783/ 3000 points affected (92.8%)
+      3.0× median:    3297/ 93457 nbrs removed ( 3.53%),  1977/ 3000 points affected (65.9%)
+      5.0× median:    1067/ 93457 nbrs removed ( 1.14%),   895/ 3000 points affected (29.8%)
+      7.0× median:     498/ 93457 nbrs removed ( 0.53%),   456/ 3000 points affected (15.2%)
+     10.0× median:     231/ 93457 nbrs removed ( 0.25%),   218/ 3000 points affected (7.3%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.7  std=7.6
+    min=14  p50=30  p90=40  p95=45  p99=57  max=81
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=68.0  std=25.7
+    min=22  p50=63  p90=92  p95=117  p99=175  max=279
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=85.31  median=52.04  std=137.26
+    p90=178.74  p95=258.08  p99=553.84  max=12197.24
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18108/205085 nbrs removed ( 8.83%),  2942/ 3000 points affected (98.1%)
+      3.0× median:    6998/205085 nbrs removed ( 3.41%),  2609/ 3000 points affected (87.0%)
+      5.0× median:    2234/205085 nbrs removed ( 1.09%),  1517/ 3000 points affected (50.6%)
+      7.0× median:    1068/205085 nbrs removed ( 0.52%),   862/ 3000 points affected (28.7%)
+     10.0× median:     513/205085 nbrs removed ( 0.25%),   473/ 3000 points affected (15.8%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=67.8  std=26.8
+    min=18  p50=62  p90=93  p95=117  p99=185  max=248
+
+======================================================================
+  Analyzing: TOSCA/michael0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/michael0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/michael0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 70734 Gaussians
+  Position range: [-92.5018, 183.6415]
+  Scale range: [0.0022, 10.3740]
+  Opacity range: [0.0019, 1.0000]
+  Rotation (normalized) range: [-0.9821, 1.0000]
+  Num Gaussians: 70734
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.357234
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.4  std=7.8
+    min=11  p50=30  p90=40  p95=45  p99=58  max=87
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=133.32  median=70.02  std=372.70
+    p90=248.19  p95=372.29  p99=1105.37  max=29455.47
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8227/ 94106 nbrs removed ( 8.74%),  2774/ 3000 points affected (92.5%)
+      3.0× median:    3353/ 94106 nbrs removed ( 3.56%),  1958/ 3000 points affected (65.3%)
+      5.0× median:    1098/ 94106 nbrs removed ( 1.17%),   869/ 3000 points affected (29.0%)
+      7.0× median:     522/ 94106 nbrs removed ( 0.55%),   452/ 3000 points affected (15.1%)
+     10.0× median:     249/ 94106 nbrs removed ( 0.26%),   230/ 3000 points affected (7.7%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=31.4  std=7.9
+    min=10  p50=31  p90=40  p95=46  p99=59  max=82
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=69.4  std=25.8
+    min=14  p50=65  p90=95  p95=118  p99=173  max=282
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=86.72  median=46.92  std=258.44
+    p90=163.81  p95=239.24  p99=659.33  max=29108.05
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18708/207518 nbrs removed ( 9.02%),  2963/ 3000 points affected (98.8%)
+      3.0× median:    7257/207518 nbrs removed ( 3.50%),  2647/ 3000 points affected (88.2%)
+      5.0× median:    2387/207518 nbrs removed ( 1.15%),  1552/ 3000 points affected (51.7%)
+      7.0× median:    1111/207518 nbrs removed ( 0.54%),   889/ 3000 points affected (29.6%)
+     10.0× median:     520/207518 nbrs removed ( 0.25%),   453/ 3000 points affected (15.1%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=68.3  std=25.3
+    min=12  p50=64  p90=94  p95=114  p99=168  max=316
+
+======================================================================
+  Analyzing: TOSCA/michael2
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/michael2/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/michael2/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 53673 Gaussians
+  Position range: [-65.3192, 107.9702]
+  Scale range: [0.0023, 7.6840]
+  Opacity range: [0.0026, 1.0000]
+  Rotation (normalized) range: [-0.9890, 1.0000]
+  Num Gaussians: 53673
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.407547
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.7  std=7.7
+    min=10  p50=31  p90=40  p95=46  p99=58  max=74
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=95.25  median=41.38  std=363.32
+    p90=152.09  p95=245.26  p99=1086.30  max=26570.05
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8036/ 94246 nbrs removed ( 8.53%),  2752/ 3000 points affected (91.7%)
+      3.0× median:    3183/ 94246 nbrs removed ( 3.38%),  1917/ 3000 points affected (63.9%)
+      5.0× median:    1094/ 94246 nbrs removed ( 1.16%),   840/ 3000 points affected (28.0%)
+      7.0× median:     540/ 94246 nbrs removed ( 0.57%),   455/ 3000 points affected (15.2%)
+     10.0× median:     255/ 94246 nbrs removed ( 0.27%),   229/ 3000 points affected (7.6%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=31.0  std=7.9
+    min=10  p50=30  p90=40  p95=45  p99=57  max=75
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=69.4  std=26.9
+    min=11  p50=65  p90=97  p95=120  p99=171  max=277
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=67.93  median=28.67  std=583.10
+    p90=106.87  p95=168.05  p99=669.77  max=195887.64
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18207/209279 nbrs removed ( 8.70%),  2945/ 3000 points affected (98.2%)
+      3.0× median:    7101/209279 nbrs removed ( 3.39%),  2604/ 3000 points affected (86.8%)
+      5.0× median:    2303/209279 nbrs removed ( 1.10%),  1486/ 3000 points affected (49.5%)
+      7.0× median:    1133/209279 nbrs removed ( 0.54%),   854/ 3000 points affected (28.5%)
+     10.0× median:     521/209279 nbrs removed ( 0.25%),   441/ 3000 points affected (14.7%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=68.9  std=27.6
+    min=10  p50=64  p90=98  p95=121  p99=174  max=286
+
+======================================================================
+  Analyzing: TOSCA/victoria0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 61471 Gaussians
+  Position range: [-79.9765, 179.0286]
+  Scale range: [0.0011, 10.0540]
+  Opacity range: [0.0024, 1.0000]
+  Rotation (normalized) range: [-0.9894, 1.0000]
+  Num Gaussians: 61471
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.366281
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=31.4  std=7.5
+    min=13  p50=31  p90=40  p95=45  p99=58  max=71
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=104.34  median=62.56  std=168.83
+    p90=225.48  p95=321.40  p99=645.88  max=20239.56
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8209/ 94545 nbrs removed ( 8.68%),  2777/ 3000 points affected (92.6%)
+      3.0× median:    3177/ 94545 nbrs removed ( 3.36%),  1946/ 3000 points affected (64.9%)
+      5.0× median:    1010/ 94545 nbrs removed ( 1.07%),   836/ 3000 points affected (27.9%)
+      7.0× median:     480/ 94545 nbrs removed ( 0.51%),   431/ 3000 points affected (14.4%)
+     10.0× median:     209/ 94545 nbrs removed ( 0.22%),   196/ 3000 points affected (6.5%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=31.0  std=7.5
+    min=13  p50=30  p90=40  p95=44  p99=57  max=82
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=69.5  std=24.7
+    min=13  p50=65  p90=96  p95=117  p99=164  max=240
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=70.25  median=42.65  std=106.11
+    p90=150.60  p95=213.37  p99=442.88  max=8003.78
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18928/205759 nbrs removed ( 9.20%),  2973/ 3000 points affected (99.1%)
+      3.0× median:    7282/205759 nbrs removed ( 3.54%),  2669/ 3000 points affected (89.0%)
+      5.0× median:    2244/205759 nbrs removed ( 1.09%),  1519/ 3000 points affected (50.6%)
+      7.0× median:    1049/205759 nbrs removed ( 0.51%),   864/ 3000 points affected (28.8%)
+     10.0× median:     492/205759 nbrs removed ( 0.24%),   449/ 3000 points affected (15.0%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=68.6  std=24.1
+    min=13  p50=65  p90=95  p95=115  p99=166  max=257
+
+======================================================================
+  Analyzing: TOSCA/victoria2
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria2/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria2/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 50611 Gaussians
+  Position range: [-90.3019, 100.6781]
+  Scale range: [0.0024, 11.5250]
+  Opacity range: [0.0023, 1.0000]
+  Rotation (normalized) range: [-0.9871, 1.0000]
+  Num Gaussians: 50611
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.410297
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=32.1  std=7.4
+    min=16  p50=31  p90=41  p95=45  p99=58  max=74
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=88.53  median=54.63  std=141.18
+    p90=188.30  p95=264.65  p99=536.80  max=15908.46
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8140/ 96039 nbrs removed ( 8.48%),  2794/ 3000 points affected (93.1%)
+      3.0× median:    3148/ 96039 nbrs removed ( 3.28%),  1927/ 3000 points affected (64.2%)
+      5.0× median:    1006/ 96039 nbrs removed ( 1.05%),   828/ 3000 points affected (27.6%)
+      7.0× median:     469/ 96039 nbrs removed ( 0.49%),   427/ 3000 points affected (14.2%)
+     10.0× median:     186/ 96039 nbrs removed ( 0.19%),   178/ 3000 points affected (5.9%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=31.6  std=7.7
+    min=14  p50=31  p90=40  p95=45  p99=60  max=86
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=71.7  std=25.7
+    min=18  p50=66  p90=99  p95=120  p99=171  max=255
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=61.42  median=36.81  std=110.88
+    p90=130.36  p95=187.67  p99=393.36  max=18729.17
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   19033/216095 nbrs removed ( 8.81%),  2969/ 3000 points affected (99.0%)
+      3.0× median:    7120/216095 nbrs removed ( 3.29%),  2660/ 3000 points affected (88.7%)
+      5.0× median:    2135/216095 nbrs removed ( 0.99%),  1478/ 3000 points affected (49.3%)
+      7.0× median:     991/216095 nbrs removed ( 0.46%),   830/ 3000 points affected (27.7%)
+     10.0× median:     445/216095 nbrs removed ( 0.21%),   402/ 3000 points affected (13.4%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=71.4  std=25.9
+    min=22  p50=66  p90=101  p95=122  p99=170  max=256
+
+======================================================================
+  Analyzing: TOSCA/wolf0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/wolf0/high_res/decoupled_appearance/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/TOSCA/SyntheticColmapData/blue_texture/wolf0/high_res/decoupled_appearance/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 53943 Gaussians
+  Position range: [-72.0937, 100.0312]
+  Scale range: [0.0017, 13.0703]
+  Opacity range: [0.0025, 1.0000]
+  Rotation (normalized) range: [-0.9939, 1.0000]
+  Num Gaussians: 53943
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.367277
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=30.2  std=7.3
+    min=13  p50=30  p90=38  p95=42  p99=56  max=76
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=135.79  median=92.95  std=196.13
+    p90=271.87  p95=382.65  p99=815.06  max=18324.17
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8238/ 91093 nbrs removed ( 9.04%),  2773/ 3000 points affected (92.4%)
+      3.0× median:    3246/ 91093 nbrs removed ( 3.56%),  1975/ 3000 points affected (65.8%)
+      5.0× median:    1054/ 91093 nbrs removed ( 1.16%),   840/ 3000 points affected (28.0%)
+      7.0× median:     503/ 91093 nbrs removed ( 0.55%),   443/ 3000 points affected (14.8%)
+     10.0× median:     228/ 91093 nbrs removed ( 0.25%),   210/ 3000 points affected (7.0%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=29.9  std=7.5
+    min=11  p50=29  p90=38  p95=42  p99=58  max=86
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=65.0  std=26.3
+    min=19  p50=61  p90=85  p95=97  p99=180  max=349
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=91.94  median=61.61  std=141.80
+    p90=184.49  p95=261.58  p99=558.32  max=13301.18
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18510/193006 nbrs removed ( 9.59%),  2939/ 3000 points affected (98.0%)
+      3.0× median:    7409/193006 nbrs removed ( 3.84%),  2664/ 3000 points affected (88.8%)
+      5.0× median:    2362/193006 nbrs removed ( 1.22%),  1611/ 3000 points affected (53.7%)
+      7.0× median:    1160/193006 nbrs removed ( 0.60%),   924/ 3000 points affected (30.8%)
+     10.0× median:     514/193006 nbrs removed ( 0.27%),   445/ 3000 points affected (14.8%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=64.4  std=25.5
+    min=21  p50=61  p90=85  p95=99  p99=180  max=271
+
+======================================================================
+  TOSCA SUMMARY (across all shapes)
+======================================================================
+
+  ring-2 (raw, before outlier filter):
+    Across shapes: mean of means = 31.2
+    Across shapes: mean of p99   = 58.1 (range: 55-63)
+    Across shapes: mean of max   = 79.2 (range: 71-90)
+
+  ring-2 (after 5.0× outlier filter):
+    Across shapes: mean of means = 30.8
+    Across shapes: mean of p99   = 57.4 (range: 55-60)
+    Across shapes: mean of max   = 84.2 (range: 75-93)
+
+    >>> RECOMMENDED ring_size_mapping[2] = 64
+        (based on max p99 across shapes = 60)
+
+  ring-3 (raw, before outlier filter):
+    Across shapes: mean of means = 68.3
+    Across shapes: mean of p99   = 173.3 (range: 161-190)
+    Across shapes: mean of max   = 295.2 (range: 240-349)
+
+  ring-3 (after 5.0× outlier filter):
+    Across shapes: mean of means = 67.7
+    Across shapes: mean of p99   = 175.7 (range: 166-185)
+    Across shapes: mean of max   = 287.1 (range: 248-333)
+
+    >>> RECOMMENDED ring_size_mapping[3] = 192
+        (based on max p99 across shapes = 185)
+
+######################################################################
+#  Polynomial Ring Neighbor Analysis
+######################################################################
+
+======================================================================
+  Analyzing: Polynomial/Paraboloid/level_03/light_0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_03/light_0/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_03/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 53883 Gaussians
+  Position range: [-0.8173, 1.2775]
+  Scale range: [0.0000, 0.1153]
+  Opacity range: [0.0016, 1.0000]
+  Rotation (normalized) range: [-0.9871, 1.0000]
+  Num Gaussians: 53883
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.005603
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=30.8  std=6.7
+    min=12  p50=31  p90=40  p95=42  p99=48  max=66
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=133.28  median=83.58  std=200.56
+    p90=284.94  p95=399.49  p99=838.49  max=10144.03
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    7995/ 93091 nbrs removed ( 8.59%),  2852/ 3000 points affected (95.1%)
+      3.0× median:    2994/ 93091 nbrs removed ( 3.22%),  1914/ 3000 points affected (63.8%)
+      5.0× median:     882/ 93091 nbrs removed ( 0.95%),   740/ 3000 points affected (24.7%)
+      7.0× median:     371/ 93091 nbrs removed ( 0.40%),   349/ 3000 points affected (11.6%)
+     10.0× median:     165/ 93091 nbrs removed ( 0.18%),   162/ 3000 points affected (5.4%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=30.6  std=6.9
+    min=13  p50=30  p90=39  p95=43  p99=48  max=58
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=66.3  std=21.0
+    min=18  p50=64  p90=95  p95=106  p99=120  max=200
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=90.94  median=50.51  std=162.90
+    p90=197.44  p95=281.86  p99=604.72  max=16455.89
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18175/199154 nbrs removed ( 9.13%),  2989/ 3000 points affected (99.6%)
+      3.0× median:    6714/199154 nbrs removed ( 3.37%),  2670/ 3000 points affected (89.0%)
+      5.0× median:    1982/199154 nbrs removed ( 1.00%),  1434/ 3000 points affected (47.8%)
+      7.0× median:     885/199154 nbrs removed ( 0.44%),   750/ 3000 points affected (25.0%)
+     10.0× median:     373/199154 nbrs removed ( 0.19%),   336/ 3000 points affected (11.2%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=66.3  std=20.8
+    min=18  p50=65  p90=95  p95=103  p99=119  max=191
+
+======================================================================
+  Analyzing: Polynomial/Saddle/level_03/light_0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_0/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 46807 Gaussians
+  Position range: [-0.8112, 0.8161]
+  Scale range: [0.0000, 0.1134]
+  Opacity range: [0.0039, 1.0000]
+  Rotation (normalized) range: [-0.9116, 0.9999]
+  Num Gaussians: 46807
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.005137
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=30.0  std=5.6
+    min=11  p50=30  p90=37  p95=38  p99=41  max=47
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=187.43  median=85.26  std=321.22
+    p90=433.05  p95=610.26  p99=1237.24  max=21127.99
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8044/ 89524 nbrs removed ( 8.99%),  2841/ 3000 points affected (94.7%)
+      3.0× median:    3034/ 89524 nbrs removed ( 3.39%),  1916/ 3000 points affected (63.9%)
+      5.0× median:     895/ 89524 nbrs removed ( 1.00%),   755/ 3000 points affected (25.2%)
+      7.0× median:     390/ 89524 nbrs removed ( 0.44%),   358/ 3000 points affected (11.9%)
+     10.0× median:     169/ 89524 nbrs removed ( 0.19%),   161/ 3000 points affected (5.4%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=29.8  std=5.5
+    min=11  p50=30  p90=36  p95=38  p99=41  max=48
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=61.3  std=14.9
+    min=12  p50=64  p90=79  p95=82  p99=88  max=95
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=132.39  median=58.19  std=240.17
+    p90=306.85  p95=440.49  p99=929.17  max=22581.32
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   18937/183843 nbrs removed (10.30%),  2984/ 3000 points affected (99.5%)
+      3.0× median:    6982/183843 nbrs removed ( 3.80%),  2678/ 3000 points affected (89.3%)
+      5.0× median:    2054/183843 nbrs removed ( 1.12%),  1440/ 3000 points affected (48.0%)
+      7.0× median:     947/183843 nbrs removed ( 0.52%),   785/ 3000 points affected (26.2%)
+     10.0× median:     394/183843 nbrs removed ( 0.21%),   356/ 3000 points affected (11.9%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=60.0  std=15.0
+    min=16  p50=63  p90=78  p95=81  p99=86  max=99
+
+======================================================================
+  Analyzing: Polynomial/HyperbolicParaboloid/level_03/light_0
+  Path: /home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_03/light_0/output
+======================================================================
+Loading Gaussian data (CPU mode) from: /home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_03/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 45392 Gaussians
+  Position range: [-0.8126, 0.8064]
+  Scale range: [0.0000, 0.1643]
+  Opacity range: [0.0034, 1.0000]
+  Rotation (normalized) range: [-0.9591, 0.9997]
+  Num Gaussians: 45392
+  Num sources in geodesic data: 64
+  Using source 0 for ratio analysis
+  Computing ring neighborhoods (k=10)...
+  Computing ring-2 neighborhoods...
+  Computing ring-3 neighborhoods...
+  Mean NN distance: 0.005429
+
+  --- ring-2 Neighbor Count Stats ---
+    mean=29.9  std=5.6
+    min=11  p50=30  p90=37  p95=38  p99=40  max=51
+  --- ring-2 Geo/Euc Ratio Stats ---
+    mean=163.66  median=85.42  std=259.27
+    p90=368.02  p95=513.63  p99=1020.96  max=15551.34
+  --- ring-2 Outlier Removal by Multiplier ---
+      2.0× median:    8289/ 89864 nbrs removed ( 9.22%),  2860/ 3000 points affected (95.3%)
+      3.0× median:    3163/ 89864 nbrs removed ( 3.52%),  1960/ 3000 points affected (65.3%)
+      5.0× median:     977/ 89864 nbrs removed ( 1.09%),   821/ 3000 points affected (27.4%)
+      7.0× median:     464/ 89864 nbrs removed ( 0.52%),   420/ 3000 points affected (14.0%)
+     10.0× median:     194/ 89864 nbrs removed ( 0.22%),   188/ 3000 points affected (6.3%)
+  --- ring-2 Post-Filter Count (5.0× multiplier) ---
+    mean=29.7  std=5.6
+    min=11  p50=30  p90=36  p95=38  p99=41  max=46
+
+  --- ring-3 Neighbor Count Stats ---
+    mean=61.7  std=14.5
+    min=13  p50=65  p90=79  p95=82  p99=87  max=130
+  --- ring-3 Geo/Euc Ratio Stats ---
+    mean=111.24  median=54.22  std=204.60
+    p90=250.05  p95=353.84  p99=747.77  max=18438.48
+  --- ring-3 Outlier Removal by Multiplier ---
+      2.0× median:   19178/184135 nbrs removed (10.42%),  2985/ 3000 points affected (99.5%)
+      3.0× median:    7109/184135 nbrs removed ( 3.86%),  2728/ 3000 points affected (90.9%)
+      5.0× median:    2163/184135 nbrs removed ( 1.17%),  1521/ 3000 points affected (50.7%)
+      7.0× median:     955/184135 nbrs removed ( 0.52%),   800/ 3000 points affected (26.7%)
+     10.0× median:     419/184135 nbrs removed ( 0.23%),   381/ 3000 points affected (12.7%)
+  --- ring-3 Post-Filter Count (5.0× multiplier) ---
+    mean=61.3  std=14.7
+    min=11  p50=65  p90=78  p95=81  p99=87  max=124
+
+======================================================================
+  POLYNOMIAL SUMMARY (across all surfaces)
+======================================================================
+
+  ring-2 (raw, before outlier filter):
+    Across surfaces: mean of means = 30.2
+    Across surfaces: mean of p99   = 43.0 (range: 40-48)
+    Across surfaces: mean of max   = 54.7 (range: 47-66)
+
+  ring-2 (after 5.0× outlier filter):
+    Across surfaces: mean of means = 30.0
+    Across surfaces: mean of p99   = 43.3 (range: 41-48)
+    Across surfaces: mean of max   = 50.7 (range: 46-58)
+
+    >>> RECOMMENDED ring_size_mapping[2] = 48
+        (based on max p99 across surfaces = 48)
+
+  ring-3 (raw, before outlier filter):
+    Across surfaces: mean of means = 63.1
+    Across surfaces: mean of p99   = 98.3 (range: 87-120)
+    Across surfaces: mean of max   = 141.7 (range: 95-200)
+
+  ring-3 (after 5.0× outlier filter):
+    Across surfaces: mean of means = 62.5
+    Across surfaces: mean of p99   = 97.3 (range: 86-119)
+    Across surfaces: mean of max   = 138.0 (range: 99-191)
+
+    >>> RECOMMENDED ring_size_mapping[3] = 128
+        (based on max p99 across surfaces = 119)
+
+######################################################################
+#  FINAL RECOMMENDATIONS
+######################################################################
+
+  TOSCA:
+    ring-2: recommended = 64
+             (max p99 = 60, absolute max = 93)
+    ring-3: recommended = 192
+             (max p99 = 185, absolute max = 333)
+
+  POLYNOMIAL:
+    ring-2: recommended = 48
+             (max p99 = 48, absolute max = 58)
+    ring-3: recommended = 128
+             (max p99 = 119, absolute max = 191)
+
+  Outlier threshold: 5.0× median (with min bound 2.0)
+  This is the currently configured value in training_patches_helpers.py
+

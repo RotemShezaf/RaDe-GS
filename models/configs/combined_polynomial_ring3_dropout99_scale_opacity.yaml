@@ -1,0 +1,84 @@
+# Training config: Combined Polynomial Surfaces – Ring 3
+# Variant: high dropout (0.99) + xyz + scale + opacity attributes
+# Based on: combined_polynomial_ring3_dropout99.yaml
+#
+# Key differences from combined_polynomial_ring3_dropout99.yaml:
+#   - dataset_config: combined_polynomial_all_scale_opacity.yaml  (scale+opacity patches)
+#   - attributes: [xyz, scale, opacity]  (richer per-neighbor features)
+#
+# Prerequisites – generate scale+opacity patches first:
+#   bash scripts/generate_patches_scale_opacity_tmux.sh
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/combined_polynomial_ring3_dropout99_scale_opacity.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/combined_polynomial_all_scale_opacity.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  attributes:
+    - xyz
+    - scale
+    - opacity
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: GaussianPatchDropout
+      max_dropout_ratio: 0.99
+  # Full dataset – all examples
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 6
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.05
+  attn_dropout: 0.05
+  drop_path_rate: 0.0
+  point_attributes: null  # null = use all attributes
+  # pool: max | mean | max_mean  (default: max)
+  pool: max
+  # pos_encoding_type: index | spatial | relative_bias
+  #   index   – sinusoidal on sorted-neighbour order (default)
+  #   spatial – sinusoidal on relative 3-D XYZ position (requires xyz in attributes)
+  pos_encoding_type: index
+  # encoder_type: conv | linear | residual
+  #   conv     – Conv1d PointNet-style with global context injection (default)
+  #   linear   – MLP (Linear + LayerNorm + GELU), original implementation
+  #   residual – MLP with residual block, no LayerNorm, LeakyReLU
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 150
+  batch_size: 512
+  learning_rate: 3.0e-4
+  min_learning_rate: 1.0e-6
+  warmup_epochs: 3
+  weight_decay: 1.0e-4
+  loss_type: smooth_l1             # mse | l1 | smooth_l1 | log_mse | log_l1
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 8
+  min_delta: 1.0e-5
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/combined_polynomial_ring3_dropout99_scale_opacity
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: combined-polynomial-ring3-dropout99-scale-opacity
+  log_file: ./checkpoints/combined_polynomial_ring3_dropout99_scale_opacity/train.log

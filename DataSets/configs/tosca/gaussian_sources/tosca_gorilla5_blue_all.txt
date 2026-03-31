@@ -1,0 +1,3 @@
+# Gaussian output paths for TOSCA shape: gorilla5, texture: blue
+# Resolutions: high_res, lighting: decoupled_appearance
+TrainData/TOSCA/SyntheticColmapData/blue_texture/gorilla5/high_res/decoupled_appearance/output

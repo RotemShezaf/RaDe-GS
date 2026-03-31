@@ -1,0 +1,4 @@
+# Gaussian output paths for TOSCA cat - blue_texture, high_res, decoupled_appearance
+# 2 poses available in high_res (cat0, cat2)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/cat0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/cat2/high_res/decoupled_appearance/output

@@ -1,0 +1,4 @@
+# Gaussian output paths for TOSCA wolf - blue_texture, high_res, decoupled_appearance
+# 3 poses, mesh diagonal ~200.0
+# 1 pose available in high_res (wolf0)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/wolf0/high_res/decoupled_appearance/output

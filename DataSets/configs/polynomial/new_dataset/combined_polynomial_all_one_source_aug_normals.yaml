@@ -1,0 +1,120 @@
+# Multi-source configuration combining ALL polynomial surfaces
+# Variant: one source + KNN fixes + _aug_normals for directed surface perturbation
+#
+# Changes from original combined_polynomial_all_one_source_aug_normals.yaml:
+#   - n_neighbors: 6 (was 10, matching run_adaptive_analysis.sh)
+#   - adaptive_k_boost: 18 (was 20)
+#   - adaptive_max_steps: 12 (was 5)
+#   - near_source_oversample: 0.3 (inverse-geodesic-weighted sampling)
+#
+# New transforms (SparseContextDropout, GaussianPatchSurfacePerturb) are
+# configured in the model training config.  Each data_source specifies its
+# own surface_type so GaussianPatchSurfacePerturb receives the correct
+# surface per-example even in combined mode.
+#
+# Workflow:
+# 1. Generate patches for each surface:
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/new_dataset/paraboloid_all_one_source_aug_normals.yaml
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/new_dataset/saddle_all_one_source_aug_normals.yaml
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/new_dataset/hyperbolic_paraboloid_all_one_source_aug_normals.yaml
+#
+# 2. Load with CombinedGaussianPatchDataset:
+#      from DataSets.gaussian_dataset import CombinedGaussianPatchDataset
+#      dataset = CombinedGaussianPatchDataset(
+#          config="DataSets/configs/polynomial/new_dataset/combined_polynomial_all_one_source_aug_normals.yaml",
+#          attributes=["xyz"],
+#          ring=2,
+#      )
+
+# Dataset class for loading training data
+dataset_class: CombinedGaussianPatchDataset
+
+# Base output directory
+output_dir: "TrainData/datasets/gaussian_patches/new_dataset/combined_polynomial_all_one_source_aug_normals"
+
+# Multiple data sources - one per polynomial surface type
+data_sources:
+  - name: "paraboloid_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/paraboloid_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/new_dataset/paraboloid_all_one_source_aug_normals"
+    surface_type: Paraboloid
+    weight: 1.0
+    iteration: null
+
+  - name: "saddle_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/saddle_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/new_dataset/saddle_all_one_source_aug_normals"
+    surface_type: Saddle
+    weight: 1.0
+    iteration: null
+
+  - name: "hyperbolic_paraboloid_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/hyperbolic_paraboloid_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/new_dataset/hyperbolic_paraboloid_all_one_source_aug_normals"
+    surface_type: HyperbolicParaboloid
+    weight: 1.0
+    iteration: null
+
+# Data generation parameters (shared across all sources)
+num_iterations: 1000
+num_sources: 1
+num_train_points: 50
+seed: 42
+
+# Near-source oversampling
+near_source_oversample: 0.3
+
+# Neighborhood computation (matched to scripts/run_adaptive_analysis.sh)
+use_mahalanobis: false
+n_neighbors: 6
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 12
+normalize_per_patch: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+  mahalanobis:
+    2: 90
+    3: 250
+    4: 600
+
+# Feature attributes
+attributes:
+  - xyz
+  - _aug_normals
+
+# Outlier filtering
+disable_outlier_filtering: true
+
+# Normalization and padding
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -10.0
+
+# Dataset info
+dataset:
+  name: "Combined Polynomial Surfaces + aug_normals – new_dataset (all levels & lights)"
+  type: "Multi-source"
+  description: >
+    Training examples from all 3 polynomial surfaces with updated KNN
+    parameters (n_neighbors=6, adaptive_k_boost=18, adaptive_max_steps=12)
+    and near-source oversampling (0.3).
+  characteristics:
+    - "Paraboloid: positive curvature (15 outputs)"
+    - "Saddle: negative curvature (15 outputs)"
+    - "HyperbolicParaboloid: mixed curvature (15 outputs)"
+    - "45 total Gaussian outputs"
+    - "Weighted sampling for balanced training"

@@ -1,92 +1,120 @@
-# Tests for Gaussian Dataset and Data Transformations
+# Test Suite for GenerateData Utils
 
-This directory contains comprehensive tests for the Gaussian patch dataset and data transformation utilities.
+This directory contains unit tests for the utilities in `/GenerateData/utils/`.
 
 ## Test Files
 
-### test_gaussian_dataset.py
-Tests for `GaussianPatchDataset` class:
-- Dataset initialization and configuration loading
-- Attribute filtering functionality
-- r1_min_val removal
-- Normalization methods (opacity, SH, scale)
-- Data loading and shape validation
-- Dataloader creation and splitting
+- `test_load_utils.py` - Tests for Gaussian data loading and CPU-compatible processing
+  - GaussianDataCPU class tests
+  - Activation functions (exp, sigmoid, quaternion normalization)
+  - Spherical harmonics feature handling
+  - Edge cases and error handling
 
-### test_data_transformation.py
-Tests for data transformation classes:
-- `PointcloudRandomInputDropout`: Random point dropout augmentation
-- `GaussianPatchRotate`: Random rotation augmentation
-- `GaussianPatchCanonicalRotate`: Canonical rotation based on center of mass
-- Transformation composition and integration
+- `test_helpers.py` - Tests for geodesic distance computation helper functions
+
+- `test_data_generation_utils.py` - Tests for KNN, neighborhood rings, adaptive KNN, and point mapping
+  - Mahalanobis distance computation
+  - Ring-1 neighbor finding (Euclidean and Mahalanobis)
+  - Ring neighborhood expansion (ring 1-4)
+  - `adaptive_ring1_neighbors` — per-point k adjustment for target ring-k count
+  - `get_all_points_nbrs_all_rings` / `get_all_points_nbrs_single_ring` with adaptive mode
+  - Point-to-surface mapping (Euclidean and Mahalanobis)
+  - Source mesh generation and mapping
+  - Gaussian-to-mesh mapping (Euclidean and Mahalanobis)
+  - Geodesic distance transfer — **vertex snapping and barycentric interpolation modes**
+  - `project_points_to_triangles_vectorized` — vectorised Ericson-2005 closest-point-on-triangle
+  - `find_closest_mesh_faces_barycentric` — 1-ring face search and barycentric weight computation
+  - Partial results saving and merging
+  - Metadata handling
 
 ## Running Tests
 
-### Run all tests:
+### Interactive with srun (Recommended)
+
+Run all tests interactively with GPU allocation:
+
 ```bash
-cd /home/rotem.shezaf/RaDe-GS/GenerateData
-python -m pytest tests/ -v
+cd /home/rotem.shezaf/RaDe-GS/GenerateData/tests
+./run_tests.sh
 ```
 
-### Run specific test file:
+Run specific test file:
+
 ```bash
-python -m pytest tests/test_gaussian_dataset.py -v
-python -m pytest tests/test_data_transformation.py -v
+./run_tests.sh test_load_utils.py
 ```
 
-### Run specific test class:
+Run specific test by name:
+
 ```bash
-python -m pytest tests/test_gaussian_dataset.py::TestGaussianPatchDataset -v
+./run_tests.sh -k test_get_rotation_normalization
 ```
 
-### Run specific test method:
+### Batch Job with sbatch
+
+Submit as a batch job:
+
 ```bash
-python -m pytest tests/test_gaussian_dataset.py::TestGaussianPatchDataset::test_normalization_opacity -v
+sbatch run_tests_batch.sh
 ```
 
-### Run with coverage:
+Monitor job status:
+
 ```bash
-python -m pytest tests/ --cov=. --cov-report=html
+squeue -u $USER
 ```
+
+View output:
+
+```bash
+tail -f test_output_<job_id>.log
+```
+
+### Direct pytest (without SLURM)
+
+If running on a node with GPU already allocated:
+
+```bash
+conda activate geo_splat
+cd /home/rotem.shezaf/RaDe-GS
+python -m pytest GenerateData/tests -v
+```
+
+## Test Requirements
+
+The tests require the following packages (available in `geo_splat` environment):
+- pytest
+- numpy
+- scipy
+- plyfile
+- trimesh (for some integration tests)
 
 ## Test Coverage
 
-### GaussianPatchDataset Tests:
-- ✓ Basic initialization
-- ✓ Configuration loading and validation
-- ✓ Attribute filtering with subset selection
-- ✓ r1_min_val removal
-- ✓ Invalid attribute detection
-- ✓ Data shape validation
-- ✓ Opacity normalization (min-max per example)
-- ✓ Scale normalization (pc_norm approach)
-- ✓ SH feature transformation
-- ✓ Dataloader creation
-- ✓ Train/validation split ratios
+### GaussianDataCPU Class Tests
+- ✅ Initialization and data storage
+- ✅ Position access (get_xyz)
+- ✅ Scale activation (exp)
+- ✅ Rotation normalization (unit quaternions, positive first component)
+- ✅ Opacity activation (sigmoid)
+- ✅ Spherical harmonics (DC and rest coefficients)
+- ✅ Feature concatenation
+- ✅ Edge cases (extreme values, zero quaternions)
 
-### Data Transformation Tests:
-- ✓ Random input dropout
-- ✓ Dropout masking behavior
-- ✓ Random rotation shape preservation
-- ✓ XYZ coordinate rotation
-- ✓ Normal vector preservation and normalization
-- ✓ Quaternion composition and normalization
-- ✓ Opacity preservation during rotation
-- ✓ Geodesic distance preservation
-- ✓ Canonical rotation alignment
-- ✓ Canonical rotation determinism
-- ✓ Transformation composition
-
-## Requirements
-
-```bash
-pip install pytest pytest-cov
-```
+### Helper Function Tests
+- ✅ Source mesh generation and mapping
+- ✅ Gaussian-to-mesh mapping (Euclidean distance)
+- ✅ Gaussian-to-mesh mapping (Mahalanobis distance)
+- ✅ Geodesic distance transfer
+- ✅ Partial result saving and loading
+- ✅ Partial result merging
+- ✅ Missing source detection
+- ✅ Metadata serialization
+- ✅ Edge cases (empty data, single Gaussian)
 
 ## Notes
 
-- Tests use temporary directories for data generation
-- Sample data is created programmatically to ensure consistency
-- Tests validate both correctness and numerical stability
-- Normalization tests check mathematical properties (centering, scaling)
-- Rotation tests verify geometric properties (orthogonality, magnitude preservation)
+- Tests use mocking for external dependencies (mesh generation, KDTree)
+- Some tests require temporary directories (handled by pytest's tmp_path fixture)
+- GPU is requested but not strictly required for most tests (CPU fallback available)
+- Tests are designed to be fast (< 1 minute total runtime)

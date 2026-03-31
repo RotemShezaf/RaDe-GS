@@ -163,20 +163,46 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if viewpoint_cam_gt_mask is not None:
                 valid_mask = valid_mask * viewpoint_cam_gt_mask.cuda()
             
+            # Normalize rendered_normal to ensure proper dot product calculation
+            # (rendered normals are alpha-blended, so they need normalization)
+            rendered_normal_normalized = torch.nn.functional.normalize(rendered_normal, dim=0)
+            
             depth_ratio = 0.6
-            normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
+            normal_error_map = (1 - (rendered_normal_normalized.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             
             # Apply mask to only compute loss on valid regions
             normal_error_masked = normal_error_map * valid_mask
             num_valid_pixels = valid_mask.sum() + 1e-6
             depth_normal_loss = (1-depth_ratio) * (normal_error_masked[0].sum() / num_valid_pixels) + depth_ratio * (normal_error_masked[1].sum() / num_valid_pixels)
+            
+            # Scale normal loss by foreground coverage ratio so it's on the same
+            # per-total-pixel scale as the (unmasked) RGB loss.  Without this,
+            # the normal loss is effectively amplified by 1/coverage_ratio because
+            # it averages only over foreground pixels while the RGB loss averages
+            # over the whole image.
+            total_pixels = rendered_image.shape[1] * rendered_image.shape[2]
+            coverage_ratio = num_valid_pixels / (total_pixels + 1e-6)
+            depth_normal_loss = depth_normal_loss * coverage_ratio
+
+            # Depth distortion loss (pure-Python proxy for GOF's CUDA distortion).
+            # Uses the squared difference between expected and median depth as a
+            # surrogate: large discrepancy indicates multi-modal depth distribution
+            # along the ray, i.e. overlapping Gaussians at different depths.
+            if opt.lambda_distortion > 0 and require_depth:
+                rendered_expected_depth_d = render_pkg["expected_depth"]
+                rendered_median_depth_d = render_pkg["median_depth"]
+                distortion_map = (rendered_expected_depth_d - rendered_median_depth_d) ** 2
+                distortion_loss = (distortion_map * valid_mask).sum() / num_valid_pixels * coverage_ratio
+            else:
+                distortion_loss = torch.tensor([0], dtype=torch.float32, device="cuda")
         else:
             lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
+            distortion_loss = torch.tensor([0], dtype=torch.float32, device="cuda")
             
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
         
-        loss = rgb_loss + depth_normal_loss * lambda_depth_normal
+        loss = rgb_loss + depth_normal_loss * lambda_depth_normal + distortion_loss * opt.lambda_distortion
         loss.backward()
 
         iter_end.record()
@@ -193,7 +219,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 progress_bar.close()
             
             # Log and save
-            training_report(tb_writer, iteration, Ll1_render, loss, depth_normal_loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background, kernel_size))
+            training_report(tb_writer, iteration, Ll1_render, loss, depth_normal_loss, distortion_loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background, kernel_size))
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
@@ -252,10 +278,11 @@ def prepare_output_and_logger(args):
         print("Tensorboard not available: not logging progress")
     return tb_writer
 
-def training_report(tb_writer, iteration, Ll1, loss, normal_loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs):
+def training_report(tb_writer, iteration, Ll1, loss, normal_loss, distortion_loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
         tb_writer.add_scalar('train_loss_patches/normal_loss', normal_loss.item(), iteration)
+        tb_writer.add_scalar('train_loss_patches/distortion_loss', distortion_loss.item(), iteration)
         tb_writer.add_scalar('train_loss_patches/total_loss', loss.item(), iteration)
         tb_writer.add_scalar('iter_time', elapsed, iteration)
 

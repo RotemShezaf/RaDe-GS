@@ -1,0 +1,68 @@
+# TOSCA Centaur - blue_texture, high_res, decoupled_appearance
+# Variant: split_enc_dec with outlier filtering, n_neighbors=10, adaptive_k_boost=16
+# For use with SplitEmbeddingEncoderDecoderTransformer
+#
+# 6 poses of centaur mesh (diagonal ~288.8)
+#
+# Usage:
+#   python DataSets/create_gaussian_training_patches.py \
+#       --config DataSets/configs/tosca/split_enc_dec/tosca_centaur.yaml
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Paths
+gaussian_output: "DataSets/configs/tosca/gaussian_sources/tosca_centaur_blue.txt"
+geodesic_data: null
+output_dir: "TrainData/datasets/gaussian_patches/split_enc_dec/tosca_centaur"
+iteration: null
+
+# Data generation parameters
+num_iterations: 5000
+num_sources: 3
+num_train_points: 100
+seed: 42
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 10
+adaptive_target_ring: 3
+adaptive_target_neighbors: 192
+adaptive_k_boost: 16
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 10
+normalize_per_patch: false
+
+# Outlier filtering (without p_u — inference-path filter)
+disable_outlier_filtering: false
+outlier_median_multiplier: 3.0
+outlier_threshold_floor: 2.0
+outlier_hard_cap: 500.0
+outlier_fallback_multiplier: 5.0
+outlier_fallback_floor: 3.0
+outlier_max_removal_fraction: null
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 64
+    3: 192
+    4: 512
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Normalization and padding
+normalize_all_neighbors: true
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -10.0
+
+# Dataset info
+dataset:
+  name: "TOSCA Centaur (6 poses)"
+  type: "TOSCA"

@@ -1,0 +1,125 @@
+# Combined TOSCA config – ALL animals with outlier filtering enabled
+# Variant: outlier filtering with tunable params
+#
+# Same structure as combined_tosca_all.yaml but with
+# disable_outlier_filtering: false and explicit outlier parameters.
+#
+# Usage:
+#   from DataSets.gaussian_dataset import CombinedGaussianPatchDataset
+#   dataset = CombinedGaussianPatchDataset(
+#       config='DataSets/configs/tosca/outlier_filtering/combined_tosca_all.yaml',
+#       attributes=['xyz'], ring=3
+#   )
+
+dataset_class: CombinedGaussianPatchDataset
+
+output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_combined_all"
+
+data_sources:
+  - name: "tosca_cat"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_cat"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_centaur"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_centaur"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_david"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_david"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_dog"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_dog"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_gorilla"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_gorilla"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_horse"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_horse"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_michael"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_michael"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_victoria"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_victoria"
+    weight: 1.0
+    iteration: null
+
+  - name: "tosca_wolf"
+    gaussian_output: null
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_wolf"
+    weight: 1.0
+    iteration: null
+
+# Data generation parameters (shared across all sources)
+num_iterations: 1000
+num_sources: 4
+num_train_points: 400
+seed: 42
+
+use_mahalanobis: false
+n_neighbors: 8
+adaptive_target_ring: 3
+adaptive_target_neighbors: 192
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 10
+normalize_per_patch: false
+
+# Outlier filtering (without p_u — inference-path filter)
+# The without-pu filter uses inter-neighbor gradient consistency
+# (stages 0-3 in _filter_outliers_without_pu). The training-path
+# params below are kept as fallback but are NOT used by the
+# without-pu path.
+disable_outlier_filtering: false
+outlier_median_multiplier: 3.0
+outlier_threshold_floor: 2.0
+outlier_hard_cap: 500.0
+outlier_fallback_multiplier: 5.0
+outlier_fallback_floor: 3.0
+# Max fraction of visited neighbors the without-pu filter may remove.
+# null = no cap. E.g. 0.5 = at most 50% removal.
+outlier_max_removal_fraction: 0.5
+
+rings: [2, 3]
+
+ring_size_mapping:
+  euclidean:
+    2: 64
+    3: 192
+    4: 512
+
+attributes:
+  - xyz
+
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -100

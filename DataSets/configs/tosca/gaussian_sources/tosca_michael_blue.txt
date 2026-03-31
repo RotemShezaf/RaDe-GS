@@ -1,0 +1,5 @@
+# Gaussian output paths for TOSCA michael - blue_texture, high_res, decoupled_appearance
+# 20 poses, mesh diagonal ~261.9
+# 2 poses available in high_res with geodesic data (michael0, michael2)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/michael0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/michael2/high_res/decoupled_appearance/output

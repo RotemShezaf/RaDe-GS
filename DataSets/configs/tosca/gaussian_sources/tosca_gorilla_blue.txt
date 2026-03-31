@@ -1,0 +1,4 @@
+# Gaussian output paths for TOSCA gorilla - blue_texture, high_res, decoupled_appearance
+# 21 poses, mesh diagonal ~188.6
+# 1 pose available in high_res with geodesic data (gorilla5)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/gorilla5/high_res/decoupled_appearance/output

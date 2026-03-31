@@ -1,1 +1,1 @@
-"""Tests for Gaussian dataset and data transformations."""
+"""Test suite for GenerateData utilities."""

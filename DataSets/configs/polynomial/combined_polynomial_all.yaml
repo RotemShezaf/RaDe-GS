@@ -1,0 +1,108 @@
+# Multi-source configuration combining ALL polynomial surfaces
+#
+# This config uses CombinedGaussianPatchDataset to load training data
+# from all 3 polynomial surfaces (Paraboloid, Saddle, HyperbolicParaboloid),
+# each spanning all colmap levels (02,03,04) and lighting conditions (0-4).
+#
+# Total: 3 surfaces × 15 Gaussian outputs each = 45 Gaussian outputs
+#
+# Workflow:
+# 1. First generate patches for each surface:
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/paraboloid_all.yaml
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/saddle_all.yaml
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/hyperbolic_paraboloid_all.yaml
+#    OR use the combined generation script:
+#      bash scripts/generate_polynomial_training_patches.sh
+#
+# 2. Load with CombinedGaussianPatchDataset:
+#      from DataSets.gaussian_dataset import CombinedGaussianPatchDataset
+#      dataset = CombinedGaussianPatchDataset(
+#          config="DataSets/configs/polynomial/combined_polynomial_all.yaml",
+#          attributes=["xyz"],
+#          ring=2,
+#      )
+
+# Dataset class for loading training data
+dataset_class: CombinedGaussianPatchDataset
+
+# Base output directory
+output_dir: "TrainData/datasets/gaussian_patches/combined_polynomial_all"
+
+# Multiple data sources - one per polynomial surface type
+# Each source uses a .txt file pointing to all 15 Gaussian outputs for that surface
+data_sources:
+  - name: "paraboloid_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/paraboloid_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/paraboloid_all"
+    weight: 1.0
+    iteration: null
+
+  - name: "saddle_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/saddle_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/saddle_all"
+    weight: 1.0
+    iteration: null
+
+  - name: "hyperbolic_paraboloid_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/hyperbolic_paraboloid_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/hyperbolic_paraboloid_all"
+    weight: 1.0
+    iteration: null
+
+# Data generation parameters (shared across all sources)
+num_iterations: 1000
+num_sources: 4
+num_train_points: 50
+seed: 42
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 12
+# Adaptive kNN
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 8
+normalize_per_patch: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+  mahalanobis:
+    2: 90
+    3: 250
+    4: 600
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Outlier filtering
+disable_outlier_filtering: true
+
+# Normalization and padding
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -20.0
+
+# Dataset info
+dataset:
+  name: "Combined Polynomial Surfaces (all levels & lights)"
+  type: "Multi-source"
+  description: "Training examples from all 3 polynomial surfaces, each with all colmap levels and lighting conditions"
+  characteristics:
+    - "Paraboloid: positive curvature (15 outputs)"
+    - "Saddle: negative curvature (15 outputs)"
+    - "HyperbolicParaboloid: mixed curvature (15 outputs)"
+    - "45 total Gaussian outputs for maximum diversity"
+    - "Weighted sampling for balanced training"

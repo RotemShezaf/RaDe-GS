@@ -1,0 +1,90 @@
+# Configuration for combined multi-surface dataset
+# This configuration loads training data from multiple Gaussian splatting outputs
+#
+# Workflow:
+# 1. Run create_gaussian_training_patches.py with this config to generate patches
+#    for each source (each source gets its own output_dir)
+# 2. Use CombinedGaussianPatchDataset with this config to load all sources together
+
+# Dataset class for loading training data
+dataset_class: CombinedGaussianPatchDataset
+
+# Base output directory (individual sources will have subdirectories)
+output_dir: "TrainData/datasets/gaussian_patches/combined_polynomial"
+
+# Multiple data sources - each source represents a different surface/texture combination
+# Each source has its own output_dir where training patches are saved
+data_sources:
+  - name: "paraboloid_blue"
+    gaussian_output: "TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_02/output"
+    geodesic_data: null  # Auto-detect from {gaussian_output}/geodesic_distance/gt_geodesic.npz
+    output_dir: "TrainData/datasets/gaussian_patches/combined_polynomial/paraboloid_blue"
+    weight: 1.0  # Sampling weight (higher = more samples from this source)
+    iteration: null  # Use highest available iteration
+
+  - name: "saddle_blue"
+    gaussian_output: "TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/output"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/combined_polynomial/saddle_blue"
+    weight: 1.0
+    iteration: null
+
+  - name: "hyperbolic_paraboloid_blue"
+    gaussian_output: "TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_02/output"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/combined_polynomial/hyperbolic_paraboloid_blue"
+    weight: 1.0
+    iteration: null
+
+# Data generation parameters (shared across all sources)
+num_iterations: 1000  # Total iterations (distributed across sources by weight)
+num_sources: 4        # Number of geodesic sources per iteration
+num_train_points: 50  # Number of training points per iteration
+seed: 42
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 12
+# Adaptive kNN
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 8
+normalize_per_patch: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping (maximum neighbors per ring)
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+  mahalanobis:
+    2: 90
+    3: 250
+    4: 600
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Outlier filtering
+disable_outlier_filtering: true
+
+# Normalization and padding
+nn_mean: 1.0
+use_r1_min_val: true
+mask_constant: -20.0
+
+# Dataset info
+dataset:
+  name: "Combined Polynomial Surfaces"
+  type: "Multi-source"
+  description: "Training examples combined from Paraboloid, Saddle, and HyperbolicParaboloid surfaces"
+  characteristics:
+    - "Multiple surface types for generalization"
+    - "Positive, negative, and mixed curvature surfaces"
+    - "Weighted sampling for balanced training"

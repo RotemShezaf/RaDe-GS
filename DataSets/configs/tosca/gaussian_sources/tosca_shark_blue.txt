@@ -1,0 +1,3 @@
+# Gaussian output paths for TOSCA shark - blue_texture, high_res, decoupled_appearance
+# 1 poses, mesh diagonal ~531.6
+# 0 poses available in high_res (shark not present)

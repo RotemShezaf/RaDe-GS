@@ -1,0 +1,58 @@
+# Configuration for Paraboloid surface - ALL levels and lighting conditions
+# Variant: 4 sources (num_sources=4), no outlier filtering, n_neighbors=10, adaptive_k_boost=16
+# For use with SplitEmbeddingEncoderDecoderTransformer
+#
+# Usage:
+#   python DataSets/create_gaussian_training_patches.py \
+#       --config DataSets/configs/polynomial/split_enc_dec/paraboloid_all.yaml
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Surface type
+surface_type: Paraboloid
+
+# Paths
+gaussian_output: "DataSets/configs/polynomial/gaussian_sources/paraboloid_blue_all.txt"
+geodesic_data: null
+output_dir: "TrainData/datasets/gaussian_patches/split_enc_dec/paraboloid_all"
+iteration: null
+
+# Data generation parameters
+num_iterations: 1000
+num_sources: 4
+num_train_points: 50
+seed: 42
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 10
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 16
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 6
+normalize_per_patch: false
+
+# Outlier filtering disabled
+disable_outlier_filtering: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Normalization and padding
+normalize_all_neighbors: true
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -10.0

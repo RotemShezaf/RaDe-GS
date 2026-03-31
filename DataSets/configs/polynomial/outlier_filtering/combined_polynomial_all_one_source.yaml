@@ -1,0 +1,100 @@
+# Multi-source configuration combining ALL polynomial surfaces
+# Variant: one source (num_sources=1) + outlier filtering with tunable params
+#
+# Trains on all 3 surfaces (Paraboloid + Saddle + HyperbolicParaboloid)
+# with outlier filtering enabled and configurable parameters.
+#
+# Workflow:
+# 1. Generate patches for each surface:
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/outlier_filtering/paraboloid_all_one_source.yaml
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/outlier_filtering/saddle_all_one_source.yaml
+#      python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/outlier_filtering/hyperbolic_paraboloid_all_one_source.yaml
+#
+# 2. Load with CombinedGaussianPatchDataset:
+#      from DataSets.gaussian_dataset import CombinedGaussianPatchDataset
+#      dataset = CombinedGaussianPatchDataset(
+#          config="DataSets/configs/polynomial/outlier_filtering/combined_polynomial_all_one_source.yaml",
+#          attributes=["xyz"],
+#          ring=3,
+#      )
+
+# Dataset class for loading training data
+dataset_class: CombinedGaussianPatchDataset
+
+# Base output directory
+output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/combined_polynomial_all_one_source"
+
+# Multiple data sources - one per polynomial surface type
+data_sources:
+  - name: "paraboloid_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/paraboloid_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/paraboloid_all_one_source"
+    surface_type: Paraboloid
+    weight: 1.0
+    iteration: null
+
+  - name: "saddle_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/saddle_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/saddle_all_one_source"
+    surface_type: Saddle
+    weight: 1.0
+    iteration: null
+
+  - name: "hyperbolic_paraboloid_all"
+    gaussian_output: "DataSets/configs/polynomial/gaussian_sources/hyperbolic_paraboloid_blue_all.txt"
+    geodesic_data: null
+    output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/hyperbolic_paraboloid_all_one_source"
+    surface_type: HyperbolicParaboloid
+    weight: 1.0
+    iteration: null
+
+# Data generation parameters (shared across all sources)
+num_iterations: 1000
+num_sources: 1
+num_train_points: 50
+seed: 42
+
+# Near-source oversampling
+#near_source_oversample: 0.3
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 16
+
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 22
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 6
+normalize_per_patch: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Outlier filtering (without p_u — inference-path filter)
+# The without-pu filter uses inter-neighbor gradient consistency
+# (stages 0-3 in _filter_outliers_without_pu). The training-path
+# params below are kept as fallback but are NOT used by the
+# without-pu path.
+disable_outlier_filtering: false
+outlier_median_multiplier: 3.0
+outlier_threshold_floor: 2.0
+outlier_hard_cap: 25.0
+outlier_fallback_multiplier: 5.0
+outlier_fallback_floor: 3.0
+# Max fraction of visited neighbors the without-pu filter may remove.
+# null = no cap. E.g. 0.5 = at most 50% removal.
+outlier_max_removal_fraction: null

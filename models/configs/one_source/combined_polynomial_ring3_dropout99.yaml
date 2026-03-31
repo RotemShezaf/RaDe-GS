@@ -1,0 +1,73 @@
+# Training config: Combined Polynomial Surfaces – Ring 3, high dropout (one source)
+# Variant: max_dropout_ratio=0.99, smooth_l1 loss, one geodesic source
+#
+# Trains GaussianPatchTransformer on the combined polynomial dataset
+# (Paraboloid + Saddle + HyperbolicParaboloid, all levels & lights)
+# with num_sources=1 patches. The high dropout combined with single-source
+# patches is ideal for training on the early-wavefront propagation regime.
+#
+# Prerequisites – generate one-source patches first:
+#   bash scripts/polynomial/generate_patches_one_source_tmux.sh
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/one_source/combined_polynomial_ring3_dropout99.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/combined_polynomial_all_one_source.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  attributes:
+    - xyz
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: GaussianPatchDropout
+      max_dropout_ratio: 0.99
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 6
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.05
+  attn_dropout: 0.05
+  drop_path_rate: 0.0
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 150
+  batch_size: 512
+  learning_rate: 3.0e-4
+  min_learning_rate: 1.0e-6
+  warmup_epochs: 3
+  weight_decay: 1.0e-4
+  loss_type: smooth_l1
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 8
+  min_delta: 1.0e-5
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/one_source/combined_polynomial_ring3_dropout99
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: combined-polynomial-ring3-dropout99-one-source
+  log_file: ./checkpoints/one_source/combined_polynomial_ring3_dropout99/train.log

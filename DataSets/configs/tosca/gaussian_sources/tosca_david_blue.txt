@@ -1,0 +1,4 @@
+# Gaussian output paths for TOSCA david - blue_texture, high_res, decoupled_appearance
+# 15 poses, mesh diagonal ~234.7
+# 1 pose available in high_res (david0)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/david0/high_res/decoupled_appearance/output

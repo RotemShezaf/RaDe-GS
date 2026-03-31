@@ -8,6 +8,13 @@ Creates data for three surfaces:
 
 Each surface is generated at multiple resolutions with corresponding point clouds.
 """
+# Ensure project root is in sys.path for module imports
+import os
+import sys
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 
 import numpy as np
@@ -307,6 +314,7 @@ def generate_multiresolution_data(surface_type, base_resolution=200, num_levels=
             f.write(f"Total Vertices: {len(mesh.vertices)}\n")
             f.write(f"Total Faces: {len(mesh.faces)}\n")
             f.write(f"Arc Length Resolution: {arc_length:.6f}\n")
+            f.write(f"Adaptive Sampling: {adaptive_sampling}\n")
             f.write(f"X Range: {x_range}\n")
             f.write(f"Y Range: {y_range}\n")
             f.write(f"Mesh File: {mesh_filename.name}\n")

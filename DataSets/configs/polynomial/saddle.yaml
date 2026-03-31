@@ -1,0 +1,63 @@
+# Configuration for Saddle (Hyperbolic Paraboloid) surface
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Paths (update these for your setup)
+# Example paths - adjust to your data location
+gaussian_output: "TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/output/sparse"
+geodesic_data: null  # Auto-detect from {gaussian_output}/geodesic_distance/gt_geodesic.npz
+output_dir: "TrainData/datasets/gaussian_patches/blue_texture/Saddle"
+iteration: null      # Use highest available iteration
+
+# Data generation parameters
+num_iterations: 10
+num_sources: 3
+num_train_points: 15
+seed: 42
+
+# Neighborhood computation - Mahalanobis works better for complex curvature
+use_mahalanobis: true
+n_neighbors: 12
+# Adaptive kNN
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 8
+normalize_per_patch: true
+# Ring configuration - Higher rings for saddle points
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 40
+    3: 150
+    4: 300
+  mahalanobis:
+    2: 90
+    3: 250
+    4: 600
+
+# Feature attributes - Include more features for complex geometry
+attributes:
+  - xyz
+
+# Outlier filtering
+disable_outlier_filtering: true
+
+# Normalization and padding
+nn_mean: 1
+
+use_r1_min_val: true
+# Dataset info
+dataset:
+  name: "Saddle"
+  type: "Polynomial"
+  description: "Training examples for Saddle surface (z = x^2 - y^2)"
+  characteristics:
+    - "Hyperbolic paraboloid"
+    - "Saddle point at origin"
+    - "Negative Gaussian curvature"
+    - "More complex geodesics"

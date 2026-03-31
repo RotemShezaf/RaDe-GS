@@ -55,10 +55,18 @@ class ModelParams(ParamGroup):
         self._white_background = False
         self.data_device = "cuda"
         self.eval = False
-        self.use_decoupled_appearance = False
+        self.use_decoupled_appearance = 3 # 0: NO, 1: GS, 2: GOF, 3: PGSR
         self.use_coord_map = False
         self.disable_filter3D = False
         self.kernel_size = 0.0 # Size of 2D filter in mip-splatting
+        
+        # self.depth_ratio = 0.6
+        self.depth_ratio = 0.0
+        
+        self.multi_view_num = 8
+        self.multi_view_max_angle = 30
+        self.multi_view_min_dis = 0.01
+        self.multi_view_max_dis = 1.5
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -86,15 +94,26 @@ class OptimizationParams(ParamGroup):
         self.rotation_lr = 0.001
         self.appearance_embeddings_lr = 0.001
         self.appearance_network_lr = 0.001
-        self.percent_dense = 0.01#0.02 #0.015
+        self.pgsr_appearance_lr = 0.001
+        self.gs_appearance_lr_init = 0.01
+        self.gs_appearance_lr_final = 0.001
+        self.gs_appearance_lr_delay_steps = 0
+        self.gs_appearance_lr_delay_mult = 0.0
+        self.percent_dense = 0.01
         self.lambda_dssim = 0.2
         self.lambda_depth_normal = 0.05
         self.densification_interval = 100
         self.opacity_reset_interval = 3000
         self.densify_from_iter = 500
         self.densify_until_iter = 15_000
-        self.regularization_from_iter = 15_000
-        self.densify_grad_threshold = 0.00013 #0.00002 
+        self.regularization_from_iter = 7000
+        self.lambda_distortion = 0.05
+        self.densify_grad_threshold = 0.0002
+
+        self.lambda_multi_view_geo = 0.02
+        self.lambda_multi_view_ncc = 0.3
+        self.multi_view_patch_size = 3
+        self.multi_view_pixel_noise_th = 1.0
 
         super().__init__(parser, "Optimization Parameters")
 

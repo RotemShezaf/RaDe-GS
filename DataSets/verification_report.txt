@@ -1,0 +1,1524 @@
+/home/rotem.shezaf/RaDe-GS/DataSets/verify_datasets.py:335: RuntimeWarning: Mean of empty slice
+  per_ex_mean = np.nanmean(euc_all_masked, axis=1)
+/home/rotem.shezaf/RaDe-GS/DataSets/verify_datasets.py:336: RuntimeWarning: All-NaN slice encountered
+  per_ex_max = np.nanmax(euc_all_masked, axis=1)
+/home/rotem.shezaf/RaDe-GS/DataSets/verify_datasets.py:337: RuntimeWarning: All-NaN slice encountered
+  per_ex_min = np.nanmin(euc_all_masked, axis=1)
+
+######################################################################
+#  Dataset Verification Report (Detailed)
+#  Generated: 2026-03-08 20:21:03
+#  Base: /home/rotem.shezaf/RaDe-GS/TrainData/datasets/gaussian_patches
+######################################################################
+
+######################################################################
+#  TOSCA Datasets
+######################################################################
+
+======================================================================
+  tosca_cat  [OK]
+======================================================================
+  Files: 2
+  Total examples: 200,000
+  Total size: 788.9 MB
+
+  --- gaussian_examples_ring2_n100000.npy ---
+    Shape: (100000, 261), dtype: float64, size: 199.1 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.6895, std=11.8998, min=0.0000, max=711.0976
+      p1=0.3377, p5=1.4353, p10=1.8295, p25=2.4989, p50=3.6350, p75=5.4136, p90=7.8548, p95=9.8922, p99=16.8462
+      Flags: zero=0.13%, >100=0.041%
+      r1_min_val: mean=2.2132, std=1.8981, [-0.0431 .. 84.6984], p50=1.7953, p95=4.9543, p99=8.2494
+      r1_min / target: mean=0.5026, std=0.1868, [-1.5296 .. 18.8321], p50=0.5023, p95=0.7077, p99=0.8557
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.3, min=0, p25=12, p50=15, p75=18, p95=25, p99=34, max=64
+      Padded: mean=48.7, 100.0% have padding, 0.10% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.572292  std=2.487793  min=0.025296  max=34.556722
+        p1=0.4208, p5=0.8498, p10=1.1622, p25=1.8493, p50=2.9227, p75=4.6407, p90=6.8120, p95=8.4576, p99=12.0380
+      Per-example: avg_mean=3.3307, avg_max=4.9127, global_max=34.5567, avg_min=1.4594, global_min=0.025296
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.744616  std=5.346436  min=0.000000  max=711.097561
+        p1=0.0000, p5=0.0000, p10=0.2109, p25=0.9487, p50=1.9588, p75=3.4379, p90=5.6202, p95=7.6042, p99=14.5290
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.116522  std=22.782308  min=0.000000  max=7099.648187
+        p1=0.0000, p5=0.0000, p10=0.0710, p25=0.3335, p50=0.7433, p75=1.2310, p90=1.9824, p95=2.7292, p99=4.8206
+      Extreme counts: >10: 1206, >50: 112, >100: 105, >500: 93
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.572965  std=13.115579  min=0.000000  max=711.097561
+        p1=0.0260, p5=0.1458, p10=0.2983, p25=0.7634, p50=1.6326, p75=2.9426, p90=4.7748, p95=6.3353, p99=11.7624
+      geo_nbr / target:
+        mean=0.529511  std=0.296435  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0711, p25=0.2952, p50=0.5598, p75=0.7815, p90=0.9122, p95=0.9563, p99=0.9918
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2582, std=2.2516, [0.0246 .. 37.6243], p50=2.6938, p95=7.6688, p99=10.9739
+
+    MASK CONSTANT (-10.0): 4,872,371 values (18.668%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 58 values (0.0580%) > mean+5.0×std (threshold=64.1883, max=711.0976)
+      ! nbr_euc_dist: 3036 values (0.1987%) > mean+5.0×std (threshold=16.0113, max=34.5567)
+      ! nbr_geodesic: 3084 values (0.2019%) > mean+5.0×std (threshold=29.4768, max=711.0976)
+      ! geo/euc_ratio: 105 values (0.0069%) > mean+5.0×std (threshold=115.0281, max=7099.6482)
+
+  --- gaussian_examples_ring3_n100000.npy ---
+    Shape: (100000, 773), dtype: float64, size: 589.8 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=6.9033, std=9.0166, min=0.0000, max=685.4884
+      p1=0.7980, p5=2.4269, p10=2.9696, p25=3.8933, p50=5.6151, p75=8.2715, p90=11.8768, p95=14.8588, p99=24.4782
+      Flags: zero=0.08%, >100=0.022%
+      r1_min_val: mean=4.5366, std=3.1810, [-0.1551 .. 89.2885], p50=3.7675, p95=9.9127, p99=15.6401
+      r1_min / target: mean=0.6735, std=0.2304, [-2.1371 .. 63.0212], p50=0.6755, p95=0.8343, p99=0.9236
+
+    NEIGHBOR COUNTS:
+      Real: mean=33.4, min=0, p25=25, p50=31, p75=38, p95=59, p99=95, max=192
+      Padded: mean=158.6, 100.0% have padding, 0.07% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.159548  std=3.509777  min=0.025296  max=45.481264
+        p1=0.6598, p5=1.2339, p10=1.6914, p25=2.6912, p50=4.2555, p75=6.7332, p90=9.8304, p95=12.1043, p99=16.9152
+      Per-example: avg_mean=4.6333, avg_max=7.2875, global_max=45.4813, avg_min=1.5792, global_min=0.025296
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.620867  std=5.090149  min=0.000000  max=685.488449
+        p1=0.0000, p5=0.2493, p10=0.7540, p25=1.8194, p50=3.3545, p75=5.8195, p90=9.5384, p95=12.8934, p99=23.3857
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.134026  std=6.906917  min=0.000000  max=5009.361337
+        p1=0.0000, p5=0.0550, p10=0.1683, p25=0.4504, p50=0.8607, p75=1.4389, p90=2.2930, p95=3.0626, p99=5.1595
+      Extreme counts: >10: 2247, >50: 59, >100: 27, >500: 25
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.454175  std=8.104155  min=0.000000  max=685.488449
+        p1=0.0414, p5=0.2174, p10=0.4418, p25=1.1164, p50=2.3822, p75=4.3125, p90=7.0273, p95=9.3451, p99=17.7648
+      geo_nbr / target:
+        mean=0.567172  std=0.279061  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0533, p10=0.1532, p25=0.3569, p50=0.6002, p75=0.8037, p90=0.9207, p95=0.9605, p99=0.9923
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.5208, std=3.0424, [0.0253 .. 45.4813], p50=3.7788, p95=10.5161, p99=14.8086
+
+    MASK CONSTANT (-10.0): 15,857,653 values (20.514%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 88 values (0.0880%) > mean+5.0×std (threshold=51.9861, max=685.4884)
+      ! nbr_euc_dist: 5254 values (0.1572%) > mean+5.0×std (threshold=22.7084, max=45.4813)
+      ! nbr_geodesic: 15277 values (0.4571%) > mean+5.0×std (threshold=30.0716, max=685.4884)
+      ! geo/euc_ratio: 94 values (0.0028%) > mean+5.0×std (threshold=35.6686, max=5009.3613)
+
+======================================================================
+  tosca_centaur  [OK]
+======================================================================
+  Files: 2
+  Total examples: 300,000
+  Total size: 1183.3 MB
+
+  --- gaussian_examples_ring2_n150000.npy ---
+    Shape: (150000, 261), dtype: float64, size: 298.7 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=8.0676, std=54.5405, min=0.0000, max=1374.9476
+      p1=0.7870, p5=1.3496, p10=1.7105, p25=2.4687, p50=3.6607, p75=5.6237, p90=8.3625, p95=11.1269, p99=30.6696
+      Flags: zero=0.07%, >100=0.399%
+      r1_min_val: mean=2.9173, std=23.2769, [-0.3357 .. 1231.5017], p50=1.7935, p95=5.2292, p99=10.8933
+      r1_min / target: mean=0.5028, std=1.3575, [-0.4564 .. 417.8422], p50=0.4992, p95=0.7199, p99=0.8859
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.1, min=0, p25=11, p50=14, p75=18, p95=25, p99=35, max=64
+      Padded: mean=48.9, 100.0% have padding, 0.06% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.639259  std=2.897936  min=0.059592  max=42.938273
+        p1=0.4602, p5=0.8245, p10=1.1134, p25=1.7894, p50=2.8946, p75=4.5773, p90=6.8788, p95=8.8280, p99=15.2585
+      Per-example: avg_mean=3.3614, avg_max=4.9652, global_max=42.9383, avg_min=1.4685, global_min=0.059592
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=5.457108  std=47.381338  min=0.000000  max=1313.354699
+        p1=0.0000, p5=0.0000, p10=0.2192, p25=0.9401, p50=1.9699, p75=3.5260, p90=5.9680, p95=8.6336, p99=24.1862
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=2.954095  std=46.075548  min=0.000000  max=10756.549293
+        p1=0.0000, p5=0.0000, p10=0.0695, p25=0.3355, p50=0.7571, p75=1.2785, p90=2.1517, p95=3.0686, p99=6.6286
+      Extreme counts: >10: 14784, >50: 7244, >100: 6590, >500: 3205
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=6.041392  std=56.128505  min=0.000000  max=1374.947590
+        p1=0.0217, p5=0.1499, p10=0.3082, p25=0.7753, p50=1.6601, p75=3.0611, p90=5.1831, p95=7.2648, p99=21.9142
+      geo_nbr / target:
+        mean=0.525180  std=0.299837  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0598, p25=0.2846, p50=0.5553, p75=0.7813, p90=0.9135, p95=0.9583, p99=0.9938
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2806, std=2.5145, [0.0596 .. 45.1397], p50=2.6544, p95=7.8408, p99=12.3870
+
+    MASK CONSTANT (-10.0): 7,342,238 values (18.754%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 554 values (0.3693%) > mean+5.0×std (threshold=280.7702, max=1374.9476)
+      ! nbr_euc_dist: 12641 values (0.5599%) > mean+5.0×std (threshold=18.1289, max=42.9383)
+      ! nbr_geodesic: 6415 values (0.2841%) > mean+5.0×std (threshold=242.3638, max=1313.3547)
+      ! geo/euc_ratio: 5811 values (0.2574%) > mean+5.0×std (threshold=233.3318, max=10756.5493)
+
+  --- gaussian_examples_ring3_n150000.npy ---
+    Shape: (150000, 773), dtype: float64, size: 884.6 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=10.6951, std=57.5010, min=0.0000, max=1409.9699
+      p1=1.4209, p5=2.2121, p10=2.7499, p25=3.8776, p50=5.6620, p75=8.5604, p90=12.5001, p95=16.2582, p99=39.5928
+      Flags: zero=0.02%, >100=0.434%
+      r1_min_val: mean=5.2410, std=22.9238, [-0.2510 .. 1307.3258], p50=3.7688, p95=10.3226, p99=19.7132
+      r1_min / target: mean=0.6675, std=0.2258, [-2.1166 .. 71.4060], p50=0.6732, p95=0.8411, p99=0.9418
+
+    NEIGHBOR COUNTS:
+      Real: mean=32.4, min=0, p25=24, p50=30, p75=37, p95=57, p99=96, max=192
+      Padded: mean=159.6, 100.0% have padding, 0.02% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.238409  std=4.040713  min=0.055792  max=55.453547
+        p1=0.6624, p5=1.1942, p10=1.6192, p25=2.6146, p50=4.2057, p75=6.6176, p90=9.8998, p95=12.6024, p99=21.1389
+      Per-example: avg_mean=4.6675, avg_max=7.3618, global_max=55.4535, avg_min=1.5949, global_min=0.055792
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=6.758413  std=41.638895  min=0.000000  max=1354.460896
+        p1=0.0000, p5=0.2541, p10=0.7438, p25=1.7791, p50=3.3794, p75=5.8742, p90=9.8479, p95=14.1823, p99=33.3414
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=2.168208  std=27.190634  min=0.000000  max=4442.741206
+        p1=0.0000, p5=0.0527, p10=0.1655, p25=0.4490, p50=0.8689, p75=1.4811, p90=2.4314, p95=3.3544, p99=6.3928
+      Extreme counts: >10: 24405, >50: 11235, >100: 10387, >500: 2976
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=8.002872  std=63.727904  min=0.000000  max=1409.969935
+        p1=0.0367, p5=0.2241, p10=0.4538, p25=1.1340, p50=2.4251, p75=4.4686, p90=7.5439, p95=10.5299, p99=29.2884
+      geo_nbr / target:
+        mean=0.560872  std=0.283322  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0392, p10=0.1373, p25=0.3456, p50=0.5942, p75=0.8017, p90=0.9206, p95=0.9610, p99=0.9936
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.5513, std=3.3182, [0.0558 .. 60.3267], p50=3.7405, p95=10.7773, p99=16.2149
+
+    MASK CONSTANT (-10.0): 23,941,291 values (20.648%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 589 values (0.3927%) > mean+5.0×std (threshold=298.2002, max=1409.9699)
+      ! nbr_euc_dist: 22496 values (0.4630%) > mean+5.0×std (threshold=25.4420, max=55.4535)
+      ! nbr_geodesic: 10247 values (0.2109%) > mean+5.0×std (threshold=214.9529, max=1354.4609)
+      ! geo/euc_ratio: 9972 values (0.2052%) > mean+5.0×std (threshold=138.1214, max=4442.7412)
+
+======================================================================
+  tosca_david  [OK]
+======================================================================
+  Files: 2
+  Total examples: 100,000
+  Total size: 394.4 MB
+
+  --- gaussian_examples_ring2_n50000.npy ---
+    Shape: (50000, 261), dtype: float64, size: 99.6 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.7982, std=22.2928, min=0.0000, max=1218.3787
+      p1=0.1487, p5=1.1417, p10=1.5910, p25=2.4657, p50=3.7109, p75=5.3494, p90=7.3615, p95=9.1757, p99=15.6430
+      Flags: zero=0.16%, >100=0.054%
+      r1_min_val: mean=2.1567, std=1.6622, [-0.4634 .. 46.7609], p50=1.8498, p95=4.6678, p99=7.9673
+      r1_min / target: mean=0.5040, std=0.1374, [-2.7796 .. 8.2893], p50=0.5035, p95=0.7045, p99=0.8358
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.3, min=0, p25=12, p50=15, p75=18, p95=25, p99=34, max=58
+      Padded: mean=48.7, 100.0% have padding, 0.10% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.558880  std=2.466181  min=0.010451  max=29.855655
+        p1=0.2604, p5=0.7858, p10=1.0934, p25=1.8007, p50=2.9874, p75=4.6749, p90=6.7282, p95=8.2764, p99=12.0676
+      Per-example: avg_mean=3.3224, avg_max=4.9058, global_max=29.8557, avg_min=1.4564, global_min=0.010451
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.836631  std=16.430774  min=0.000000  max=1213.578022
+        p1=0.0000, p5=0.0000, p10=0.1669, p25=0.8665, p50=1.9084, p75=3.3712, p90=5.3150, p95=7.0761, p99=13.7598
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=3.423266  std=172.938458  min=0.000000  max=35283.376767
+        p1=0.0000, p5=0.0000, p10=0.0675, p25=0.3191, p50=0.7161, p75=1.1810, p90=1.8721, p95=2.5649, p99=4.4464
+      Extreme counts: >10: 281, >50: 222, >100: 222, >500: 222
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.599506  std=20.746156  min=0.000000  max=1218.378692
+        p1=0.0211, p5=0.1223, p10=0.2634, p25=0.7091, p50=1.5826, p75=2.9193, p90=4.5986, p95=5.9268, p99=9.9827
+      geo_nbr / target:
+        mean=0.529348  std=0.295922  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0711, p25=0.2970, p50=0.5596, p75=0.7802, p90=0.9111, p95=0.9559, p99=0.9916
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2511, std=2.2237, [0.0105 .. 29.8557], p50=2.7604, p95=7.4623, p99=10.7342
+
+    MASK CONSTANT (-10.0): 2,433,889 values (18.650%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 27 values (0.0540%) > mean+5.0×std (threshold=116.2620, max=1218.3787)
+      ! nbr_euc_dist: 1610 values (0.2102%) > mean+5.0×std (threshold=15.8898, max=29.8557)
+      ! nbr_geodesic: 222 values (0.0290%) > mean+5.0×std (threshold=84.9905, max=1213.5780)
+      ! geo/euc_ratio: 222 values (0.0290%) > mean+5.0×std (threshold=868.1156, max=35283.3768)
+
+  --- gaussian_examples_ring3_n50000.npy ---
+    Shape: (50000, 773), dtype: float64, size: 294.9 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=7.0510, std=23.3830, min=0.0000, max=1213.7195
+      p1=0.2227, p5=1.8701, p10=2.4958, p25=3.8022, p50=5.6899, p75=8.1761, p90=11.1715, p95=13.8355, p99=23.2509
+      Flags: zero=0.11%, >100=0.052%
+      r1_min_val: mean=4.3984, std=2.9757, [-0.1276 .. 65.3007], p50=3.8274, p95=9.3129, p99=15.1092
+      r1_min / target: mean=0.6727, std=0.3373, [-70.7503 .. 3.3301], p50=0.6749, p95=0.8307, p99=0.9137
+
+    NEIGHBOR COUNTS:
+      Real: mean=33.7, min=0, p25=25, p50=31, p75=38, p95=61, p99=94, max=186
+      Padded: mean=158.3, 100.0% have padding, 0.06% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.135214  std=3.524786  min=0.015762  max=36.672274
+        p1=0.4471, p5=1.1217, p10=1.5489, p25=2.5636, p50=4.3232, p75=6.8237, p90=9.7661, p95=11.9878, p99=16.9819
+      Per-example: avg_mean=4.6086, avg_max=7.2670, global_max=36.6723, avg_min=1.5772, global_min=0.015762
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.462239  std=8.449453  min=0.000000  max=1212.318861
+        p1=0.0000, p5=0.1858, p10=0.6521, p25=1.6542, p50=3.2511, p75=5.6826, p90=9.0699, p95=12.3267, p99=22.4584
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.404323  std=48.215482  min=0.000000  max=11141.488686
+        p1=0.0000, p5=0.0538, p10=0.1628, p25=0.4349, p50=0.8304, p75=1.3773, p90=2.1777, p95=2.8936, p99=4.8324
+      Extreme counts: >10: 273, >50: 100, >100: 100, >500: 100
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.588342  std=22.320784  min=0.000000  max=1213.719514
+        p1=0.0331, p5=0.1829, p10=0.3887, p25=1.0271, p50=2.2815, p75=4.2471, p90=6.7314, p95=8.6570, p99=14.3586
+      geo_nbr / target:
+        mean=0.568000  std=0.278440  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0541, p10=0.1543, p25=0.3591, p50=0.6017, p75=0.8035, p90=0.9205, p95=0.9602, p99=0.9923
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.4946, std=3.0199, [0.0158 .. 34.2144], p50=3.8463, p95=10.2283, p99=14.4567
+
+    MASK CONSTANT (-10.0): 7,917,314 values (20.485%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 26 values (0.0520%) > mean+5.0×std (threshold=123.9659, max=1213.7195)
+      ! nbr_euc_dist: 2202 values (0.1309%) > mean+5.0×std (threshold=22.7591, max=36.6723)
+      ! nbr_geodesic: 1016 values (0.0604%) > mean+5.0×std (threshold=46.7095, max=1212.3189)
+      ! geo/euc_ratio: 100 values (0.0059%) > mean+5.0×std (threshold=242.4817, max=11141.4887)
+
+======================================================================
+  tosca_dog  [OK]
+======================================================================
+  Files: 2
+  Total examples: 100,000
+  Total size: 394.4 MB
+
+  --- gaussian_examples_ring2_n50000.npy ---
+    Shape: (50000, 261), dtype: float64, size: 99.6 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.3492, std=3.3848, min=0.0000, max=82.5872
+      p1=0.6742, p5=1.2311, p10=1.5902, p25=2.3037, p50=3.4176, p75=5.4236, p90=8.0301, p95=10.0822, p99=16.3808
+      Flags: zero=0.04%
+      r1_min_val: mean=2.1694, std=1.8289, [-0.1610 .. 59.0433], p50=1.7007, p95=5.0899, p99=8.3767
+      r1_min / target: mean=0.5022, std=0.1614, [-6.9136 .. 16.8621], p50=0.5012, p95=0.7083, p99=0.8480
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.1, min=0, p25=12, p50=14, p75=18, p95=25, p99=35, max=64
+      Padded: mean=48.9, 100.0% have padding, 0.04% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.580696  std=2.733705  min=0.024102  max=39.058722
+        p1=0.4149, p5=0.7649, p10=1.0488, p25=1.7086, p50=2.7810, p75=4.6643, p90=7.2235, p95=9.0389, p99=13.0200
+      Per-example: avg_mean=3.3215, avg_max=4.9037, global_max=39.0587, avg_min=1.4602, global_min=0.024102
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.648371  std=3.154731  min=0.000000  max=81.437625
+        p1=0.0000, p5=0.0000, p10=0.2061, p25=0.8763, p50=1.8553, p75=3.3541, p90=5.6818, p95=7.7491, p99=14.6069
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.941259  std=0.932244  min=0.000000  max=22.113356
+        p1=0.0000, p5=0.0000, p10=0.0708, p25=0.3324, p50=0.7398, p75=1.2244, p90=1.9631, p95=2.6853, p99=4.6079
+      Extreme counts: >10: 161
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.207531  std=2.437238  min=0.000000  max=82.587248
+        p1=0.0285, p5=0.1425, p10=0.2851, p25=0.7165, p50=1.5450, p75=2.8685, p90=4.8370, p95=6.4661, p99=10.8987
+      geo_nbr / target:
+        mean=0.529561  std=0.296021  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0720, p25=0.2969, p50=0.5594, p75=0.7813, p90=0.9115, p95=0.9559, p99=0.9912
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2449, std=2.4448, [0.0241 .. 38.2600], p50=2.5582, p95=8.1352, p99=11.7354
+
+    MASK CONSTANT (-10.0): 2,443,029 values (18.721%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 238 values (0.4760%) > mean+5.0×std (threshold=21.2731, max=82.5872)
+      ! nbr_euc_dist: 1697 values (0.2242%) > mean+5.0×std (threshold=17.2492, max=39.0587)
+      ! nbr_geodesic: 4018 values (0.5308%) > mean+5.0×std (threshold=18.4220, max=81.4376)
+      ! geo/euc_ratio: 3008 values (0.3974%) > mean+5.0×std (threshold=5.6025, max=22.1134)
+
+  --- gaussian_examples_ring3_n50000.npy ---
+    Shape: (50000, 773), dtype: float64, size: 294.9 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=6.6055, std=4.7010, min=0.0000, max=87.8921
+      p1=1.1359, p5=1.9969, p10=2.5626, p25=3.6077, p50=5.2582, p75=8.3245, p90=12.1209, p95=15.0760, p99=23.3994
+      Flags: zero=0.01%
+      r1_min_val: mean=4.4362, std=3.2260, [-0.6026 .. 61.8789], p50=3.5264, p95=10.1134, p99=15.7853
+      r1_min / target: mean=0.6734, std=0.1101, [0.0000 .. 6.8492], p50=0.6747, p95=0.8332, p99=0.9173
+
+    NEIGHBOR COUNTS:
+      Real: mean=32.9, min=0, p25=24, p50=30, p75=38, p95=60, p99=91, max=192
+      Padded: mean=159.1, 100.0% have padding, 0.01% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.183137  std=3.834340  min=0.032710  max=40.570798
+        p1=0.5919, p5=1.1049, p10=1.5251, p25=2.4832, p50=4.0502, p75=6.8359, p90=10.4929, p95=12.9487, p99=18.0804
+      Per-example: avg_mean=4.6158, avg_max=7.2981, global_max=40.5708, avg_min=1.5778, global_min=0.032710
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.497089  std=4.732606  min=0.000000  max=87.671892
+        p1=0.0000, p5=0.2427, p10=0.6900, p25=1.6722, p50=3.2034, p75=5.7025, p90=9.5479, p95=12.8972, p99=22.9497
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.094744  std=1.001987  min=0.000000  max=20.770650
+        p1=0.0000, p5=0.0545, p10=0.1654, p25=0.4461, p50=0.8522, p75=1.4232, p90=2.2547, p95=2.9948, p99=4.9697
+      Extreme counts: >10: 335
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.194153  std=3.323372  min=0.000000  max=87.892073
+        p1=0.0429, p5=0.2109, p10=0.4186, p25=1.0464, p50=2.2556, p75=4.1901, p90=7.0669, p95=9.3571, p99=15.3970
+      geo_nbr / target:
+        mean=0.567459  std=0.278520  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0539, p10=0.1534, p25=0.3585, p50=0.6009, p75=0.8033, p90=0.9198, p95=0.9597, p99=0.9919
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.4971, std=3.2998, [0.0327 .. 40.2366], p50=3.5802, p95=11.1845, p99=15.7080
+
+    MASK CONSTANT (-10.0): 7,954,193 values (20.580%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 192 values (0.3840%) > mean+5.0×std (threshold=30.1105, max=87.8921)
+      ! nbr_euc_dist: 2027 values (0.1232%) > mean+5.0×std (threshold=24.3548, max=40.5708)
+      ! nbr_geodesic: 8596 values (0.5223%) > mean+5.0×std (threshold=28.1601, max=87.6719)
+      ! geo/euc_ratio: 5932 values (0.3604%) > mean+5.0×std (threshold=6.1047, max=20.7707)
+
+======================================================================
+  tosca_gorilla  [OK]
+======================================================================
+  Files: 2
+  Total examples: 100,000
+  Total size: 394.4 MB
+
+  --- gaussian_examples_ring2_n50000.npy ---
+    Shape: (50000, 261), dtype: float64, size: 99.6 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.3196, std=3.2258, min=0.0000, max=86.7282
+      p1=0.8259, p5=1.4763, p10=1.8238, p25=2.5754, p50=3.6785, p75=5.0922, p90=7.1039, p95=8.9908, p99=16.6073
+      Flags: zero=0.08%
+      r1_min_val: mean=2.1590, std=1.7412, [-0.2080 .. 46.6680], p50=1.8347, p95=4.5183, p99=8.3427
+      r1_min / target: mean=0.5042, std=0.1341, [-1.1648 .. 12.2599], p50=0.5033, p95=0.6940, p99=0.8252
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.5, min=0, p25=12, p50=15, p75=18, p95=25, p99=35, max=64
+      Padded: mean=48.5, 100.0% have padding, 0.08% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.515185  std=2.318938  min=0.013901  max=28.172811
+        p1=0.5145, p5=0.9012, p10=1.2000, p25=1.8841, p50=2.9913, p75=4.5041, p90=6.4865, p95=8.0260, p99=11.5023
+      Per-example: avg_mean=3.2632, avg_max=4.8093, global_max=28.1728, avg_min=1.4344, global_min=0.013901
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.665489  std=3.217240  min=0.000000  max=86.572639
+        p1=0.0000, p5=0.0000, p10=0.2384, p25=0.9667, p50=1.9672, p75=3.3294, p90=5.2638, p95=7.2211, p99=15.6655
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.931550  std=0.909608  min=0.000000  max=55.244155
+        p1=0.0000, p5=0.0000, p10=0.0743, p25=0.3354, p50=0.7423, p75=1.2158, p90=1.9298, p95=2.6210, p99=4.4732
+      Extreme counts: >10: 127, >50: 1
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.174906  std=2.365281  min=0.000000  max=86.728156
+        p1=0.0295, p5=0.1532, p10=0.3089, p25=0.7664, p50=1.6215, p75=2.8722, p90=4.4382, p95=5.7625, p99=10.5103
+      geo_nbr / target:
+        mean=0.532084  std=0.294977  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0758, p25=0.3022, p50=0.5628, p75=0.7823, p90=0.9119, p95=0.9562, p99=0.9915
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.1865, std=2.0534, [0.0111 .. 30.4985], p50=2.7508, p95=7.1243, p99=10.2321
+
+    MASK CONSTANT (-10.0): 2,425,371 values (18.585%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 308 values (0.6160%) > mean+5.0×std (threshold=20.4485, max=86.7282)
+      ! nbr_euc_dist: 1453 values (0.1876%) > mean+5.0×std (threshold=15.1099, max=28.1728)
+      ! nbr_geodesic: 5335 values (0.6887%) > mean+5.0×std (threshold=18.7517, max=86.5726)
+      ! geo/euc_ratio: 2988 values (0.3857%) > mean+5.0×std (threshold=5.4796, max=55.2442)
+
+  --- gaussian_examples_ring3_n50000.npy ---
+    Shape: (50000, 773), dtype: float64, size: 294.9 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=6.5927, std=4.3749, min=0.0000, max=99.6047
+      p1=1.4786, p5=2.3960, p10=2.9081, p25=4.0928, p50=5.6594, p75=7.7249, p90=10.8309, p95=13.8069, p99=24.1393
+      Flags: zero=0.03%
+      r1_min_val: mean=4.4243, std=2.9606, [-0.1331 .. 63.6337], p50=3.8287, p95=9.2409, p99=15.9387
+      r1_min / target: mean=0.6749, std=0.1092, [-0.3592 .. 9.5343], p50=0.6757, p95=0.8264, p99=0.9102
+
+    NEIGHBOR COUNTS:
+      Real: mean=34.3, min=0, p25=26, p50=31, p75=38, p95=62, p99=98, max=192
+      Padded: mean=157.7, 100.0% have padding, 0.03% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.103436  std=3.299532  min=0.011146  max=35.449338
+        p1=0.7364, p5=1.2926, p10=1.7300, p25=2.7358, p50=4.3738, p75=6.5823, p90=9.4682, p95=11.5799, p99=16.1532
+      Per-example: avg_mean=4.5519, avg_max=7.1674, global_max=35.4493, avg_min=1.5499, global_min=0.011146
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.624048  std=4.882239  min=0.000000  max=99.604685
+        p1=0.0000, p5=0.2854, p10=0.7901, p25=1.8436, p50=3.3995, p75=5.6583, p90=9.3563, p95=13.2739, p99=24.5000
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.102350  std=1.002261  min=0.000000  max=96.779554
+        p1=0.0000, p5=0.0583, p10=0.1710, p25=0.4533, p50=0.8625, p75=1.4368, p90=2.2711, p95=3.0008, p99=4.9076
+      Extreme counts: >10: 290, >50: 3
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.159221  std=3.204509  min=0.000000  max=99.604685
+        p1=0.0437, p5=0.2238, p10=0.4478, p25=1.1114, p50=2.3647, p75=4.2130, p90=6.5315, p95=8.5405, p99=15.0824
+      geo_nbr / target:
+        mean=0.572239  std=0.277945  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0573, p10=0.1585, p25=0.3643, p50=0.6078, p75=0.8074, p90=0.9219, p95=0.9611, p99=0.9924
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.4309, std=2.7857, [0.0111 .. 36.9209], p50=3.8762, p95=9.7773, p99=13.8053
+
+    MASK CONSTANT (-10.0): 7,887,374 values (20.407%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 282 values (0.5640%) > mean+5.0×std (threshold=28.4671, max=99.6047)
+      ! nbr_euc_dist: 2383 values (0.1391%) > mean+5.0×std (threshold=21.6011, max=35.4493)
+      ! nbr_geodesic: 9486 values (0.5539%) > mean+5.0×std (threshold=29.0352, max=99.6047)
+      ! geo/euc_ratio: 5336 values (0.3116%) > mean+5.0×std (threshold=6.1137, max=96.7796)
+
+======================================================================
+  tosca_horse  [OK]
+======================================================================
+  Files: 2
+  Total examples: 100,000
+  Total size: 394.4 MB
+
+  --- gaussian_examples_ring2_n50000.npy ---
+    Shape: (50000, 261), dtype: float64, size: 99.6 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.2926, std=3.3055, min=0.0000, max=71.8261
+      p1=0.7016, p5=1.1901, p10=1.5616, p25=2.2880, p50=3.4179, p75=5.2971, p90=7.8884, p95=10.0184, p99=16.9686
+      Flags: zero=0.05%
+      r1_min_val: mean=2.1474, std=1.8263, [-0.3027 .. 65.0984], p50=1.6956, p95=5.0592, p99=8.8581
+      r1_min / target: mean=0.5022, std=0.1782, [0.0000 .. 27.3814], p50=0.4998, p95=0.7046, p99=0.8453
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.3, min=0, p25=12, p50=15, p75=18, p95=25, p99=35, max=63
+      Padded: mean=48.7, 100.0% have padding, 0.05% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.609258  std=2.826580  min=0.072001  max=37.587259
+        p1=0.4282, p5=0.7677, p10=1.0456, p25=1.7152, p50=2.8242, p75=4.6292, p90=7.1015, p95=9.1184, p99=14.2611
+      Per-example: avg_mean=3.3200, avg_max=4.8956, global_max=37.5873, avg_min=1.4560, global_min=0.072001
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.617442  std=3.012018  min=0.000000  max=70.866988
+        p1=0.0000, p5=0.0000, p10=0.2078, p25=0.8599, p50=1.8396, p75=3.3326, p90=5.6192, p95=7.7206, p99=14.5153
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.926740  std=0.917933  min=0.000000  max=17.761871
+        p1=0.0000, p5=0.0000, p10=0.0704, p25=0.3262, p50=0.7287, p75=1.2041, p90=1.9327, p95=2.6526, p99=4.5547
+      Extreme counts: >10: 130
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.181154  std=2.311214  min=0.000000  max=71.826131
+        p1=0.0289, p5=0.1465, p10=0.2904, p25=0.7203, p50=1.5466, p75=2.8469, p90=4.7388, p95=6.3225, p99=10.8821
+      geo_nbr / target:
+        mean=0.528128  std=0.295353  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0724, p25=0.2952, p50=0.5580, p75=0.7790, p90=0.9094, p95=0.9545, p99=0.9910
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2330, std=2.5027, [0.0347 .. 37.5873], p50=2.5625, p95=8.0452, p99=12.5523
+
+    MASK CONSTANT (-10.0): 2,432,816 values (18.642%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 243 values (0.4860%) > mean+5.0×std (threshold=20.8199, max=71.8261)
+      ! nbr_euc_dist: 2276 values (0.2967%) > mean+5.0×std (threshold=17.7422, max=37.5873)
+      ! nbr_geodesic: 4370 values (0.5696%) > mean+5.0×std (threshold=17.6775, max=70.8670)
+      ! geo/euc_ratio: 3122 values (0.4069%) > mean+5.0×std (threshold=5.5164, max=17.7619)
+
+  --- gaussian_examples_ring3_n50000.npy ---
+    Shape: (50000, 773), dtype: float64, size: 294.9 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=6.5540, std=7.4320, min=0.0000, max=1024.0124
+      p1=1.2049, p5=1.9388, p10=2.4876, p25=3.5660, p50=5.2436, p75=8.1288, p90=11.9223, p95=14.8091, p99=24.3976
+      Flags: zero=0.02%, >100=0.004%
+      r1_min_val: mean=4.3806, std=3.2178, [-0.4052 .. 85.4286], p50=3.5172, p95=10.0440, p99=16.3374
+      r1_min / target: mean=0.6733, std=0.1034, [0.0000 .. 2.7131], p50=0.6734, p95=0.8323, p99=0.9162
+
+    NEIGHBOR COUNTS:
+      Real: mean=33.4, min=0, p25=25, p50=31, p75=38, p95=61, p99=96, max=178
+      Padded: mean=158.6, 100.0% have padding, 0.02% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.268999  std=4.082820  min=0.075747  max=51.568140
+        p1=0.6086, p5=1.1053, p10=1.5155, p25=2.4995, p50=4.1110, p75=6.7781, p90=10.4777, p95=13.4383, p99=20.3769
+      Per-example: avg_mean=4.6213, avg_max=7.3123, global_max=51.5681, avg_min=1.5901, global_min=0.075747
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.451194  std=4.583757  min=0.000000  max=91.961066
+        p1=0.0000, p5=0.2472, p10=0.6887, p25=1.6540, p50=3.1824, p75=5.6370, p90=9.4877, p95=12.9130, p99=22.8309
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.074248  std=0.982974  min=0.000000  max=21.807365
+        p1=0.0000, p5=0.0549, p10=0.1646, p25=0.4387, p50=0.8407, p75=1.3931, p90=2.2014, p95=2.9292, p99=4.9152
+      Extreme counts: >10: 294
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.239442  std=8.172950  min=0.000000  max=1024.012408
+        p1=0.0429, p5=0.2150, p10=0.4244, p25=1.0547, p50=2.2686, p75=4.1856, p90=6.9757, p95=9.2842, p99=15.4416
+      geo_nbr / target:
+        mean=0.565820  std=0.277669  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0546, p10=0.1541, p25=0.3572, p50=0.5989, p75=0.8002, p90=0.9178, p95=0.9586, p99=0.9918
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.4862, std=3.3870, [0.0757 .. 58.7724], p50=3.5824, p95=11.0946, p99=16.7397
+
+    MASK CONSTANT (-10.0): 7,930,482 values (20.519%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 32 values (0.0640%) > mean+5.0×std (threshold=43.7138, max=1024.0124)
+      ! nbr_euc_dist: 3714 values (0.2225%) > mean+5.0×std (threshold=25.6831, max=51.5681)
+      ! nbr_geodesic: 7896 values (0.4730%) > mean+5.0×std (threshold=27.3700, max=91.9611)
+      ! geo/euc_ratio: 6160 values (0.3690%) > mean+5.0×std (threshold=5.9891, max=21.8074)
+
+======================================================================
+  tosca_michael  [OK]
+======================================================================
+  Files: 2
+  Total examples: 200,000
+  Total size: 788.9 MB
+
+  --- gaussian_examples_ring2_n100000.npy ---
+    Shape: (100000, 261), dtype: float64, size: 199.1 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.7902, std=18.9135, min=0.0000, max=1172.4418
+      p1=0.0952, p5=1.0994, p10=1.5817, p25=2.4288, p50=3.6865, p75=5.3225, p90=7.3810, p95=9.2859, p99=17.1406
+      Flags: zero=0.19%, >100=0.071%
+      r1_min_val: mean=2.1544, std=1.7929, [-0.1234 .. 45.6654], p50=1.8295, p95=4.6628, p99=8.3965
+      r1_min / target: mean=0.5038, std=0.7285, [-1.4355 .. 225.4212], p50=0.5011, p95=0.7076, p99=0.8540
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.3, min=0, p25=12, p50=15, p75=18, p95=25, p99=34, max=63
+      Padded: mean=48.7, 100.0% have padding, 0.15% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.559735  std=2.477808  min=0.007466  max=27.393690
+        p1=0.1629, p5=0.7615, p10=1.0925, p25=1.8101, p50=2.9870, p75=4.6699, p90=6.7463, p95=8.3430, p99=12.0200
+      Per-example: avg_mean=3.2998, avg_max=4.8645, global_max=27.3937, avg_min=1.4481, global_min=0.007466
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.743003  std=8.701990  min=0.000000  max=1061.076021
+        p1=0.0000, p5=0.0000, p10=0.1521, p25=0.8733, p50=1.9180, p75=3.3946, p90=5.3973, p95=7.3473, p99=15.1357
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=2.314100  std=130.314930  min=0.000000  max=35842.146808
+        p1=0.0000, p5=0.0000, p10=0.0680, p25=0.3208, p50=0.7222, p75=1.1955, p90=1.9069, p95=2.5971, p99=4.4521
+      Extreme counts: >10: 479, >50: 276, >100: 276, >500: 276
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.704150  std=19.757122  min=0.000000  max=1172.441839
+        p1=0.0188, p5=0.1167, p10=0.2583, p25=0.7131, p50=1.5918, p75=2.9245, p90=4.6163, p95=5.9793, p99=10.7113
+      geo_nbr / target:
+        mean=0.529722  std=0.296348  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0708, p25=0.2969, p50=0.5598, p75=0.7818, p90=0.9121, p95=0.9564, p99=0.9919
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2187, std=2.2230, [0.0075 .. 27.4107], p50=2.7299, p95=7.4468, p99=10.7464
+
+    MASK CONSTANT (-10.0): 4,866,008 values (18.644%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 71 values (0.0710%) > mean+5.0×std (threshold=99.3580, max=1172.4418)
+      ! nbr_euc_dist: 3152 values (0.2055%) > mean+5.0×std (threshold=15.9488, max=27.3937)
+      ! nbr_geodesic: 577 values (0.0376%) > mean+5.0×std (threshold=46.2530, max=1061.0760)
+      ! geo/euc_ratio: 276 values (0.0180%) > mean+5.0×std (threshold=653.8887, max=35842.1468)
+
+  --- gaussian_examples_ring3_n100000.npy ---
+    Shape: (100000, 773), dtype: float64, size: 589.8 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=7.0959, std=20.5265, min=0.0000, max=1085.4991
+      p1=0.1365, p5=1.8439, p10=2.5675, p25=3.8468, p50=5.7311, p75=8.0862, p90=11.1122, p95=13.8974, p99=24.3391
+      Flags: zero=0.16%, >100=0.075%
+      r1_min_val: mean=4.4015, std=3.1228, [-0.1685 .. 76.3181], p50=3.8393, p95=9.2836, p99=15.6027
+      r1_min / target: mean=0.6711, std=0.1353, [-2.9982 .. 15.8413], p50=0.6746, p95=0.8334, p99=0.9224
+
+    NEIGHBOR COUNTS:
+      Real: mean=33.6, min=0, p25=25, p50=31, p75=38, p95=62, p99=97, max=190
+      Padded: mean=158.4, 100.0% have padding, 0.12% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.153166  std=3.475650  min=0.007466  max=37.380476
+        p1=0.3597, p5=1.1288, p10=1.5943, p25=2.6349, p50=4.3732, p75=6.8224, p90=9.7286, p95=11.8554, p99=16.7817
+      Per-example: avg_mean=4.5866, avg_max=7.2238, global_max=37.3805, avg_min=1.5712, global_min=0.007466
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.568900  std=6.721222  min=0.000000  max=1017.028574
+        p1=0.0000, p5=0.1729, p10=0.6526, p25=1.7107, p50=3.3221, p75=5.7464, p90=9.2054, p95=12.6718, p99=24.2583
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.430649  std=53.227892  min=0.000000  max=14844.326308
+        p1=0.0000, p5=0.0542, p10=0.1637, p25=0.4373, p50=0.8391, p75=1.3965, p90=2.2143, p95=2.9411, p99=4.8664
+      Extreme counts: >10: 698, >50: 199, >100: 199, >500: 198
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.619528  std=19.102891  min=0.000000  max=1085.499112
+        p1=0.0309, p5=0.1815, p10=0.3909, p25=1.0475, p50=2.3250, p75=4.2860, p90=6.7599, p95=8.7370, p99=14.9597
+      geo_nbr / target:
+        mean=0.568881  std=0.278884  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0536, p10=0.1541, p25=0.3594, p50=0.6031, p75=0.8050, p90=0.9212, p95=0.9607, p99=0.9924
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.4622, std=2.9820, [0.0075 .. 36.6500], p50=3.8463, p95=10.1351, p99=14.2126
+
+    MASK CONSTANT (-10.0): 15,837,287 values (20.488%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 75 values (0.0750%) > mean+5.0×std (threshold=109.7286, max=1085.4991)
+      ! nbr_euc_dist: 4659 values (0.1385%) > mean+5.0×std (threshold=22.5314, max=37.3805)
+      ! nbr_geodesic: 7725 values (0.2297%) > mean+5.0×std (threshold=38.1750, max=1017.0286)
+      ! geo/euc_ratio: 198 values (0.0059%) > mean+5.0×std (threshold=267.5701, max=14844.3263)
+
+======================================================================
+  tosca_victoria  [OK]
+======================================================================
+  Files: 2
+  Total examples: 200,000
+  Total size: 788.9 MB
+
+  --- gaussian_examples_ring2_n100000.npy ---
+    Shape: (100000, 261), dtype: float64, size: 199.1 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.3320, std=2.9539, min=0.0000, max=129.3603
+      p1=0.9002, p5=1.4945, p10=1.8545, p25=2.6125, p50=3.7591, p75=5.2739, p90=7.1383, p95=8.8121, p99=14.7464
+      Flags: zero=0.03%, >100=0.002%
+      r1_min_val: mean=2.1786, std=1.7343, [-0.2781 .. 125.7348], p50=1.8791, p95=4.4671, p99=7.5325
+      r1_min / target: mean=0.5076, std=0.2241, [-0.9036 .. 50.5364], p50=0.5037, p95=0.7031, p99=0.8353
+
+    NEIGHBOR COUNTS:
+      Real: mean=15.5, min=0, p25=12, p50=15, p75=18, p95=25, p99=33, max=61
+      Padded: mean=48.5, 100.0% have padding, 0.03% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.514345  std=2.187161  min=0.031739  max=24.904267
+        p1=0.5156, p5=0.9074, p10=1.2132, p25=1.9195, p50=3.0479, p75=4.6064, p90=6.3949, p95=7.6886, p99=10.6246
+      Per-example: avg_mean=3.2987, avg_max=4.8676, global_max=24.9043, avg_min=1.4397, global_min=0.031739
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.600564  std=2.848119  min=0.000000  max=129.089157
+        p1=0.0000, p5=0.0000, p10=0.2402, p25=0.9690, p50=1.9973, p75=3.4016, p90=5.2437, p95=6.9067, p99=12.8739
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.929537  std=0.939495  min=0.000000  max=89.342298
+        p1=0.0000, p5=0.0000, p10=0.0734, p25=0.3328, p50=0.7375, p75=1.2103, p90=1.9165, p95=2.6119, p99=4.4980
+      Extreme counts: >10: 439, >50: 5
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.152908  std=2.166463  min=0.000000  max=129.360344
+        p1=0.0309, p5=0.1548, p10=0.3096, p25=0.7710, p50=1.6358, p75=2.9078, p90=4.4783, p95=5.6931, p99=9.4331
+      geo_nbr / target:
+        mean=0.532147  std=0.295216  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0752, p25=0.3014, p50=0.5631, p75=0.7828, p90=0.9121, p95=0.9562, p99=0.9913
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2360, std=2.0003, [0.0317 .. 25.2845], p50=2.8190, p95=7.0451, p99=9.7083
+
+    MASK CONSTANT (-10.0): 4,851,573 values (18.588%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 485 values (0.4850%) > mean+5.0×std (threshold=19.1013, max=129.3603)
+      ! nbr_euc_dist: 1997 values (0.1290%) > mean+5.0×std (threshold=14.4501, max=24.9043)
+      ! nbr_geodesic: 7851 values (0.5070%) > mean+5.0×std (threshold=16.8412, max=129.0892)
+      ! geo/euc_ratio: 5636 values (0.3640%) > mean+5.0×std (threshold=5.6270, max=89.3423)
+
+  --- gaussian_examples_ring3_n100000.npy ---
+    Shape: (100000, 773), dtype: float64, size: 589.8 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=6.6177, std=4.2675, min=0.0000, max=176.7833
+      p1=1.5547, p5=2.3888, p10=2.9666, p25=4.1077, p50=5.8119, p75=8.0209, p90=10.8145, p95=13.2358, p99=21.2424
+      Flags: zero=0.00%, >100=0.009%
+      r1_min_val: mean=4.4630, std=3.1387, [0.0000 .. 172.9092], p50=3.9132, p95=8.9250, p99=14.3460
+      r1_min / target: mean=0.6771, std=0.0969, [0.0000 .. 2.7652], p50=0.6766, p95=0.8268, p99=0.9078
+
+    NEIGHBOR COUNTS:
+      Real: mean=34.4, min=0, p25=26, p50=32, p75=39, p95=61, p99=92, max=189
+      Padded: mean=157.6, 100.0% have padding, 0.00% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.060025  std=3.080827  min=0.031739  max=35.047761
+        p1=0.7428, p5=1.3008, p10=1.7450, p25=2.7754, p50=4.4317, p75=6.6768, p90=9.1785, p95=10.9427, p99=14.8143
+      Per-example: avg_mean=4.5969, avg_max=7.2237, global_max=35.0478, avg_min=1.5665, global_min=0.031739
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.459754  std=4.546759  min=0.000000  max=176.596021
+        p1=0.0000, p5=0.2879, p10=0.7875, p25=1.8458, p50=3.4316, p75=5.7273, p90=8.8620, p95=11.7066, p99=21.0718
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.092030  std=1.055746  min=0.000000  max=89.496387
+        p1=0.0000, p5=0.0583, p10=0.1705, p25=0.4495, p50=0.8525, p75=1.4099, p90=2.2269, p95=2.9550, p99=4.9152
+      Extreme counts: >10: 1691, >50: 29
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.110161  std=3.133908  min=0.000000  max=176.783283
+        p1=0.0451, p5=0.2269, p10=0.4508, p25=1.1181, p50=2.3769, p75=4.2311, p90=6.4977, p95=8.2451, p99=13.2785
+      geo_nbr / target:
+        mean=0.570857  std=0.277666  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0576, p10=0.1583, p25=0.3631, p50=0.6053, p75=0.8056, p90=0.9214, p95=0.9607, p99=0.9922
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.4983, std=2.7094, [0.0317 .. 35.0478], p50=3.9630, p95=9.6532, p99=13.0368
+
+    MASK CONSTANT (-10.0): 15,758,937 values (20.387%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 400 values (0.4000%) > mean+5.0×std (threshold=27.9550, max=176.7833)
+      ! nbr_euc_dist: 3215 values (0.0934%) > mean+5.0×std (threshold=20.4642, max=35.0478)
+      ! nbr_geodesic: 15523 values (0.4511%) > mean+5.0×std (threshold=27.1935, max=176.5960)
+      ! geo/euc_ratio: 9537 values (0.2772%) > mean+5.0×std (threshold=6.3708, max=89.4964)
+
+======================================================================
+  tosca_wolf  [OK]
+======================================================================
+  Files: 2
+  Total examples: 100,000
+  Total size: 394.4 MB
+
+  --- gaussian_examples_ring2_n50000.npy ---
+    Shape: (50000, 261), dtype: float64, size: 99.6 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=64
+
+    TARGET (geodesic p_u):
+      mean=4.3487, std=3.3229, min=0.0000, max=102.9124
+      p1=0.8663, p5=1.4908, p10=1.8626, p25=2.5638, p50=3.5502, p75=5.1716, p90=7.5266, p95=9.3687, p99=16.1490
+      Flags: zero=0.04%, >100=0.002%
+      r1_min_val: mean=2.1661, std=1.7481, [-0.2774 .. 61.3540], p50=1.7785, p95=4.7905, p99=7.9766
+      r1_min / target: mean=0.5006, std=0.1320, [0.0000 .. 6.0836], p50=0.5009, p95=0.6990, p99=0.8342
+
+    NEIGHBOR COUNTS:
+      Real: mean=14.7, min=0, p25=11, p50=14, p75=17, p95=24, p99=32, max=63
+      Padded: mean=49.3, 100.0% have padding, 0.04% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.651516  std=2.874169  min=0.109847  max=39.483580
+        p1=0.5120, p5=0.8955, p10=1.1952, p25=1.8760, p50=2.8971, p75=4.4837, p90=6.8417, p95=8.8638, p99=15.2775
+      Per-example: avg_mean=3.3776, avg_max=5.0006, global_max=39.4836, avg_min=1.4728, global_min=0.109847
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.593021  std=3.207464  min=0.000000  max=99.534317
+        p1=0.0000, p5=0.0000, p10=0.2093, p25=0.9319, p50=1.9159, p75=3.2278, p90=5.1940, p95=7.0631, p99=14.7477
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.915120  std=0.903001  min=0.000000  max=20.956849
+        p1=0.0000, p5=0.0000, p10=0.0628, p25=0.3161, p50=0.7189, p75=1.1949, p90=1.9141, p95=2.6270, p99=4.5266
+      Extreme counts: >10: 29
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.224192  std=2.370024  min=0.000000  max=102.912360
+        p1=0.0328, p5=0.1611, p10=0.3213, p25=0.7898, p50=1.6511, p75=2.8938, p90=4.6205, p95=6.1243, p99=10.6510
+      geo_nbr / target:
+        mean=0.522582  std=0.296105  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0652, p25=0.2876, p50=0.5506, p75=0.7739, p90=0.9069, p95=0.9536, p99=0.9907
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2977, std=2.4667, [0.1098 .. 39.4836], p50=2.6885, p95=7.7942, p99=12.5578
+
+    MASK CONSTANT (-10.0): 2,462,900 values (18.873%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 247 values (0.4940%) > mean+5.0×std (threshold=20.9630, max=102.9124)
+      ! nbr_euc_dist: 4170 values (0.5657%) > mean+5.0×std (threshold=18.0224, max=39.4836)
+      ! nbr_geodesic: 4352 values (0.5904%) > mean+5.0×std (threshold=18.6303, max=99.5343)
+      ! geo/euc_ratio: 3051 values (0.4139%) > mean+5.0×std (threshold=5.4301, max=20.9568)
+
+  --- gaussian_examples_ring3_n50000.npy ---
+    Shape: (50000, 773), dtype: float64, size: 294.9 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=192
+
+    TARGET (geodesic p_u):
+      mean=6.6432, std=4.6947, min=0.0000, max=85.6921
+      p1=1.5620, p5=2.4587, p10=3.0056, p25=4.0001, p50=5.4076, p75=7.9046, p90=11.4790, p95=14.1560, p99=23.7313
+      Flags: zero=0.02%
+      r1_min_val: mean=4.4541, std=3.1898, [-0.3938 .. 78.8950], p50=3.6474, p95=9.6049, p99=15.6758
+      r1_min / target: mean=0.6725, std=0.1537, [-24.0849 .. 3.3390], p50=0.6737, p95=0.8295, p99=0.9165
+
+    NEIGHBOR COUNTS:
+      Real: mean=31.3, min=0, p25=23, p50=29, p75=36, p95=53, p99=91, max=188
+      Padded: mean=160.7, 100.0% have padding, 0.02% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.322770  std=4.129672  min=0.111868  max=48.124650
+        p1=0.7319, p5=1.2753, p10=1.7248, p25=2.7139, p50=4.1954, p75=6.5597, p90=10.1363, p95=13.2197, p99=21.9306
+      Per-example: avg_mean=4.7136, avg_max=7.4614, global_max=48.1247, avg_min=1.6125, global_min=0.111868
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.458918  std=5.093869  min=0.000000  max=85.626194
+        p1=0.0000, p5=0.2414, p10=0.7328, p25=1.7717, p50=3.2457, p75=5.3502, p90=8.7996, p95=12.1623, p99=26.8684
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.062398  std=0.979995  min=0.000000  max=13.908177
+        p1=0.0000, p5=0.0474, p10=0.1540, p25=0.4244, p50=0.8223, p75=1.3766, p90=2.2068, p95=2.9543, p99=4.9166
+      Extreme counts: >10: 70
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.255096  std=3.408966  min=0.000000  max=85.692108
+        p1=0.0473, p5=0.2338, p10=0.4655, p25=1.1459, p50=2.3932, p75=4.2179, p90=6.8215, p95=9.1431, p99=15.9266
+      geo_nbr / target:
+        mean=0.559766  std=0.279600  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0479, p10=0.1454, p25=0.3484, p50=0.5902, p75=0.7964, p90=0.9165, p95=0.9583, p99=0.9916
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.5912, std=3.2949, [0.1119 .. 48.9887], p50=3.7812, p95=10.8378, p99=16.6958
+
+    MASK CONSTANT (-10.0): 8,034,781 values (20.789%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 285 values (0.5700%) > mean+5.0×std (threshold=30.1168, max=85.6921)
+      ! nbr_euc_dist: 6727 values (0.4298%) > mean+5.0×std (threshold=25.9711, max=48.1247)
+      ! nbr_geodesic: 12058 values (0.7704%) > mean+5.0×std (threshold=29.9283, max=85.6262)
+      ! geo/euc_ratio: 5630 values (0.3597%) > mean+5.0×std (threshold=5.9624, max=13.9082)
+
+######################################################################
+#  Polynomial Datasets
+######################################################################
+
+======================================================================
+  paraboloid_all_one_source  [OK]
+======================================================================
+  Files: 2
+  Total examples: 1,500,000
+  Total size: 4085.5 MB
+
+  --- gaussian_examples_ring2_n750000.npy ---
+    Shape: (750000, 197), dtype: float64, size: 1127.2 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=48
+
+    TARGET (geodesic p_u):
+      mean=4.4811, std=3.7379, min=0.0000, max=42.4203
+      p1=0.4589, p5=0.7983, p10=1.0304, p25=1.6159, p50=3.1143, p75=6.5139, p90=9.7523, p95=11.7274, p99=16.4566
+      Flags: zero=0.08%
+      r1_min_val: mean=2.2226, std=1.9393, [-2.3127 .. 20.4873], p50=1.5353, p95=6.0028, p99=8.4494
+      r1_min / target: mean=0.4962, std=0.8694, [-385.7183 .. 280.0797], p50=0.4932, p95=0.7326, p99=0.9136
+
+    NEIGHBOR COUNTS:
+      Real: mean=14.9, min=0, p25=11, p50=14, p75=18, p95=25, p99=31, max=48
+      Padded: mean=33.1, 100.0% have padding, 0.08% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.650023  std=3.207839  min=0.028262  max=37.059960
+        p1=0.2800, p5=0.5105, p10=0.6951, p25=1.1768, p50=2.5154, p75=5.3816, p90=8.1009, p95=9.9343, p99=13.8353
+      Per-example: avg_mean=3.3316, avg_max=4.8920, global_max=37.1535, avg_min=1.4614, global_min=0.026172
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.690330  std=2.874636  min=0.000000  max=41.737189
+        p1=0.0000, p5=0.0000, p10=0.1715, p25=0.6909, p50=1.6321, p75=3.8902, p90=6.6253, p95=8.5056, p99=12.6911
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.983346  std=0.947565  min=0.000000  max=16.135886
+        p1=0.0000, p5=0.0000, p10=0.0766, p25=0.3572, p50=0.7802, p75=1.2891, p90=2.0360, p95=2.7599, p99=4.7314
+      Extreme counts: >10: 176
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.316385  std=2.568804  min=0.000000  max=42.420257
+        p1=0.0233, p5=0.1154, p10=0.2303, p25=0.5873, p50=1.3733, p75=3.1608, p90=5.7608, p95=7.6077, p99=11.5766
+      geo_nbr / target:
+        mean=0.529745  std=0.294030  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0744, p25=0.3025, p50=0.5588, p75=0.7783, p90=0.9100, p95=0.9549, p99=0.9910
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2027, std=2.9753, [0.0283 .. 38.8253], p50=2.0408, p95=9.2457, p99=12.8972
+
+    MASK CONSTANT (-10.0): 24,819,232 values (16.798%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 878 values (0.1171%) > mean+5.0×std (threshold=23.1704, max=42.4203)
+      ! nbr_euc_dist: 4512 values (0.1513%) > mean+5.0×std (threshold=19.6892, max=37.0600)
+      ! nbr_geodesic: 6279 values (0.2106%) > mean+5.0×std (threshold=17.0635, max=41.7372)
+      ! geo/euc_ratio: 12582 values (0.4220%) > mean+5.0×std (threshold=5.7212, max=16.1359)
+
+    (neighbor stats from 200,000 / 750,000 sampled examples)
+
+  --- gaussian_examples_ring3_n750000.npy ---
+    Shape: (750000, 517), dtype: float64, size: 2958.3 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=128
+
+    TARGET (geodesic p_u):
+      mean=6.7906, std=5.4517, min=0.0000, max=50.7066
+      p1=0.8550, p5=1.3071, p10=1.6349, p25=2.4894, p50=4.8279, p75=9.9254, p90=14.5944, p95=17.2957, p99=23.8147
+      Flags: zero=0.02%
+      r1_min_val: mean=4.5362, std=3.6731, [-0.4837 .. 33.5683], p50=3.2728, p95=11.6329, p99=15.9059
+      r1_min / target: mean=0.6692, std=0.2906, [-5.6258 .. 203.4031], p50=0.6670, p95=0.8453, p99=0.9595
+
+    NEIGHBOR COUNTS:
+      Real: mean=31.9, min=0, p25=24, p50=30, p75=38, p95=55, p99=73, max=126
+      Padded: mean=96.1, 100.0% have padding, 0.02% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.383396  std=4.500163  min=0.023206  max=44.486331
+        p1=0.3952, p5=0.7304, p10=1.0155, p25=1.7745, p50=4.0205, p75=7.9107, p90=11.6794, p95=14.1902, p99=19.3907
+      Per-example: avg_mean=4.6384, avg_max=7.2272, global_max=48.6355, avg_min=1.5820, global_min=0.023206
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.568520  std=4.425218  min=0.000000  max=46.890587
+        p1=0.0000, p5=0.2007, p10=0.5613, p25=1.3302, p50=3.0072, p75=6.6843, p90=10.7056, p95=13.4161, p99=19.4476
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.132678  std=1.039182  min=0.000000  max=25.427658
+        p1=0.0000, p5=0.0574, p10=0.1777, p25=0.4644, p50=0.8822, p75=1.4571, p90=2.3235, p95=3.1214, p99=5.2352
+      Extreme counts: >10: 725
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.387497  std=3.626134  min=0.000001  max=49.264139
+        p1=0.0347, p5=0.1724, p10=0.3427, p25=0.8714, p50=2.0564, p75=4.7444, p90=8.3386, p95=10.8599, p99=16.1891
+      geo_nbr / target:
+        mean=0.566550  std=0.276868  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0549, p10=0.1585, p25=0.3596, p50=0.5971, p75=0.8001, p90=0.9191, p95=0.9594, p99=0.9919
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.3789, std=4.0498, [0.0232 .. 43.9187], p50=2.7758, p95=12.7574, p99=17.4978
+
+    MASK CONSTANT (-10.0): 72,110,835 values (18.597%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 512 values (0.0683%) > mean+5.0×std (threshold=34.0493, max=50.7066)
+      ! nbr_euc_dist: 5326 values (0.0836%) > mean+5.0×std (threshold=27.8842, max=44.4863)
+      ! nbr_geodesic: 9982 values (0.1566%) > mean+5.0×std (threshold=26.6946, max=46.8906)
+      ! geo/euc_ratio: 24990 values (0.3921%) > mean+5.0×std (threshold=6.3286, max=25.4277)
+
+    (neighbor stats from 200,000 / 750,000 sampled examples)
+
+======================================================================
+  saddle_all_one_source  [OK]
+======================================================================
+  Files: 2
+  Total examples: 1,500,000
+  Total size: 4085.5 MB
+
+  --- gaussian_examples_ring2_n750000.npy ---
+    Shape: (750000, 197), dtype: float64, size: 1127.2 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=48
+
+    TARGET (geodesic p_u):
+      mean=4.4480, std=3.4643, min=0.0000, max=24.1190
+      p1=0.4583, p5=0.8404, p10=1.0764, p25=1.6089, p50=3.2157, p75=6.5903, p90=9.6329, p95=11.2198, p99=14.2809
+      Flags: zero=0.10%
+      r1_min_val: mean=2.2178, std=1.7631, [-0.8502 .. 13.0281], p50=1.6531, p95=5.6861, p99=7.1547
+      r1_min / target: mean=0.5036, std=0.5397, [-40.3245 .. 216.3170], p50=0.5009, p95=0.7264, p99=0.9222
+
+    NEIGHBOR COUNTS:
+      Real: mean=14.1, min=0, p25=11, p50=14, p75=17, p95=23, p99=28, max=47
+      Padded: mean=33.9, 100.0% have padding, 0.10% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.586283  std=2.927660  min=0.026380  max=19.827477
+        p1=0.3031, p5=0.5603, p10=0.7706, p25=1.2639, p50=2.5524, p75=5.3205, p90=7.8413, p95=9.5574, p99=12.4178
+      Per-example: avg_mean=3.3747, avg_max=5.0173, global_max=19.8937, avg_min=1.4553, global_min=0.025047
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.571590  std=2.618465  min=0.000000  max=22.986952
+        p1=0.0000, p5=0.0000, p10=0.1622, p25=0.6879, p50=1.5787, p75=3.8273, p90=6.3359, p95=8.0068, p99=11.2065
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.947275  std=0.910461  min=0.000000  max=29.611423
+        p1=0.0000, p5=0.0000, p10=0.0667, p25=0.3401, p50=0.7522, p75=1.2474, p90=1.9767, p95=2.6665, p99=4.5194
+      Extreme counts: >10: 122
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.255004  std=2.408760  min=0.000001  max=24.083103
+        p1=0.0224, p5=0.1121, p10=0.2245, p25=0.5738, p50=1.3335, p75=3.1764, p90=5.6663, p95=7.3536, p99=10.6895
+      geo_nbr / target:
+        mean=0.529997  std=0.294682  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0686, p25=0.3034, p50=0.5604, p75=0.7784, p90=0.9102, p95=0.9551, p99=0.9911
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.2839, std=2.8113, [0.0257 .. 21.4033], p50=2.2090, p95=9.1418, p99=12.0912
+
+    MASK CONSTANT (-10.0): 25,397,622 values (17.190%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 23 values (0.0031%) > mean+5.0×std (threshold=21.7696, max=24.1190)
+      ! nbr_euc_dist: 39 values (0.0014%) > mean+5.0×std (threshold=18.2246, max=19.8275)
+      ! nbr_geodesic: 1826 values (0.0645%) > mean+5.0×std (threshold=15.6639, max=22.9870)
+      ! geo/euc_ratio: 11179 values (0.3952%) > mean+5.0×std (threshold=5.4996, max=29.6114)
+
+    (neighbor stats from 200,000 / 750,000 sampled examples)
+
+  --- gaussian_examples_ring3_n750000.npy ---
+    Shape: (750000, 517), dtype: float64, size: 2958.3 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=128
+
+    TARGET (geodesic p_u):
+      mean=6.8203, std=5.0837, min=0.0000, max=31.7319
+      p1=0.8771, p5=1.4260, p10=1.7563, p25=2.5186, p50=5.2057, p75=10.0163, p90=14.4500, p95=16.6582, p99=20.7348
+      Flags: zero=0.03%
+      r1_min_val: mean=4.5823, std=3.3924, [-1.1673 .. 22.2375], p50=3.6453, p95=11.1484, p99=13.7180
+      r1_min / target: mean=0.6770, std=0.2496, [-9.2394 .. 112.7346], p50=0.6752, p95=0.8439, p99=0.9640
+
+    NEIGHBOR COUNTS:
+      Real: mean=28.9, min=0, p25=23, p50=29, p75=34, p95=44, p99=53, max=92
+      Padded: mean=99.1, 100.0% have padding, 0.03% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.221579  std=4.173732  min=0.030430  max=29.064679
+        p1=0.4263, p5=0.8009, p10=1.1106, p25=1.8510, p50=3.9014, p75=7.6925, p90=11.2911, p95=13.6817, p99=17.6713
+      Per-example: avg_mean=4.7889, avg_max=7.5281, global_max=29.0647, avg_min=1.5894, global_min=0.026380
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.246817  std=3.890130  min=0.000000  max=30.572405
+        p1=0.0000, p5=0.1819, p10=0.5736, p25=1.3313, p50=2.8569, p75=6.3290, p90=9.8822, p95=12.2279, p99=16.5215
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.107817  std=1.026383  min=0.000000  max=21.461667
+        p1=0.0000, p5=0.0453, p10=0.1633, p25=0.4449, p50=0.8495, p75=1.4300, p90=2.3208, p95=3.1051, p99=5.1099
+      Extreme counts: >10: 479
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.264685  std=3.421491  min=0.000001  max=31.075266
+        p1=0.0322, p5=0.1609, p10=0.3211, p25=0.8232, p50=1.9497, p75=4.6989, p90=8.1417, p95=10.4876, p99=15.0080
+      geo_nbr / target:
+        mean=0.568218  std=0.278293  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0459, p10=0.1544, p25=0.3624, p50=0.6016, p75=0.8025, p90=0.9202, p95=0.9601, p99=0.9920
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.6073, std=3.9887, [0.0304 .. 28.3926], p50=3.0637, p95=12.9813, p99=17.1275
+
+    MASK CONSTANT (-10.0): 74,344,946 values (19.173%)
+
+    *** OUTLIER FLAGS ***
+      ! nbr_euc_dist: 50 values (0.0009%) > mean+5.0×std (threshold=26.0902, max=29.0647)
+      ! nbr_geodesic: 1371 values (0.0237%) > mean+5.0×std (threshold=23.6975, max=30.5724)
+      ! geo/euc_ratio: 19893 values (0.3444%) > mean+5.0×std (threshold=6.2397, max=21.4617)
+
+    (neighbor stats from 200,000 / 750,000 sampled examples)
+
+======================================================================
+  hyperbolic_paraboloid_all_one_source  [OK]
+======================================================================
+  Files: 2
+  Total examples: 1,500,000
+  Total size: 4085.5 MB
+
+  --- gaussian_examples_ring2_n750000.npy ---
+    Shape: (750000, 197), dtype: float64, size: 1127.2 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=48
+
+    TARGET (geodesic p_u):
+      mean=4.5427, std=3.3899, min=0.0000, max=25.3979
+      p1=0.5074, p5=0.9279, p10=1.1966, p25=1.7973, p50=3.4602, p75=6.5960, p90=9.5230, p95=11.1825, p99=14.3954
+      Flags: zero=0.11%
+      r1_min_val: mean=2.2388, std=1.7160, [-0.4714 .. 14.8027], p50=1.7419, p95=5.6035, p99=7.0962
+      r1_min / target: mean=0.5039, std=3.2834, [-4.5297 .. 2759.9371], p50=0.4966, p95=0.7357, p99=0.9547
+
+    NEIGHBOR COUNTS:
+      Real: mean=14.3, min=0, p25=11, p50=14, p75=17, p95=23, p99=28, max=47
+      Padded: mean=33.7, 100.0% have padding, 0.11% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=3.583782  std=2.803106  min=0.032927  max=21.991563
+        p1=0.3453, p5=0.6276, p10=0.8542, p25=1.3868, p50=2.6407, p75=5.2067, p90=7.6116, p95=9.2531, p99=12.1673
+      Per-example: avg_mean=3.4128, avg_max=5.0740, global_max=22.7098, avg_min=1.4675, global_min=0.030048
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=2.624474  std=2.596117  min=0.000000  max=22.578194
+        p1=0.0000, p5=0.0000, p10=0.1830, p25=0.7629, p50=1.7116, p75=3.8325, p90=6.3102, p95=7.9657, p99=11.2691
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=0.962694  std=0.919771  min=0.000000  max=18.726432
+        p1=0.0000, p5=0.0000, p10=0.0697, p25=0.3474, p50=0.7634, p75=1.2707, p90=2.0134, p95=2.7047, p99=4.5486
+      Extreme counts: >10: 111
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=2.284198  std=2.386491  min=0.000002  max=25.397906
+        p1=0.0242, p5=0.1209, p10=0.2414, p25=0.6159, p50=1.4126, p75=3.1837, p90=5.6311, p95=7.2955, p99=10.6731
+      geo_nbr / target:
+        mean=0.532437  std=0.294262  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0000, p10=0.0711, p25=0.3074, p50=0.5638, p75=0.7804, p90=0.9108, p95=0.9554, p99=0.9911
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=3.3187, std=2.7097, [0.0329 .. 22.1672], p50=2.3430, p95=8.9059, p99=11.8924
+
+    MASK CONSTANT (-10.0): 25,293,097 values (17.119%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 61 values (0.0081%) > mean+5.0×std (threshold=21.4924, max=25.3979)
+      ! nbr_euc_dist: 218 values (0.0076%) > mean+5.0×std (threshold=17.5993, max=21.9916)
+      ! nbr_geodesic: 2582 values (0.0905%) > mean+5.0×std (threshold=15.6051, max=22.5782)
+      ! geo/euc_ratio: 10932 values (0.3834%) > mean+5.0×std (threshold=5.5615, max=18.7264)
+
+    (neighbor stats from 200,000 / 750,000 sampled examples)
+
+  --- gaussian_examples_ring3_n750000.npy ---
+    Shape: (750000, 517), dtype: float64, size: 2958.3 MB
+    Attributes: ['xyz'], feat_per_nbr=4, max_nbrs=128
+
+    TARGET (geodesic p_u):
+      mean=6.9060, std=4.9286, min=0.0000, max=33.5964
+      p1=0.9728, p5=1.5599, p10=1.9412, p25=2.7826, p50=5.4922, p75=10.0040, p90=14.2001, p95=16.4746, p99=20.6771
+      Flags: zero=0.02%
+      r1_min_val: mean=4.6023, std=3.2715, [-0.3082 .. 22.4224], p50=3.7856, p95=10.9486, p99=13.5544
+      r1_min / target: mean=0.6719, std=0.2737, [-3.9059 .. 131.9106], p50=0.6703, p95=0.8475, p99=0.9842
+
+    NEIGHBOR COUNTS:
+      Real: mean=29.2, min=0, p25=24, p50=29, p75=34, p95=44, p99=54, max=111
+      Padded: mean=98.8, 100.0% have padding, 0.02% fully padded
+
+    CENTER POINT: xyz all zeros ✓
+
+    NEIGHBOR EUCLIDEAN DISTANCE (||xyz|| from center):
+      distribution:
+        mean=5.198991  std=3.999413  min=0.044475  max=33.887840
+        p1=0.4852, p5=0.8949, p10=1.2296, p25=2.0261, p50=3.9653, p75=7.5115, p90=10.9512, p95=13.2687, p99=17.3211
+      Per-example: avg_mean=4.8300, avg_max=7.5891, global_max=33.8878, avg_min=1.6024, global_min=0.038200
+
+    NEIGHBOR GEODESIC DISTANCE:
+      distribution:
+        mean=4.282626  std=3.826978  min=0.000000  max=31.239593
+        p1=0.0000, p5=0.2026, p10=0.6224, p25=1.4412, p50=2.9875, p75=6.2723, p90=9.7829, p95=12.0967, p99=16.4752
+      Beyond-target (geo>target): 0.00%
+
+    GEODESIC / EUCLIDEAN RATIO:
+      distribution:
+        mean=1.109937  std=1.021252  min=0.000000  max=17.689430
+        p1=0.0000, p5=0.0473, p10=0.1661, p25=0.4471, p50=0.8530, p75=1.4355, p90=2.3233, p95=3.1042, p99=5.0895
+      Extreme counts: >10: 280
+
+    NEIGHBOR vs TARGET:
+      |geo_nbr - target|:
+        mean=3.270572  std=3.353695  min=0.000001  max=31.787495
+        p1=0.0349, p5=0.1742, p10=0.3470, p25=0.8835, p50=2.0414, p75=4.6420, p90=8.0027, p95=10.3090, p99=14.8814
+      geo_nbr / target:
+        mean=0.568667  std=0.277669  min=0.000000  max=1.000000
+        p1=0.0000, p5=0.0478, p10=0.1564, p25=0.3634, p50=0.6015, p75=0.8024, p90=0.9199, p95=0.9600, p99=0.9920
+
+    PADDED NEIGHBOR EUCLIDEAN (should match real dist):
+      distribution: mean=4.6646, std=3.8455, [0.0427 .. 33.8878], p50=3.2642, p95=12.6499, p99=16.8383
+
+    MASK CONSTANT (-10.0): 74,109,785 values (19.113%)
+
+    *** OUTLIER FLAGS ***
+      ! target: 4 values (0.0005%) > mean+5.0×std (threshold=31.5491, max=33.5964)
+      ! nbr_euc_dist: 329 values (0.0056%) > mean+5.0×std (threshold=25.1961, max=33.8878)
+      ! nbr_geodesic: 2069 values (0.0354%) > mean+5.0×std (threshold=23.4175, max=31.2396)
+      ! geo/euc_ratio: 19557 values (0.3350%) > mean+5.0×std (threshold=6.2162, max=17.6894)
+
+    (neighbor stats from 200,000 / 750,000 sampled examples)
+
+######################################################################
+#  SUMMARY
+######################################################################
+
+  Datasets checked:  12
+  Missing:           0
+  Total .npy files:  24
+  Total examples:    5,900,000
+  Total size:        17778.5 MB
+  Errors:            0
+  Warnings:          0
+  Outlier flags:     95
+
+  --- Outlier Flags ---
+  ! tosca_cat/gaussian_examples_ring2_n100000.npy: target: 58 values (0.0580%) > mean+5.0×std (threshold=64.1883, max=711.0976)
+  ! tosca_cat/gaussian_examples_ring2_n100000.npy: nbr_euc_dist: 3036 values (0.1987%) > mean+5.0×std (threshold=16.0113, max=34.5567)
+  ! tosca_cat/gaussian_examples_ring2_n100000.npy: nbr_geodesic: 3084 values (0.2019%) > mean+5.0×std (threshold=29.4768, max=711.0976)
+  ! tosca_cat/gaussian_examples_ring2_n100000.npy: geo/euc_ratio: 105 values (0.0069%) > mean+5.0×std (threshold=115.0281, max=7099.6482)
+  ! tosca_cat/gaussian_examples_ring3_n100000.npy: target: 88 values (0.0880%) > mean+5.0×std (threshold=51.9861, max=685.4884)
+  ! tosca_cat/gaussian_examples_ring3_n100000.npy: nbr_euc_dist: 5254 values (0.1572%) > mean+5.0×std (threshold=22.7084, max=45.4813)
+  ! tosca_cat/gaussian_examples_ring3_n100000.npy: nbr_geodesic: 15277 values (0.4571%) > mean+5.0×std (threshold=30.0716, max=685.4884)
+  ! tosca_cat/gaussian_examples_ring3_n100000.npy: geo/euc_ratio: 94 values (0.0028%) > mean+5.0×std (threshold=35.6686, max=5009.3613)
+  ! tosca_centaur/gaussian_examples_ring2_n150000.npy: target: 554 values (0.3693%) > mean+5.0×std (threshold=280.7702, max=1374.9476)
+  ! tosca_centaur/gaussian_examples_ring2_n150000.npy: nbr_euc_dist: 12641 values (0.5599%) > mean+5.0×std (threshold=18.1289, max=42.9383)
+  ! tosca_centaur/gaussian_examples_ring2_n150000.npy: nbr_geodesic: 6415 values (0.2841%) > mean+5.0×std (threshold=242.3638, max=1313.3547)
+  ! tosca_centaur/gaussian_examples_ring2_n150000.npy: geo/euc_ratio: 5811 values (0.2574%) > mean+5.0×std (threshold=233.3318, max=10756.5493)
+  ! tosca_centaur/gaussian_examples_ring3_n150000.npy: target: 589 values (0.3927%) > mean+5.0×std (threshold=298.2002, max=1409.9699)
+  ! tosca_centaur/gaussian_examples_ring3_n150000.npy: nbr_euc_dist: 22496 values (0.4630%) > mean+5.0×std (threshold=25.4420, max=55.4535)
+  ! tosca_centaur/gaussian_examples_ring3_n150000.npy: nbr_geodesic: 10247 values (0.2109%) > mean+5.0×std (threshold=214.9529, max=1354.4609)
+  ! tosca_centaur/gaussian_examples_ring3_n150000.npy: geo/euc_ratio: 9972 values (0.2052%) > mean+5.0×std (threshold=138.1214, max=4442.7412)
+  ! tosca_david/gaussian_examples_ring2_n50000.npy: target: 27 values (0.0540%) > mean+5.0×std (threshold=116.2620, max=1218.3787)
+  ! tosca_david/gaussian_examples_ring2_n50000.npy: nbr_euc_dist: 1610 values (0.2102%) > mean+5.0×std (threshold=15.8898, max=29.8557)
+  ! tosca_david/gaussian_examples_ring2_n50000.npy: nbr_geodesic: 222 values (0.0290%) > mean+5.0×std (threshold=84.9905, max=1213.5780)
+  ! tosca_david/gaussian_examples_ring2_n50000.npy: geo/euc_ratio: 222 values (0.0290%) > mean+5.0×std (threshold=868.1156, max=35283.3768)
+  ! tosca_david/gaussian_examples_ring3_n50000.npy: target: 26 values (0.0520%) > mean+5.0×std (threshold=123.9659, max=1213.7195)
+  ! tosca_david/gaussian_examples_ring3_n50000.npy: nbr_euc_dist: 2202 values (0.1309%) > mean+5.0×std (threshold=22.7591, max=36.6723)
+  ! tosca_david/gaussian_examples_ring3_n50000.npy: nbr_geodesic: 1016 values (0.0604%) > mean+5.0×std (threshold=46.7095, max=1212.3189)
+  ! tosca_david/gaussian_examples_ring3_n50000.npy: geo/euc_ratio: 100 values (0.0059%) > mean+5.0×std (threshold=242.4817, max=11141.4887)
+  ! tosca_dog/gaussian_examples_ring2_n50000.npy: target: 238 values (0.4760%) > mean+5.0×std (threshold=21.2731, max=82.5872)
+  ! tosca_dog/gaussian_examples_ring2_n50000.npy: nbr_euc_dist: 1697 values (0.2242%) > mean+5.0×std (threshold=17.2492, max=39.0587)
+  ! tosca_dog/gaussian_examples_ring2_n50000.npy: nbr_geodesic: 4018 values (0.5308%) > mean+5.0×std (threshold=18.4220, max=81.4376)
+  ! tosca_dog/gaussian_examples_ring2_n50000.npy: geo/euc_ratio: 3008 values (0.3974%) > mean+5.0×std (threshold=5.6025, max=22.1134)
+  ! tosca_dog/gaussian_examples_ring3_n50000.npy: target: 192 values (0.3840%) > mean+5.0×std (threshold=30.1105, max=87.8921)
+  ! tosca_dog/gaussian_examples_ring3_n50000.npy: nbr_euc_dist: 2027 values (0.1232%) > mean+5.0×std (threshold=24.3548, max=40.5708)
+  ! tosca_dog/gaussian_examples_ring3_n50000.npy: nbr_geodesic: 8596 values (0.5223%) > mean+5.0×std (threshold=28.1601, max=87.6719)
+  ! tosca_dog/gaussian_examples_ring3_n50000.npy: geo/euc_ratio: 5932 values (0.3604%) > mean+5.0×std (threshold=6.1047, max=20.7707)
+  ! tosca_gorilla/gaussian_examples_ring2_n50000.npy: target: 308 values (0.6160%) > mean+5.0×std (threshold=20.4485, max=86.7282)
+  ! tosca_gorilla/gaussian_examples_ring2_n50000.npy: nbr_euc_dist: 1453 values (0.1876%) > mean+5.0×std (threshold=15.1099, max=28.1728)
+  ! tosca_gorilla/gaussian_examples_ring2_n50000.npy: nbr_geodesic: 5335 values (0.6887%) > mean+5.0×std (threshold=18.7517, max=86.5726)
+  ! tosca_gorilla/gaussian_examples_ring2_n50000.npy: geo/euc_ratio: 2988 values (0.3857%) > mean+5.0×std (threshold=5.4796, max=55.2442)
+  ! tosca_gorilla/gaussian_examples_ring3_n50000.npy: target: 282 values (0.5640%) > mean+5.0×std (threshold=28.4671, max=99.6047)
+  ! tosca_gorilla/gaussian_examples_ring3_n50000.npy: nbr_euc_dist: 2383 values (0.1391%) > mean+5.0×std (threshold=21.6011, max=35.4493)
+  ! tosca_gorilla/gaussian_examples_ring3_n50000.npy: nbr_geodesic: 9486 values (0.5539%) > mean+5.0×std (threshold=29.0352, max=99.6047)
+  ! tosca_gorilla/gaussian_examples_ring3_n50000.npy: geo/euc_ratio: 5336 values (0.3116%) > mean+5.0×std (threshold=6.1137, max=96.7796)
+  ! tosca_horse/gaussian_examples_ring2_n50000.npy: target: 243 values (0.4860%) > mean+5.0×std (threshold=20.8199, max=71.8261)
+  ! tosca_horse/gaussian_examples_ring2_n50000.npy: nbr_euc_dist: 2276 values (0.2967%) > mean+5.0×std (threshold=17.7422, max=37.5873)
+  ! tosca_horse/gaussian_examples_ring2_n50000.npy: nbr_geodesic: 4370 values (0.5696%) > mean+5.0×std (threshold=17.6775, max=70.8670)
+  ! tosca_horse/gaussian_examples_ring2_n50000.npy: geo/euc_ratio: 3122 values (0.4069%) > mean+5.0×std (threshold=5.5164, max=17.7619)
+  ! tosca_horse/gaussian_examples_ring3_n50000.npy: target: 32 values (0.0640%) > mean+5.0×std (threshold=43.7138, max=1024.0124)
+  ! tosca_horse/gaussian_examples_ring3_n50000.npy: nbr_euc_dist: 3714 values (0.2225%) > mean+5.0×std (threshold=25.6831, max=51.5681)
+  ! tosca_horse/gaussian_examples_ring3_n50000.npy: nbr_geodesic: 7896 values (0.4730%) > mean+5.0×std (threshold=27.3700, max=91.9611)
+  ! tosca_horse/gaussian_examples_ring3_n50000.npy: geo/euc_ratio: 6160 values (0.3690%) > mean+5.0×std (threshold=5.9891, max=21.8074)
+  ! tosca_michael/gaussian_examples_ring2_n100000.npy: target: 71 values (0.0710%) > mean+5.0×std (threshold=99.3580, max=1172.4418)
+  ! tosca_michael/gaussian_examples_ring2_n100000.npy: nbr_euc_dist: 3152 values (0.2055%) > mean+5.0×std (threshold=15.9488, max=27.3937)
+  ! tosca_michael/gaussian_examples_ring2_n100000.npy: nbr_geodesic: 577 values (0.0376%) > mean+5.0×std (threshold=46.2530, max=1061.0760)
+  ! tosca_michael/gaussian_examples_ring2_n100000.npy: geo/euc_ratio: 276 values (0.0180%) > mean+5.0×std (threshold=653.8887, max=35842.1468)
+  ! tosca_michael/gaussian_examples_ring3_n100000.npy: target: 75 values (0.0750%) > mean+5.0×std (threshold=109.7286, max=1085.4991)
+  ! tosca_michael/gaussian_examples_ring3_n100000.npy: nbr_euc_dist: 4659 values (0.1385%) > mean+5.0×std (threshold=22.5314, max=37.3805)
+  ! tosca_michael/gaussian_examples_ring3_n100000.npy: nbr_geodesic: 7725 values (0.2297%) > mean+5.0×std (threshold=38.1750, max=1017.0286)
+  ! tosca_michael/gaussian_examples_ring3_n100000.npy: geo/euc_ratio: 198 values (0.0059%) > mean+5.0×std (threshold=267.5701, max=14844.3263)
+  ! tosca_victoria/gaussian_examples_ring2_n100000.npy: target: 485 values (0.4850%) > mean+5.0×std (threshold=19.1013, max=129.3603)
+  ! tosca_victoria/gaussian_examples_ring2_n100000.npy: nbr_euc_dist: 1997 values (0.1290%) > mean+5.0×std (threshold=14.4501, max=24.9043)
+  ! tosca_victoria/gaussian_examples_ring2_n100000.npy: nbr_geodesic: 7851 values (0.5070%) > mean+5.0×std (threshold=16.8412, max=129.0892)
+  ! tosca_victoria/gaussian_examples_ring2_n100000.npy: geo/euc_ratio: 5636 values (0.3640%) > mean+5.0×std (threshold=5.6270, max=89.3423)
+  ! tosca_victoria/gaussian_examples_ring3_n100000.npy: target: 400 values (0.4000%) > mean+5.0×std (threshold=27.9550, max=176.7833)
+  ! tosca_victoria/gaussian_examples_ring3_n100000.npy: nbr_euc_dist: 3215 values (0.0934%) > mean+5.0×std (threshold=20.4642, max=35.0478)
+  ! tosca_victoria/gaussian_examples_ring3_n100000.npy: nbr_geodesic: 15523 values (0.4511%) > mean+5.0×std (threshold=27.1935, max=176.5960)
+  ! tosca_victoria/gaussian_examples_ring3_n100000.npy: geo/euc_ratio: 9537 values (0.2772%) > mean+5.0×std (threshold=6.3708, max=89.4964)
+  ! tosca_wolf/gaussian_examples_ring2_n50000.npy: target: 247 values (0.4940%) > mean+5.0×std (threshold=20.9630, max=102.9124)
+  ! tosca_wolf/gaussian_examples_ring2_n50000.npy: nbr_euc_dist: 4170 values (0.5657%) > mean+5.0×std (threshold=18.0224, max=39.4836)
+  ! tosca_wolf/gaussian_examples_ring2_n50000.npy: nbr_geodesic: 4352 values (0.5904%) > mean+5.0×std (threshold=18.6303, max=99.5343)
+  ! tosca_wolf/gaussian_examples_ring2_n50000.npy: geo/euc_ratio: 3051 values (0.4139%) > mean+5.0×std (threshold=5.4301, max=20.9568)
+  ! tosca_wolf/gaussian_examples_ring3_n50000.npy: target: 285 values (0.5700%) > mean+5.0×std (threshold=30.1168, max=85.6921)
+  ! tosca_wolf/gaussian_examples_ring3_n50000.npy: nbr_euc_dist: 6727 values (0.4298%) > mean+5.0×std (threshold=25.9711, max=48.1247)
+  ! tosca_wolf/gaussian_examples_ring3_n50000.npy: nbr_geodesic: 12058 values (0.7704%) > mean+5.0×std (threshold=29.9283, max=85.6262)
+  ! tosca_wolf/gaussian_examples_ring3_n50000.npy: geo/euc_ratio: 5630 values (0.3597%) > mean+5.0×std (threshold=5.9624, max=13.9082)
+  ! paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: target: 878 values (0.1171%) > mean+5.0×std (threshold=23.1704, max=42.4203)
+  ! paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: nbr_euc_dist: 4512 values (0.1513%) > mean+5.0×std (threshold=19.6892, max=37.0600)
+  ! paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: nbr_geodesic: 6279 values (0.2106%) > mean+5.0×std (threshold=17.0635, max=41.7372)
+  ! paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: geo/euc_ratio: 12582 values (0.4220%) > mean+5.0×std (threshold=5.7212, max=16.1359)
+  ! paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: target: 512 values (0.0683%) > mean+5.0×std (threshold=34.0493, max=50.7066)
+  ! paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: nbr_euc_dist: 5326 values (0.0836%) > mean+5.0×std (threshold=27.8842, max=44.4863)
+  ! paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: nbr_geodesic: 9982 values (0.1566%) > mean+5.0×std (threshold=26.6946, max=46.8906)
+  ! paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: geo/euc_ratio: 24990 values (0.3921%) > mean+5.0×std (threshold=6.3286, max=25.4277)
+  ! saddle_all_one_source/gaussian_examples_ring2_n750000.npy: target: 23 values (0.0031%) > mean+5.0×std (threshold=21.7696, max=24.1190)
+  ! saddle_all_one_source/gaussian_examples_ring2_n750000.npy: nbr_euc_dist: 39 values (0.0014%) > mean+5.0×std (threshold=18.2246, max=19.8275)
+  ! saddle_all_one_source/gaussian_examples_ring2_n750000.npy: nbr_geodesic: 1826 values (0.0645%) > mean+5.0×std (threshold=15.6639, max=22.9870)
+  ! saddle_all_one_source/gaussian_examples_ring2_n750000.npy: geo/euc_ratio: 11179 values (0.3952%) > mean+5.0×std (threshold=5.4996, max=29.6114)
+  ! saddle_all_one_source/gaussian_examples_ring3_n750000.npy: nbr_euc_dist: 50 values (0.0009%) > mean+5.0×std (threshold=26.0902, max=29.0647)
+  ! saddle_all_one_source/gaussian_examples_ring3_n750000.npy: nbr_geodesic: 1371 values (0.0237%) > mean+5.0×std (threshold=23.6975, max=30.5724)
+  ! saddle_all_one_source/gaussian_examples_ring3_n750000.npy: geo/euc_ratio: 19893 values (0.3444%) > mean+5.0×std (threshold=6.2397, max=21.4617)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: target: 61 values (0.0081%) > mean+5.0×std (threshold=21.4924, max=25.3979)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: nbr_euc_dist: 218 values (0.0076%) > mean+5.0×std (threshold=17.5993, max=21.9916)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: nbr_geodesic: 2582 values (0.0905%) > mean+5.0×std (threshold=15.6051, max=22.5782)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring2_n750000.npy: geo/euc_ratio: 10932 values (0.3834%) > mean+5.0×std (threshold=5.5615, max=18.7264)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: target: 4 values (0.0005%) > mean+5.0×std (threshold=31.5491, max=33.5964)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: nbr_euc_dist: 329 values (0.0056%) > mean+5.0×std (threshold=25.1961, max=33.8878)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: nbr_geodesic: 2069 values (0.0354%) > mean+5.0×std (threshold=23.4175, max=31.2396)
+  ! hyperbolic_paraboloid_all_one_source/gaussian_examples_ring3_n750000.npy: geo/euc_ratio: 19557 values (0.3350%) > mean+5.0×std (threshold=6.2162, max=17.6894)
+
+  All datasets OK with 95 outlier flag(s).
+

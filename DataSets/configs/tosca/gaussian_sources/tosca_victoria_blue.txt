@@ -1,0 +1,5 @@
+# Gaussian output paths for TOSCA victoria - blue_texture, high_res, decoupled_appearance
+# 24 poses, mesh diagonal ~243.4
+# 2 poses available in high_res (victoria0, victoria2)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria2/high_res/decoupled_appearance/output

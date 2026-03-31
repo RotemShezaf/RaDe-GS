@@ -1,0 +1,76 @@
+# Training config: Combined Polynomial Surfaces – Ring 2 (new_dataset)
+# Variant: one geodesic source, blended_mse loss
+#
+# Changes from one_source/combined_polynomial_ring2.yaml:
+#   - Dataset config: new_dataset (updated KNN params + near-source oversampling)
+#   - Transforms: added SparseContextDropout + GaussianPatchSurfacePerturb (null = no-op)
+#   - Loss: blended_mse
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/new_dataset/combined_polynomial_ring2.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/new_dataset/combined_polynomial_all_one_source.yaml
+  ring: 2
+  train_split: 0.8
+  use_r1_min: true
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: SparseContextDropout
+      min_valid: 1
+      max_valid_ratio: 1.00
+      p: 0.7
+      p_dropout: 0.3
+      max_dropout_ratio: 0.99
+    - name: GaussianPatchSurfacePerturb
+      surface_type: null
+      max_offset: 0.02
+      p: 0.5
+      max_ratio: 1.0
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 6
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.1
+  attn_dropout: 0.1
+  drop_path_rate: 0.1
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 100
+  batch_size: 512
+  learning_rate: 3.0e-4
+  min_learning_rate: 1.0e-6
+  weight_decay: 1.0e-4
+  loss_type: blended_mse
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 10
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/new_dataset/combined_polynomial_ring2
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: new-dataset-combined-polynomial-ring2
+  log_file: ./checkpoints/new_dataset/combined_polynomial_ring2/train.log

@@ -1,0 +1,75 @@
+# Configuration for Saddle surface - ALL levels and lighting conditions
+# Variant: one source + KNN fixes + _aug_normals for directed surface perturbation
+#
+# Changes from original one_source config:
+#   - n_neighbors: 6 (was 10, matching run_adaptive_analysis.sh)
+#   - adaptive_k_boost: 18 (was 20)
+#   - adaptive_max_mean_cut: 0.00 (added)
+#   - adaptive_max_steps: 12 (was 5 / absent)
+#   - near_source_oversample: 0.3 (inverse-geodesic-weighted sampling)
+#
+# New transforms (SparseContextDropout, GaussianPatchSurfacePerturb) are
+# configured in the model training config, not here.
+#
+# Usage:
+#   python DataSets/create_gaussian_training_patches.py \
+#       --config DataSets/configs/polynomial/new_dataset/saddle_all_one_source.yaml
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Surface type (used by GaussianPatchSurfacePerturb transform)
+surface_type: Saddle
+
+# Paths
+gaussian_output: "DataSets/configs/polynomial/gaussian_sources/saddle_blue_all.txt"
+geodesic_data: null
+output_dir: "TrainData/datasets/gaussian_patches/new_dataset/saddle_all_one_source_aug_normals"
+iteration: null
+
+# Data generation parameters
+num_iterations: 1000
+num_sources: 1
+num_train_points: 50
+seed: 42
+
+# Near-source oversampling: 30% of training points drawn with
+# inverse-geodesic-distance weighting (biases toward wavefront regime)
+near_source_oversample: 0.3
+
+# Neighborhood computation (matched to scripts/run_adaptive_analysis.sh)
+use_mahalanobis: false
+n_neighbors: 6
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 12
+normalize_per_patch: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+  mahalanobis:
+    2: 90
+    3: 250
+    4: 600
+
+# Feature attributes
+attributes:
+  - xyz
+  - _aug_normals
+
+# Outlier filtering
+disable_outlier_filtering: true
+
+# Normalization and padding
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -10.0

@@ -1,0 +1,72 @@
+# TOSCA Wolf - blue_texture, high_res, decoupled_appearance
+# Variant: outlier filtering with tunable params
+#
+# 3 poses of wolf mesh (diagonal ~200.0)
+#
+# Usage:
+#   python DataSets/create_gaussian_training_patches.py \
+#       --config DataSets/configs/tosca/outlier_filtering/tosca_wolf.yaml
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Paths
+gaussian_output: "DataSets/configs/tosca/gaussian_sources/tosca_wolf_blue.txt"
+geodesic_data: null
+output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/tosca_wolf"
+iteration: null
+
+# Data generation parameters
+num_iterations: 5000
+num_sources: 4
+num_train_points: 400
+seed: 42
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 8
+adaptive_target_ring: 3
+adaptive_target_neighbors: 192
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 10
+normalize_per_patch: false
+
+# Outlier filtering (without p_u — inference-path filter)
+# The without-pu filter uses inter-neighbor gradient consistency
+# (stages 0-3 in _filter_outliers_without_pu). The training-path
+# params below are kept as fallback but are NOT used by the
+# without-pu path.
+disable_outlier_filtering: false
+outlier_median_multiplier: 3.0
+outlier_threshold_floor: 2.0
+outlier_hard_cap: 500.0
+outlier_fallback_multiplier: 5.0
+outlier_fallback_floor: 3.0
+# Max fraction of visited neighbors the without-pu filter may remove.
+# null = no cap. E.g. 0.5 = at most 50% removal.
+outlier_max_removal_fraction: 0.5
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 64
+    3: 192
+    4: 512
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Normalization and padding
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -100
+
+# Dataset info
+dataset:
+  name: "TOSCA Wolf (3 poses)"
+  type: "TOSCA"

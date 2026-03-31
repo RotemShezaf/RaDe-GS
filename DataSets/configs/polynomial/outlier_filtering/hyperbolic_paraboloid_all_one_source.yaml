@@ -1,0 +1,71 @@
+# Configuration for HyperbolicParaboloid surface - ALL levels and lighting conditions
+# Variant: one source (num_sources=1) + outlier filtering with tunable params
+#
+# Usage:
+#   python DataSets/create_gaussian_training_patches.py \
+#       --config DataSets/configs/polynomial/outlier_filtering/hyperbolic_paraboloid_all_one_source.yaml
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Surface type (used by GaussianPatchSurfacePerturb transform)
+surface_type: HyperbolicParaboloid
+
+# Paths
+gaussian_output: "DataSets/configs/polynomial/gaussian_sources/hyperbolic_paraboloid_blue_all.txt"
+geodesic_data: null
+output_dir: "TrainData/datasets/gaussian_patches/outlier_filtering/hyperbolic_paraboloid_all_one_source"
+iteration: null
+
+# Data generation parameters
+num_iterations: 1000
+num_sources: 1
+num_train_points: 50
+seed: 42
+
+# Near-source oversampling
+#near_source_oversample: 0.3
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 16
+#adaptive_target_ring: 3
+#adaptive_target_neighbors: 128
+#adaptive_k_boost: 22
+#adaptive_max_mean_cut: 0.00
+#adaptive_max_steps: 6
+normalize_per_patch: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Outlier filtering (without p_u — inference-path filter)
+# The without-pu filter uses inter-neighbor gradient consistency
+# (stages 0-3 in _filter_outliers_without_pu). The training-path
+# params below are kept as fallback but are NOT used by the
+# without-pu path.
+disable_outlier_filtering: false
+outlier_median_multiplier: 3.0
+outlier_threshold_floor: 2.0
+outlier_hard_cap: 500.0
+outlier_fallback_multiplier: 5.0
+outlier_fallback_floor: 3.0
+# Max fraction of visited neighbors the without-pu filter may remove.
+# null = no cap. E.g. 0.5 = at most 50% removal.
+outlier_max_removal_fraction: null
+
+# Normalization and padding
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -10.0

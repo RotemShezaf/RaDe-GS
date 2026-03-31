@@ -1,0 +1,75 @@
+# Training config: Combined Polynomial Surfaces – Ring 3 (one source, rotation, Huber loss)
+# Variant: linear encoder + index positional encoding, one geodesic source,
+#          xyz + rotation attributes, Huber loss
+#
+# Based on combined_polynomial_ring3_huber.yaml with rotation attribute added.
+#
+# Prerequisites – generate one-source rotation patches first:
+#   bash scripts/polynomial/patches/generate_patches_one_source_rotation_tmux.sh
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/one_source/combined_polynomial_ring3_huber_rotation.yaml
+
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/new_dataset/combined_polynomial_all_one_source_rotation.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: SparseContextDropout
+      min_valid: 1
+      max_valid_ratio: 1.00
+      p: 0.5
+      p_dropout: 1
+      max_dropout_ratio: 1.00
+  subset_seed: 42
+  max_examples: null
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.0001
+  attn_dropout: 0.0001
+  drop_path_rate: 0.0001
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 100
+  batch_size: 256
+  learning_rate: 4.0e-4
+  min_learning_rate: 1.0e-6
+  weight_decay: 5.0e-5
+  loss_type: mse
+  #huber_delta: 1.0        # transition from quadratic to linear
+  gradient_clip_norm: 1.0
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 12
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/one_source/combined_polynomial_ring3_huber_rotation
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: combined-polynomial-ring3-one-source-huber-rotation
+  log_file: ./checkpoints/one_source/combined_polynomial_ring3_huber_rotation/train.log

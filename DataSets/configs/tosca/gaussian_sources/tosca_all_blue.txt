@@ -1,0 +1,16 @@
+# Gaussian output paths for ALL TOSCA animals - blue_texture, high_res, decoupled_appearance
+# 14 total poses across 9 animals (filtered to high_res + geodesic data available)
+TrainData/TOSCA/SyntheticColmapData/blue_texture/cat0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/cat2/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur1/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/centaur5/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/david0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/dog0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/gorilla5/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/horse0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/michael0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/michael2/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria0/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/victoria2/high_res/decoupled_appearance/output
+TrainData/TOSCA/SyntheticColmapData/blue_texture/wolf0/high_res/decoupled_appearance/output

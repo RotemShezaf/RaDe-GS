@@ -1,0 +1,77 @@
+# Training config: Combined TOSCA Animals – Ring 3 (outlier filtering)
+# Variant: Linear encoder + index positional encoding + max pooling + mse loss
+#
+# Trains GaussianPatchTransformer on the combined TOSCA dataset
+# (9 animal types, 17 poses) with outlier filtering enabled.
+#
+# Prerequisites – generate outlier filtering patches first:
+#   bash scripts/tosca/outlier_filtering/patches/generate_patches_tmux.sh
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/outlier_filtering/combined_tosca_ring3.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/tosca/outlier_filtering/combined_tosca_all.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: SparseContextDropout
+      min_valid: 1
+      max_valid_ratio: 1.00
+      p: 0.5
+      p_dropout: 1
+      max_dropout_ratio: 1.00
+  subset_seed: 42
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.0001
+  attn_dropout: 0.0001
+  drop_path_rate: 0.0001
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 100
+  batch_size: 256
+  learning_rate: 3.0e-4
+  min_learning_rate: 1.0e-6
+  weight_decay: 5.0e-5
+  loss_type: blended_mse
+  lambda: 0.5
+  blended_mse_lambda: 1
+  huber_delta: 1.0
+  gradient_clip_norm: 1.0
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 8
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/outlier_filtering/combined_tosca_ring3
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: outlier-filtering-combined-tosca-ring3
+  log_file: ./checkpoints/outlier_filtering/combined_tosca_ring3/train.log

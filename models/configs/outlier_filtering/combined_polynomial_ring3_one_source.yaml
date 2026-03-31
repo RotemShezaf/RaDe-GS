@@ -1,0 +1,78 @@
+# Training config: Combined Polynomial Surfaces – Ring 3 (outlier filtering, one source)
+# Variant: linear encoder + index positional encoding, one geodesic source
+#
+# Trains GaussianPatchTransformer on the combined polynomial dataset
+# (Paraboloid + Saddle + HyperbolicParaboloid, all levels & lights)
+# with num_sources=1 patches and outlier filtering enabled.
+#
+# Prerequisites – generate outlier filtering patches first:
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/outlier_filtering/paraboloid_all_one_source.yaml
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/outlier_filtering/saddle_all_one_source.yaml
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/outlier_filtering/hyperbolic_paraboloid_all_one_source.yaml
+#
+# Usage:
+#   python models/train_gaussian_patch_transformer.py \
+#       --train_config models/configs/outlier_filtering/combined_polynomial_ring3_one_source.yaml
+
+# ── Dataset ────────────────────────────────────────────────────────────
+dataset:
+  dataset_config: DataSets/configs/polynomial/outlier_filtering/combined_polynomial_all_one_source.yaml
+  ring: 3
+  train_split: 0.8
+  use_r1_min: true
+  transforms:
+    - name: GaussianPatchCanonicalRotate
+    - name: SparseContextDropout
+      min_valid: 1
+      max_valid_ratio: 1.00
+      p: 0.5
+      p_dropout: 1
+      max_dropout_ratio: 0.99
+  max_examples: null
+  subset_seed: 42
+
+# ── Model ──────────────────────────────────────────────────────────────
+model:
+  embed_dim: 128
+  encoder_depth: 6
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.00001
+  attn_dropout: 0.00001
+  drop_path_rate: 0.00001
+  point_attributes: null
+  pool: max
+  pos_encoding_type: index
+  encoder_type: linear
+
+# ── Training ───────────────────────────────────────────────────────────
+training:
+  num_epochs: 150
+  batch_size: 1024
+  learning_rate: 8.0e-4
+  warmup_epochs: 30
+  min_learning_rate: 1.0e-6
+  weight_decay: 2.0e-5
+  loss_type: blended_mse
+  blended_mse_lambda: 0.5
+  gradient_clip_norm: 1.0
+  seed: 42
+
+# ── Early stopping ─────────────────────────────────────────────────────
+early_stopping_cfg:
+  early_stopping: true
+  patience: 8
+  min_delta: 0.0
+
+# ── Infrastructure ─────────────────────────────────────────────────────
+infrastructure:
+  save_dir: ./checkpoints/outlier_filtering/combined_polynomial_ring3_one_source
+  save_every: 10
+  num_workers: 6
+
+# ── Logging ────────────────────────────────────────────────────────────
+logging:
+  use_wandb: true
+  wandb_project: gaussian-patch-transformer
+  wandb_run_name: outlier-filtering-combined-polynomial-ring3-one-source
+  log_file: ./checkpoints/outlier_filtering/combined_polynomial_ring3_one_source/train.log

@@ -1,0 +1,71 @@
+# Configuration for Saddle surface - ALL levels and lighting conditions
+#
+# Combines 15 Gaussian outputs (3 levels × 5 lights) from blue_texture Saddle
+# into a single training dataset via the .txt multi-output file.
+#
+# Usage:
+#   python DataSets/create_gaussian_training_patches.py --config DataSets/configs/polynomial/saddle_all.yaml
+
+# Dataset class for loading training data
+dataset_class: GaussianPatchDataset
+
+# Paths
+# gaussian_output points to a .txt file listing all 15 output folders
+gaussian_output: "DataSets/configs/polynomial/gaussian_sources/saddle_blue_all.txt"
+geodesic_data: null  # Auto-detect from {gaussian_output}/geodesic_distance/gt_geodesic.npz
+output_dir: "TrainData/datasets/gaussian_patches/saddle_all"
+iteration: null      # Use highest available iteration
+
+# Data generation parameters
+num_iterations: 1000
+num_sources: 4
+num_train_points: 50
+seed: 42
+
+# Neighborhood computation
+use_mahalanobis: false
+n_neighbors: 12
+# Adaptive kNN
+adaptive_target_ring: 3
+adaptive_target_neighbors: 128
+adaptive_k_boost: 18
+adaptive_max_mean_cut: 0.00
+adaptive_max_steps: 8
+normalize_per_patch: true
+
+# Ring configuration
+rings: [2, 3]
+
+# Ring size mapping
+ring_size_mapping:
+  euclidean:
+    2: 48
+    3: 128
+    4: 512
+  mahalanobis:
+    2: 90
+    3: 250
+    4: 600
+
+# Feature attributes
+attributes:
+  - xyz
+
+# Outlier filtering
+disable_outlier_filtering: true
+
+# Normalization and padding
+nn_mean: 1
+use_r1_min_val: true
+mask_constant: -20.0
+
+# Dataset info
+dataset:
+  name: "Saddle (all levels & lights)"
+  type: "Polynomial"
+  description: "Training examples for Saddle surface (z = x^2 - y^2) across all colmap levels (02,03,04) and lighting conditions (0-4)"
+  characteristics:
+    - "Hyperbolic paraboloid"
+    - "Saddle point at origin"
+    - "Negative Gaussian curvature"
+    - "15 Gaussian outputs (3 levels × 5 lights)"

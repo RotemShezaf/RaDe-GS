@@ -1,0 +1,357 @@
+============================================================
+Adaptive kNN Analysis (Polynomial only) — srun launcher
+============================================================
+  Node:            gipdeep10
+  CPUs:            80
+  GPU:             none
+  Time limit:      06:00:00
+  Conda env:       geo_splat
+  Dataset:         polynomial
+  Poly neighbors:  128
+
+  srun command:
+    srun --nodelist=gipdeep10 --cpus-per-task=80  --time=06:00:00 --pty bash -c 'cd /home/rotem.shezaf/RaDe-GS && source $(conda info --base)/etc/profile.d/conda.sh && conda activate geo_splat && python DataSets/analyze_geodesic_valid_neighbors.py     --mode adaptive     --dataset polynomial     --adaptive_target_ring 3     --adaptive_target_neighbors 128     --adaptive_k_boost 20     --adaptive_max_mean_cut 0.00     --adaptive_max_steps 6     --num_sources 4     --num_trials 50     --n_neighbors 14'
+
+No CUDA runtime is found, using CUDA_HOME='/home/rotem.shezaf/miniconda3/envs/geo_splat'
+Warning: Neither knn_cuda nor simple-knn available, falling back to CPU implementation
+Analyzing 45 shapes (ring=3, k=14, num_sources=4, mahalanobis=False, workers=45)...
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_02/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_02/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_03/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_02/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_03/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_02/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_02/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_03/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_03/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_04/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_03/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_04/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_04/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_04/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_02/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/HyperbolicParaboloid/level_04/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_02/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_02/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_02/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_03/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_02/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_03/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_03/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_03/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_03/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_04/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_04/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_04/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_04/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_04/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_02/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_1/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_2/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_4/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_0/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_03/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+Loading Gaussian data (CPU mode) from: TrainData/Polynomial/SyntheticColmapData/blue_texture/Saddle/level_04/light_3/output/point_cloud/iteration_30000/point_cloud.ply
+  Loaded 45392 Gaussians
+  Loaded 39742 Gaussians
+  Position range: [-0.8126, 0.8064]
+  Scale range: [0.0000, 0.1643]
+  Loaded 43372 Gaussians
+  Position range: [-0.8064, 0.8039]
+  Opacity range: [0.0034, 1.0000]
+  Scale range: [0.0000, 0.1003]
+  Opacity range: [0.0023, 1.0000]
+  Position range: [-0.8123, 1.2769]
+  Rotation (normalized) range: [-0.9591, 0.9997]
+  Rotation (normalized) range: [-0.9929, 0.9998]
+  Scale range: [0.0000, 0.1282]
+  Opacity range: [0.0018, 1.0000]
+  Rotation (normalized) range: [-0.9956, 1.0000]
+  Loaded 38395 Gaussians
+  Position range: [-0.8095, 0.8116]
+  Loaded 93533 Gaussians
+  Scale range: [0.0000, 0.1244]
+  Opacity range: [0.0032, 1.0000]
+  Loaded 84359 Gaussians
+  Rotation (normalized) range: [-0.9446, 0.9998]
+  Position range: [-0.8072, 0.8147]
+  Loaded 51912 Gaussians
+  Scale range: [0.0000, 0.1259]
+  Position range: [-0.8043, 0.8044]
+  Opacity range: [0.0021, 1.0000]
+  Position range: [-0.8049, 0.8061]
+  Scale range: [0.0000, 0.1250]
+  Rotation (normalized) range: [-0.9515, 0.9999]
+  Opacity range: [0.0019, 1.0000]
+  Scale range: [0.0000, 0.1085]
+  Opacity range: [0.0041, 1.0000]
+  Rotation (normalized) range: [-0.9489, 1.0000]
+  Rotation (normalized) range: [-0.9521, 0.9999]
+  Loaded 37356 Gaussians
+  Loaded 46683 Gaussians
+  Position range: [-0.8100, 0.8097]
+  Position range: [-0.8098, 0.8251]
+  Scale range: [0.0000, 0.1403]
+  Opacity range: [0.0039, 1.0000]
+  Scale range: [0.0000, 0.1179]
+  Opacity range: [0.0030, 1.0000]
+  Rotation (normalized) range: [-0.9468, 0.9997]
+  Rotation (normalized) range: [-0.9267, 0.9997]
+  Loaded 44711 Gaussians
+  Loaded 46807 Gaussians
+  Position range: [-0.8074, 0.8107]
+  Position range: [-0.8112, 0.8161]
+  Scale range: [0.0000, 0.1347]
+  Scale range: [0.0000, 0.1134]
+  Opacity range: [0.0036, 1.0000]
+  Opacity range: [0.0039, 1.0000]
+  Rotation (normalized) range: [-0.9333, 0.9997]
+  Rotation (normalized) range: [-0.9116, 0.9999]
+  Loaded 53083 Gaussians
+  Loaded 40051 Gaussians
+  Position range: [-0.8157, 0.8081]
+  Loaded 45833 Gaussians
+  Position range: [-0.8115, 0.8108]
+  Loaded 38016 Gaussians
+  Scale range: [0.0000, 0.1199]
+  Position range: [-0.8191, 0.8060]
+  Opacity range: [0.0041, 1.0000]
+  Scale range: [0.0000, 0.1161]
+  Position range: [-0.8069, 0.8051]
+  Scale range: [0.0000, 0.1005]
+  Opacity range: [0.0036, 1.0000]
+  Scale range: [0.0000, 0.1203]
+  Opacity range: [0.0040, 1.0000]
+  Opacity range: [0.0040, 1.0000]
+  Rotation (normalized) range: [-0.9167, 0.9999]
+  Rotation (normalized) range: [-0.9992, 0.9999]
+  Rotation (normalized) range: [-0.9505, 0.9998]
+  Rotation (normalized) range: [-0.9341, 0.9999]
+  Loaded 44207 Gaussians
+  Position range: [-0.8082, 0.8101]
+  Scale range: [0.0000, 0.1265]
+  Opacity range: [0.0038, 1.0000]
+  Rotation (normalized) range: [-0.9072, 0.9999]
+  Loaded 43250 Gaussians
+  Position range: [-0.8152, 0.8065]
+  Scale range: [0.0000, 0.1576]
+  Opacity range: [0.0024, 1.0000]
+  Loaded 45300 Gaussians
+  Rotation (normalized) range: [-0.9019, 0.9996]
+  Loaded 44962 Gaussians
+  Position range: [-0.8140, 0.8069]
+  Loaded 51504 Gaussians
+  Scale range: [0.0000, 0.1321]
+  Opacity range: [0.0033, 1.0000]
+  Rotation (normalized) range: [-0.9330, 0.9998]
+  Position range: [-0.8165, 1.2771]
+  Position range: [-0.8073, 0.8040]
+  Loaded 50792 Gaussians
+  Scale range: [0.0000, 0.1256]
+  Scale range: [0.0000, 0.1115]
+  Opacity range: [0.0016, 1.0000]
+  Opacity range: [0.0033, 1.0000]
+  Position range: [-0.8089, 1.2774]
+  Rotation (normalized) range: [-0.9150, 1.0000]
+  Rotation (normalized) range: [-0.9955, 0.9998]
+  Scale range: [0.0000, 0.1173]
+  Opacity range: [0.0017, 1.0000]
+  Rotation (normalized) range: [-0.9708, 1.0000]
+  Loaded 94288 Gaussians
+  Loaded 51435 Gaussians
+  Loaded 40518 Gaussians
+  Position range: [-0.8058, 0.8040]
+  Scale range: [0.0000, 0.1491]
+  Position range: [-0.8187, 0.8077]
+  Position range: [-0.8081, 0.8057]
+  Opacity range: [0.0026, 1.0000]
+  Rotation (normalized) range: [-0.9428, 1.0000]
+  Scale range: [0.0000, 0.1144]
+  Scale range: [0.0000, 0.1237]
+  Opacity range: [0.0039, 1.0000]
+  Opacity range: [0.0037, 1.0000]
+  Rotation (normalized) range: [-0.9993, 0.9999]
+  Rotation (normalized) range: [-0.9882, 0.9998]
+  Loaded 47958 Gaussians
+  Loaded 44708 Gaussians
+  Position range: [-0.8101, 0.8046]
+  Position range: [-0.8137, 1.2761]
+  Scale range: [0.0000, 0.1043]
+  Opacity range: [0.0037, 1.0000]
+  Scale range: [0.0000, 0.1331]
+  Opacity range: [0.0016, 1.0000]
+  Rotation (normalized) range: [-0.9410, 0.9999]
+  Rotation (normalized) range: [-0.9378, 1.0000]
+  Loaded 55177 Gaussians
+  Position range: [-0.8068, 1.2768]
+  Loaded 93504 Gaussians
+  Scale range: [0.0000, 0.1168]
+  Opacity range: [0.0016, 1.0000]
+  Position range: [-0.8048, 1.2777]
+  Rotation (normalized) range: [-0.9780, 1.0000]
+  Scale range: [0.0000, 0.1176]
+  Opacity range: [0.0014, 1.0000]
+  Rotation (normalized) range: [-0.9757, 1.0000]
+  Loaded 47479 Gaussians
+  Position range: [-0.8067, 1.2776]
+  Scale range: [0.0000, 0.1259]
+  Opacity range: [0.0014, 1.0000]
+  Rotation (normalized) range: [-0.9990, 1.0000]
+  Loaded 53883 Gaussians
+  Loaded 59006 Gaussians
+  Position range: [-0.8173, 1.2775]
+  Scale range: [0.0000, 0.1153]
+  Position range: [-0.8059, 1.2775]
+  Opacity range: [0.0016, 1.0000]
+  Rotation (normalized) range: [-0.9871, 1.0000]
+  Scale range: [0.0000, 0.1053]
+  Opacity range: [0.0016, 1.0000]
+  Rotation (normalized) range: [-0.9083, 1.0000]
+  Loaded 52415 Gaussians
+  Position range: [-0.8062, 1.2772]
+  Scale range: [0.0000, 0.1230]
+  Opacity range: [0.0013, 1.0000]
+  Rotation (normalized) range: [-0.9992, 1.0000]
+  Loaded 53611 Gaussians
+  Loaded 59648 Gaussians
+  Position range: [-0.8048, 0.8082]
+  Scale range: [0.0000, 0.1101]
+  Position range: [-0.8145, 1.2769]
+  Opacity range: [0.0039, 1.0000]
+  Scale range: [0.0000, 0.1078]
+  Rotation (normalized) range: [-0.9695, 1.0000]
+  Opacity range: [0.0013, 1.0000]
+  Rotation (normalized) range: [-0.9302, 0.9999]
+  Loaded 82249 Gaussians
+  Position range: [-0.8140, 0.8056]
+  Loaded 91891 Gaussians
+  Scale range: [0.0000, 0.1420]
+  Opacity range: [0.0013, 1.0000]
+  Position range: [-0.8138, 0.8053]
+  Rotation (normalized) range: [-0.9559, 0.9999]
+  Scale range: [0.0000, 0.1251]
+  Opacity range: [0.0022, 1.0000]
+  Rotation (normalized) range: [-0.9552, 0.9999]
+  Loaded 85976 Gaussians
+  Position range: [-0.8071, 0.8046]
+  Scale range: [0.0000, 0.1078]
+  Opacity range: [0.0024, 1.0000]
+  Rotation (normalized) range: [-0.9970, 0.9999]
+  Loaded 87370 Gaussians
+  Position range: [-0.8107, 0.8101]
+  Loaded 86993 Gaussians
+  Scale range: [0.0000, 0.1383]
+  Opacity range: [0.0018, 1.0000]
+  Position range: [-0.8055, 0.8058]
+  Rotation (normalized) range: [-0.9555, 0.9998]
+  Scale range: [0.0000, 0.1029]
+  Opacity range: [0.0022, 1.0000]
+  Rotation (normalized) range: [-0.9961, 0.9998]
+  Loaded 91758 Gaussians
+  Loaded 99204 Gaussians
+  Position range: [-0.8111, 1.2773]
+  Loaded 90461 Gaussians
+  Scale range: [0.0000, 0.1142]
+  Opacity range: [0.0014, 1.0000]
+  Position range: [-0.8037, 1.2767]
+  Position range: [-0.8050, 1.2767]
+  Scale range: [0.0000, 0.1058]
+  Rotation (normalized) range: [-0.9965, 1.0000]
+  Opacity range: [0.0013, 1.0000]
+  Scale range: [0.0000, 0.1184]
+  Rotation (normalized) range: [-0.9970, 1.0000]
+  Opacity range: [0.0011, 1.0000]
+  Rotation (normalized) range: [-0.9991, 1.0000]
+  Loaded 83818 Gaussians
+  Position range: [-0.8075, 0.8073]
+  Scale range: [0.0000, 0.1179]
+  Opacity range: [0.0019, 1.0000]
+  Rotation (normalized) range: [-0.9069, 0.9999]
+  Loaded 97618 Gaussians
+  Position range: [-0.8100, 1.2769]
+  Scale range: [0.0000, 0.1481]
+  Opacity range: [0.0010, 1.0000]
+  Rotation (normalized) range: [-0.9795, 1.0000]
+  Loaded 92786 Gaussians
+  Position range: [-0.8061, 0.8037]
+  Scale range: [0.0000, 0.1447]
+  Opacity range: [0.0027, 1.0000]
+  Rotation (normalized) range: [-0.9948, 1.0000]
+  Saddle/level_04/light_4: 38016 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_04/light_0: 39742 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_04/light_4: 43372 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_04/light_2: 44711 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_03/light_0: 46807 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_04/light_4: 37356 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_04/light_3: 45833 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_04/light_0: 38395 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_04/light_1: 40051 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_03/light_2: 51912 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_04/light_1: 40518 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_03/light_4: 43250 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_03/light_0: 45392 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_03/light_4: 44962 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_04/light_2: 44207 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_04/light_3: 45300 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_04/light_0: 44708 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_03/light_1: 46683 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_03/light_1: 47958 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_04/light_2: 50792 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_03/light_4: 51504 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_04/light_1: 47479 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_03/light_2: 51435 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_03/light_1: 55177 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_03/light_3: 53083 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_03/light_3: 53611 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_04/light_3: 52415 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_03/light_0: 53883 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_03/light_2: 59006 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_03/light_3: 59648 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_02/light_0: 84359 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_02/light_3: 93533 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_02/light_3: 94288 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_02/light_1: 93504 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_02/light_4: 82249 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_02/light_0: 85976 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_02/light_1: 86993 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_02/light_2: 91891 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  HyperbolicParaboloid/level_02/light_1: 87370 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_02/light_4: 83818 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_02/light_4: 90461 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_02/light_0: 91758 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_02/light_3: 99204 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Saddle/level_02/light_2: 92786 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+  Paraboloid/level_02/light_2: 97618 gaussians, 64 sources, ring=3, adaptive ring-3≥128 k_boost=20
+
+^CProcess ForkPoolWorker-41:
+Process ForkPoolWorker-42:
+Process ForkPoolWorker-12:
+Process ForkPoolWorker-15:
+Process ForkPoolWorker-30:
+Process ForkPoolWorker-11:
+Process ForkPoolWorker-10:
+Process ForkPoolWorker-45:
+Traceback (most recent call last):
+  File "/home/rotem.shezaf/RaDe-GS/DataSets/analyze_geodesic_valid_neighbors.py", line 567, in <module>
+    main()
+  File "/home/rotem.shezaf/RaDe-GS/DataSets/analyze_geodesic_valid_neighbors.py", line 559, in main
+    results = pool.map(_worker, tasks)
+  File "/home/rotem.shezaf/miniconda3/envs/geo_splat/lib/python3.9/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/home/rotem.shezaf/miniconda3/envs/geo_splat/lib/python3.9/multiprocessing/pool.py", line 765, in get
+    self.wait(timeout)
+  File "/home/rotem.shezaf/miniconda3/envs/geo_splat/lib/python3.9/multiprocessing/pool.py", line 762, in wait
+    self._event.wait(timeout)
+  File "/home/rotem.shezaf/miniconda3/envs/geo_splat/lib/python3.9/threading.py", line 581, in wait
+    signaled = self._cond.wait(timeout)
+  File "/home/rotem.shezaf/miniconda3/envs/geo_splat/lib/python3.9/threading.py", line 312, in wait
+    waiter.acquire()
+KeyboardInterrupt

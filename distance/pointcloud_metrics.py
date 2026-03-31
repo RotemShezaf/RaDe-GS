@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.spatial.ckdtree import cKDTree
+from scipy.spatial import cKDTree
 
 from distance.ex_lib import last_axis_norm
 
