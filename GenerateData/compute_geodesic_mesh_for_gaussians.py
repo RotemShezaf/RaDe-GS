@@ -280,7 +280,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_min_angle",
         type=float,
-        default=20.0,
+        default=10.0,
         help="Min-angle threshold (degrees) for bad triangles (default: 20.0).",
     )
     parser.add_argument(
@@ -330,13 +330,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_iterations",
         type=int,
-        default=1,
+        default=3,
         help="Maximum refinement passes (default: 1 — ring+flip is sufficient).",
     )
     parser.add_argument(
         "--refine_warmup_iterations",
         type=int,
-        default=0,
+        default=10,
         help=(
             "Number of initial refinement iterations in which longest-edge "
             "splitting is applied only to Gaussian-touching bad triangles. "
@@ -401,7 +401,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_smoothing_passes",
         type=int,
-        default=3,
+        default=4,
         help=(
             "Number of Laplacian smoothing passes per refinement iteration. "
             "Default: 3."

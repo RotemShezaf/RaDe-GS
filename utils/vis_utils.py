@@ -14,12 +14,12 @@ def apply_colormap(image, cmap="viridis"):
     image_long_max = torch.max(image_long)
     assert image_long_min >= 0, f"the min value is {image_long_min}"
     assert image_long_max <= 255, f"the max value is {image_long_max}"
-    return colormap[image_long[..., 0]]
+    return colormap[image_long]
 
 
 def apply_depth_colormap(
     depth,
-    accumulation,
+    accumulation=None,
     near_plane = 2.0,
     far_plane = 4.0,
     cmap="turbo",

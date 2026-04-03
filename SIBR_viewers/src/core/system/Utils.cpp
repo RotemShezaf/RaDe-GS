@@ -272,7 +272,8 @@ namespace sibr
 				return false;
 			}
 			if(overwrite) {
-				fs::copy_file(source, destination, boost::filesystem::copy_option::overwrite_if_exists);
+				// fs::copy_file(source, destination, boost::filesystem::copy_option::overwrite_if_exists);
+				fs::copy_file(source, destination, boost::filesystem::copy_options::overwrite_existing);
 			} else {
 				fs::copy_file(source, destination);
 			}

@@ -1233,7 +1233,7 @@ def insert_gaussians_into_grid_mesh(
     # only the closest one wins; the other stays as a separate vertex.
     grid_kd_2d = KDTree(vertices[:n_grid, :2])
     snap_dist, snap_idx = grid_kd_2d.query(vertices[n_grid:, :2], k=1)
-    snap_tol = 1e-6
+    snap_tol = 5e-6
     snapped_to = np.where(snap_dist < snap_tol, snap_idx, -1)  # -1 = not snapped
 
     # Resolve conflicts: when multiple Gaussians snap to the same grid
@@ -1507,14 +1507,35 @@ def _insert_gaussians_local(
             fi = int(group_face_ids[mi])
             gi_slice = sorted_gauss_global[group_starts[mi]:group_ends[mi]]
             corners = grid_faces[fi].astype(np.int64)
-            local_global = np.concatenate([corners, gi_slice.astype(np.int64)])
-            local_xy = vertices[local_global, :2]
-            local_tri = Delaunay(local_xy)
-            multi_faces_list.append(local_global[local_tri.simplices])
-        combined = np.vstack(multi_faces_list)
-        out_parts.append(combined)
+
+            # Remove snapped Gaussians whose index already matches a
+            # corner vertex — they are immovable and already part of the
+            # face; including them again would create duplicate vertices
+            # in the local Delaunay and produce degenerate triangles.
+            corner_set = set(corners.tolist())
+            gi_clean = gi_slice[~np.isin(gi_slice, list(corner_set))]
+
+            if len(gi_clean) == 0:
+                # All Gaussians in this face were snapped to corners
+                out_parts.append(corners.reshape(1, 3))
+            elif len(gi_clean) == 1:
+                # One remaining Gaussian → fan-split
+                P = int(gi_clean[0])
+                A, B, C = int(corners[0]), int(corners[1]), int(corners[2])
+                fan = np.array([[P, A, B], [P, B, C], [P, C, A]], dtype=np.int64)
+                out_parts.append(fan)
+            else:
+                # Multiple non-corner Gaussians → local Delaunay
+                local_global = np.concatenate([corners, gi_clean.astype(np.int64)])
+                local_xy = vertices[local_global, :2]
+                local_tri = Delaunay(local_xy)
+                multi_faces_list.append(local_global[local_tri.simplices])
+
+        if multi_faces_list:
+            combined = np.vstack(multi_faces_list)
+            out_parts.append(combined)
         n_delaunay = len(multi_idx)
-        n_delaunay_faces = len(combined)
+        n_delaunay_faces = sum(len(f) for f in multi_faces_list) if multi_faces_list else 0
 
     faces_out = np.vstack(out_parts).astype(np.int32)
     dt = _time.time() - t0
@@ -4000,8 +4021,10 @@ def refine_bad_triangles(
     faces = np.array(faces, dtype=np.int32)
 
     # ── Gaussian protection mask ───────────────────────────────────────
+    if gaussian_vertex_indices is None:
+        gaussian_vertex_indices = np.arange(0, dtype=np.int32)
     is_gaussian = np.zeros(len(vertices), dtype=bool)
-    if gaussian_vertex_indices is not None and len(gaussian_vertex_indices) > 0:
+    if len(gaussian_vertex_indices) > 0:
         is_gaussian[gaussian_vertex_indices] = True
 
     # ── Harsher thresholds for Gaussian-touching triangles ─────────────
@@ -4354,8 +4377,6 @@ def refine_bad_triangles(
                         f"{n_bad_post} bad"
                     )
 
-    gaussian_vertex_indices = np.where(is_gaussian)[0].astype(np.int32)
-
     # ── Circumcenter Steiner insertion for stubborn Gaussian triangles ─
     if steiner_fix_gaussians and gauss_max_aspect_ratio is not None:
         # Use the general quality thresholds (not the permissive Gaussian-
@@ -4372,7 +4393,6 @@ def refine_bad_triangles(
             max_iterations=steiner_max_iterations,
             verbose=verbose,
         )
-        gaussian_vertex_indices = np.where(is_gaussian)[0].astype(np.int32)
 
     # ── Delaunay flip polish pass ─────────────────────────────────────
     if delaunay_flip_polish:

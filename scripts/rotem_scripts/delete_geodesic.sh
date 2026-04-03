@@ -1,0 +1,1 @@
+find /home/rotem.shezaf/RaDe-GS/TrainData/Polynomial/SyntheticColmapData -type d -name "*geodesic_distance" -exec rm -rf {} + 2>&1 && echo "Deletion complete"

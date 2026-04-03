@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Script to render all surfaces with synthetic COLMAP datasets
+# Can be run from project root or from GenerateData/scripts directory
+
+# Determine project root directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [[ "$SCRIPT_DIR" == */GenerateData/scripts ]]; then
+    PROJECT_ROOT="$SCRIPT_DIR/../.."
+else
+    PROJECT_ROOT="$SCRIPT_DIR"
+fi
+
+cd "$PROJECT_ROOT" || exit 1
+
+echo "Running from project root: $PROJECT_ROOT"
+echo "Rendering all surfaces..."
+echo ""
+
+# Render Paraboloid
+echo "========================================="
+echo "1/3 Rendering Paraboloid..."
+echo "========================================="
+# Generate synthetic COLMAP dataset from polynomial mesh
+# --colmap_level: Resolution for COLMAP point cloud (higher = denser points3D)
+# --image_mesh_level: Resolution for rendering images (can be lower for speed)
+python GenerateData/create_synthetic_colmap_dataset_from_mesh.py \
+    --surface Paraboloid \
+    --colmap_level 2 \
+    --image_mesh_level 1 \
+    --num_views 150 \
+    --image_width 640 \
+    --image_height 480 \
+    --camera_radius 2.6 \
+    --texture_name blue \
+
+# Render Saddle
+echo "========================================="
+echo "2/3 Rendering Saddle..."
+echo "========================================="
+python GenerateData/create_synthetic_colmap_dataset_from_mesh.py \
+    --surface Paraboloid \
+    --colmap_level 2 \
+    --image_mesh_level 1 \
+    --num_views 150 \
+    --image_width 640 \
+    --image_height 480 \
+    --camera_radius 2.6 \
+    --texture_name blue \
+
+# Render HyperbolicParaboloid
+echo "========================================="
+echo "3/3 Rendering HyperbolicParaboloid..."
+echo "========================================="
+python GenerateData/create_synthetic_colmap_dataset_from_mesh.py \
+    --surface HyperbolicParaboloid \
+    --colmap_level 2 \
+    --image_mesh_level 0 \
+    --num_views 150 \
+    --image_width 640 \
+    --image_height 480 \
+    --camera_radius 3 \
+    --texture_name blue \
+
+echo ""
+echo "========================================="
+echo "All surfaces rendered successfully!"
+echo "========================================="

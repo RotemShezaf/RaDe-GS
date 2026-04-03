@@ -117,14 +117,13 @@ include_directories(${FFMPEG_INCLUDE_DIR})
 ## Find embree3
 ###################
 sibr_addlibrary(
-    NAME embree3
+    NAME embree
     MSVC11 "https://repo-sam.inria.fr/fungraph/dependencies/ibr-common/win3rdParty-MSVC11-splitted%20version/embree2.7.0.x64.windows.7z"
     MSVC14 "https://repo-sam.inria.fr/fungraph/dependencies/ibr-common/win3rdParty-MSVC15-splitted%20version/embree-3.6.1.x64.vc14.windows.7z"     # TODO SV: provide a valid version if required
 )
 
 # CLUSTER
-#find_package(embree 3.0 REQUIRED PATHS "/data/graphdeco/share/embree/usr/local/lib64/cmake/" )
-find_package(embree 3.0 )
+find_package(embree 4.0 )
 
 ###################
 ## Find eigen3
@@ -187,7 +186,7 @@ if (WIN32)
     endif()
 endif()
 
-find_package(Boost 1.65.0 REQUIRED COMPONENTS ${Boost_REQUIRED_COMPONENTS})
+find_package(Boost REQUIRED CONFIG COMPONENTS ${Boost_REQUIRED_COMPONENTS})
 # for CLUSTER
 ##find_package(Boost 1.58.0 REQUIRED COMPONENTS ${Boost_REQUIRED_COMPONENTS})
 

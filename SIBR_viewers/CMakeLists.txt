@@ -7,13 +7,13 @@
 # 
 # For inquiries contact sibr@inria.fr and/or George.Drettakis@inria.fr
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.22)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.30)
 
 set (CMAKE_SYSTEM_VERSION 10.0.15063.0 CACHE INTERNAL "Cmake system version" FORCE)
 PROJECT(sibr_projects)
 
-set(REQUIRED_VERSION "3.22.0")
-set(CHECKED_VERSION "3.27.0")
+set(REQUIRED_VERSION "3.30.0")
+set(CHECKED_VERSION "3.30.0")
 
 if (CMAKE_VERSION VERSION_LESS REQUIRED_VERSION)
     message(WARNING "Deprecated version of cmake. Please update to at least ${REQUIRED_VERSION} (${CHECKED_VERSION} recommended).")

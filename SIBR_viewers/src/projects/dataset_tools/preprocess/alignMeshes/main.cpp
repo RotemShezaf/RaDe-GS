@@ -759,7 +759,6 @@ int main(int ac, char** av)
 		int im = 0;
 		for (const auto& camIm : cams2Align) {
 
-			//std::string extensionFile = boost::filesystem::extension(camIm->name());
 			std::ostringstream ssZeroPad;
 			ssZeroPad << std::setw(8) << std::setfill('0') << camIm->id();
 			std::string newFileName = ssZeroPad.str() + ".jpg";

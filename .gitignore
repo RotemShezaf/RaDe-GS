@@ -12,7 +12,7 @@ utils/__pycache__
 *.egg-info
 debug*
 dtu_eval/Offical_DTU_Dataset
-*.sh
+train*.sh
 submodules/diff-gaussian-rasterization-org
 snapshot_fw.dump
 snapshot_bw.dump
@@ -52,3 +52,9 @@ KNN_CUDA/
 
 # Temp debug/test scripts
 test_analysis_scripts/
+
+# From upstream
+.cache
+*.ncu-rep
+.clangd
+debug_depth*.py

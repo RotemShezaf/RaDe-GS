@@ -40,6 +40,8 @@ class CameraInfo(NamedTuple):
     width: int
     height: int
     mask: np.array = None
+    depth: np.array = None
+    normal: np.array = None
 
 class SceneInfo(NamedTuple):
     point_cloud: BasicPointCloud
@@ -321,9 +323,124 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
                            point_cloud=pcd)
     return scene_info
 
+def readObjaverseInfo(path, white_background, eval):
+    cam_infos = []
+    import lmdb
 
+    lmdb_dir = path
+    env = lmdb.open(lmdb_dir)
+    txn = env.begin()
+    with open(os.path.join(lmdb_dir, "metadata.json")) as json_data:
+        meta = json.load(json_data)
+
+    cam2world_matrices = meta["cam2world_matrices"]
+    intrisic = np.array(meta["intrinsics"][0])
+    W, H = meta["resolution"]
+
+    FovX = focal2fov(intrisic[0, 0], W)
+    FovY = focal2fov(intrisic[1, 1], H)
+    image_num = len(cam2world_matrices)
+
+    uvh = np.stack(
+        [*np.meshgrid(np.arange(W), np.arange(H)), np.ones((H, W), dtype=np.float32)],
+        axis=-1,
+    )
+    uvh = uvh.reshape(-1, 3) @ np.linalg.inv(intrisic).T
+    for image_id in range(image_num):
+
+        extr = np.array(cam2world_matrices[image_id])
+        cam_pos = extr[:3, 3:]
+        R = np.zeros([3, 3])
+
+        R[0] = extr[:3, 0]
+        R[1] = -extr[:3, 1]
+        R[2] = -extr[:3, 2]
+        T = -R @ cam_pos
+
+        data = txn.get(("%04d_rgb" % image_id).encode())
+        image_array = np.frombuffer(data, dtype=np.uint8)
+        image = cv2.imdecode(
+            image_array, cv2.IMREAD_UNCHANGED
+        )  # IMREAD_COLOR IMREAD_UNCHANGED
+        image = image.astype(np.float32) / 255
+
+        depth_data = txn.get(("%04d_depth" % image_id).encode())
+        depth_array = np.frombuffer(depth_data, dtype=np.float32)
+        depth = depth_array.reshape(H, W)
+
+        normal_data = txn.get(("%04d_normal" % image_id).encode())
+        normal_array = np.frombuffer(normal_data, dtype=np.uint8)
+        normal = cv2.imdecode(normal_array, cv2.IMREAD_UNCHANGED)
+        normal = normal[..., [2, 1, 0]]
+
+        normal = (normal / 65535) * 2 - 1
+        normal = normal / np.linalg.norm(normal, axis=-1, keepdims=True)
+        normal[..., 1] = -normal[..., 1]
+        normal[..., 2] = -normal[..., 2]
+
+        bg = np.array([1, 1, 1]) if white_background else np.array([0, 0, 0])
+        mask = image[..., 3]
+        image[..., :3] = image[..., :3] * mask[..., None] + bg * (1 - mask[..., None])
+        image = Image.fromarray((image * 255).astype(np.uint8), "RGBA")
+
+        cam_infos.append(
+            CameraInfo(
+                uid=image_id,
+                R=np.transpose(R),
+                T=T.squeeze(),
+                FovY=FovY,
+                FovX=FovX,
+                image=image,
+                image_path="",
+                image_name="",
+                width=W,
+                height=H,
+                mask=None,
+                depth=depth,
+                normal=normal,
+            )
+        )
+    env.close()
+
+    if eval:
+        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % 3 != 0]
+        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % 3 == 0]
+    else:
+        train_cam_infos = cam_infos
+        test_cam_infos = []
+
+    nerf_normalization = getNerfppNorm(train_cam_infos)
+    print(f'cameras extent: {nerf_normalization["radius"]}')
+
+    ply_path = os.path.join(lmdb_dir, "points3d.ply")
+    if not os.path.exists(ply_path):
+        # Since this data set has no colmap data, we start with random points
+        num_pts = 100_000
+        print(f"Generating random point cloud ({num_pts})...")
+
+        xyz = np.random.random((num_pts, 3)) * 2.6 - 1.3
+        shs = np.random.random((num_pts, 3)) / 255.0
+        pcd = BasicPointCloud(
+            points=xyz, colors=SH2RGB(shs), normals=np.zeros((num_pts, 3))
+        )
+
+        storePly(ply_path, xyz, SH2RGB(shs) * 255)
+    try:
+        pcd = fetchPly(ply_path)
+    except:
+        pcd = None
+
+    scene_info = SceneInfo(
+        point_cloud=pcd,
+        train_cameras=train_cam_infos,
+        test_cameras=test_cam_infos,
+        nerf_normalization=nerf_normalization,
+        ply_path=ply_path,
+    )
+    return scene_info
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
-    "Blender" : readNerfSyntheticInfo
+    "Blender" : readNerfSyntheticInfo,
+    "Objaverse": readObjaverseInfo,
 }

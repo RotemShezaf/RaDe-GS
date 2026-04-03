@@ -1,4 +1,6 @@
-extlibs/
+extlibs/*
+!extlibs/CudaRasterizer
+
 build/
 install/
 cmake-gui.exe.stackdump

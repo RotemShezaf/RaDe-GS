@@ -59,9 +59,7 @@ def _unbatched_marching_tetrahedra(vertices, tets, sdf, scales):
         merged_faces = None
         merged_verts_ids = None
         for tet_chunk in torch.chunk(tets, tets.shape[0] // chunk_size + 1):
-            torch.cuda.empty_cache()
             verts, verts_scales, faces, verts_ids = _unbatched_marching_tetrahedra(vertices, tet_chunk, sdf, scales)
-            
             if merged_verts is None:
                 merged_verts = verts
                 merged_scales = verts_scales
@@ -90,7 +88,6 @@ def _unbatched_marching_tetrahedra(vertices, tets, sdf, scales):
                 merged_verts = (unique_verts_0, unique_verts_1)
                 merged_scales = unique_scales
                 merged_verts_ids = unique_edges
-                torch.cuda.empty_cache()
                 
         return merged_verts, merged_scales, merged_faces, merged_verts_ids
         
@@ -137,7 +134,7 @@ def _unbatched_marching_tetrahedra(vertices, tets, sdf, scales):
 
     return verts, verts_scales, faces, interp_v
 
-
+@torch.no_grad()
 def marching_tetrahedra(vertices, tets, sdf, scales):
     r"""Convert discrete signed distance fields encoded on tetrahedral grids to triangle 
     meshes using marching tetrahedra algorithm as described in `An efficient method of 

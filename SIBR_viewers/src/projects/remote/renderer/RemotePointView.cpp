@@ -35,9 +35,9 @@ void sibr::RemotePointView::send_receive()
 		SIBR_LOG << "Trying to connect..." << std::endl;
 		try
 		{
-			boost::asio::io_service ioservice;
-			boost::asio::ip::tcp::socket sock(ioservice);
-			boost::asio::ip::address addr = boost::asio::ip::address::from_string(_ip);
+			boost::asio::io_context ioc;
+			boost::asio::ip::tcp::socket sock(ioc);
+			boost::asio::ip::address addr = boost::asio::ip::make_address(_ip);
 			boost::asio::ip::tcp::endpoint contact(addr, _port);
 
 			boost::system::error_code ec;

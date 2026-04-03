@@ -5,176 +5,138 @@ Baowen Zhang, Chuan Fang, Rakesh Shrestha, Yixun Liang, Xiaoxiao Long, Ping Tan
 
 [Project page](https://baowenz.github.io/radegs/)
 ![Teaser image](assets/teaser.png)
-# News! 
-### 1. We have updated the formluation of RaDe-GS (as shown in the 'Modifications'). It achieves better performance on TNT dataset.
-### 2. Now, we release the updated code of Marching Tetrahedra, based on [GOF](https://github.com/autonomousvision/gaussian-opacity-fields/blob/main/eval_tnt/run.py)'s orginal proposal. In our version, opacities are calculated in ray space, which better fits our needs.
+## News!
+- **The paper has been accepted for publication in ACM Transactions on Graphics (TOG)!**
+- **We incorporate the multi-view regularization from PGSR.**
 
-# Modifications
-
-1. We change to calculate depth using per-pixel cosine values  (Eq. 14: $d=cos\theta\ t^*$). Additionally, an option is provided to directly render the camera space coordinate map. We utilize the inverse of affine approximation to transform intersections from ray space to camera space, and these transformed points are then used in computing normal consistency loss.
-2. The depth distortion loss has been eliminated from our training process. Currently, we rely solely on normal consistency loss for geometry regularization.  We believe future techniques will enhance performance even further.
-
-
-# 1. Installation
-## Clone this repository.
+## 1. Installation
+### Clone this repository.
 ```
-git clone https://github.com/BaowenZ/RaDe-GS.git --recursive
+git clone https://github.com/HKUST-SAIL/RaDe-GS.git --recursive
 ```
 
-# 2) (Optional) Convert a surface level into Gaussian splats
-python GenerateData/create_gaussian_splats.py Paraboloid 1 --data_root TrainData/raw
-
-# 3) Render COLMAP-style images & cameras (produces JPGs and bin/txt/ply files)
-python GenerateData/create_synthetic_colmap_dataset.py Paraboloid 1 \
-	--data_root TrainData/raw --output_root data/synthetic_polys
-
-## Install dependencies.
-1. create an environment
+### Create an environment
 ```
-conda create -n radegs python=3.9
+conda create -n radegs python=3.12
 conda activate radegs
 ```
 
-2. install pytorch and other dependencies.
+### Install pytorch and other dependencies.
 ```
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-```
-3. for adding the cuda toolkit headers:
-```
-conda install nvidia/label/cuda-12.1.1::cuda-toolkit -c nvidia/label/cuda-12.1.1
-conda install -c conda-forge cudatoolkit-dev
-#export TORCH_CUDA_ARCH_LIST="8.6, 7.7"
-#conda install -c "nvidia/label/cuda-12.1.1" cuda-toolkit
-conda install nvidia::cuda-nvcc==12.1.105
-conda install conda-forge::ninja
-# Install CUDA 12.1 toolkit (includes dev headers - do NOT install cudatoolkit-dev)
-#pip install --no-build-isolation git+https://github.com/unlimblue/KNN_CUDA.git
-conda install -c conda-forge gcc=12 gxx=12
-
-
-```
-```
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu130
 pip install -r requirements.txt
 ```
 
-
-
-3. install submodules
+### Install submodules
 ```
-pip install --no-build-isolation submodules/diff-gaussian-rasterization
-#to do: solve knn isue
-#pip install --no-build-isolation submodules/simple-knn/
-#pip install --upgrade https://github.com/unlimblue/KNN_CUDA/releases/download/0.#2/KNN_CUDA-0.#2-py3-none-any.whl
-# that how i solved
-git clone https://github.com/unlimblue/KNN_CUDA.git
-cd KNN_CUDA
-make && make install
-
-
+pip install submodules/diff-gaussian-rasterization --no-build-isolation
+pip install submodules/warp-patch-ncc --no-build-isolation
+pip install submodules/simple-knn/ --no-build-isolation
+pip install git+https://github.com/rahul-goel/fused-ssim/ --no-build-isolation
 
 # tetra-nerf for Marching Tetrahedra
-cd submodules/tetra_triangulation
-conda install -c conda-forge cmake=3.26
-conda install conda-forge::gmp
 conda install conda-forge::cgal
-cmake .
-# you can specify your own cuda path
-# export CPATH=/usr/local/cuda-11.3/targets/x86_64-linux/include:$CPATH
-make 
-pip install -e .
-#setup dintance calculation 
-cd distance/external/fmm
- python setup.py build_ext --inplace
-cd  distance/external/vtp
-python setup.py build_ext --inplace
+pip install submodules/tetra_triangulation/ --no-build-isolation
+```
+---
+
+## 2. Data Preparation
+
+### DTU
+We train on the **preprocessed DTU dataset** from **2DGS**:  
+https://surfsplatting.github.io/
+
+For geometry evaluation, download the **official DTU point clouds** and place them under:
+```text
+dtu_eval/Offical_DTU_Dataset
+```
+DTU dataset page: https://roboimagedata.compute.dtu.dk/?page_id=36
+
+### Tanks and Temples (TnT)
+Please follow [PGSR](https://github.com/zju3dv/PGSR) to preprocess the TnT dataset. For evaluation, download the **GT point clouds**, **camera poses**, **alignments**, and **crop files** from:  
+https://www.tanksandtemples.org/download/
+
+Expected structure:
+```text
+GT_TNT_dataset/
+  Barn/
+    images/
+      000001.jpg
+      000002.jpg
+      ...
+    sparse/
+      0/
+        ...
+    Barn.json
+    Barn.ply
+    Barn_COLMAP_SfM.log
+    Barn_trans.txt
+  Caterpillar/
+    ...
+```
 ```
 
-## Install dependencies new.
-1. create an environment
-```
-conda create -f env.yaml
-conda activate geo_splat
-pip install requirements.txt
-```
+### Objaverse
+For depth and normal evaluation, we render multi-view images from Objaverse assets and export the corresponding ground-truth depth maps and surface normal maps. The rendered dataset can be downloaded from [this link](https://huggingface.co/datasets/BaowenZ/objaverse-multiview-renderings).
 
+---
 
+## 3. Training & Evaluation
 
-2. install submodules
-```
-pip install submodules/diff-gaussian-rasterization
-pip install  submodules/simple-knn/
-#to do: solve KNN issue
-#conda install -c conda-forge gcc=11 gxx=11
+Below are example commands for training, mesh extraction, rendering, and evaluation.
 
-# IMPORTANT: Set GPU architecture before compiling (REQUIRED!)
-# Find your GPU's compute capability: https://developer.nvidia.com/cuda-gpus
-# Common values: RTX 3090/3080=8.6, RTX 4090=8.9, A100=8.0, V100=7.0
-#for finding
-nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader | head -1
-export TORCH_CUDA_ARCH_LIST="8.6"  # Change to YOUR GPU's compute capability
-export TORCH_CUDA_ARCH_LIST="6.1;7.0;7.5;8.0;8.6;8.9"#for gidpeep
+### DTU
 
-pip install git+https://github.com/unlimblue/KNN_CUDA.git
+```bash
+# Training
+python train.py -s <path_to_dtu> -m <output_dir> -r 2 --use_decoupled_appearance 3
 
+# Mesh extraction
+python mesh_extract.py -m <output_dir>
 
-
-# tetra-nerf for Marching Tetrahedra
-cd submodules/tetra_triangulation
-conda install -c conda-forge cmake=3.26
-conda install conda-forge::gmp
-conda install conda-forge::cgal
-cmake .
-# you can specify your own cuda path
-# export CPATH=/usr/local/cuda-11.3/targets/x86_64-linux/include:$CPATH
-make 
-pip install -e .
-#setup dintance calculation 
-cd distance/external/fmm
- python setup.py build_ext --inplace
-cd  distance/external/vtp
-python setup.py build_ext --inplace
+# Evaluation
+python evaluate_dtu_mesh.py -m <output_dir>
 ```
 
-# 2. Preparation
-We use preprocessed DTU dataset from [2DGS](https://surfsplatting.github.io/) for training. And we follow GOF to evaluate the geometry. Point clouds from the [DTU dataset](https://roboimagedata.compute.dtu.dk/?page_id=36) need saved to dtu_eval/Offical_DTU_Dataset for the geometry evaluation.
-We use preprocessed Tanks and Temples dataset from [GOF](https://huggingface.co/datasets/ZehaoYu/gaussian-opacity-fields/tree/main). For evalution, please download ground truth point cloud, camera poses, alignments and cropfiles from [Tanks and Temples dataset](https://www.tanksandtemples.org/download/). The ground truth dataset should be organized as:
-```
-GT_TNT_dataset
-│
-└─── Barn
-│   │
-|   └─── Barn.json
-│   │
-|   └─── Barn.ply
-│   │
-|   └─── Barn_COLMAP_SfM.log
-│   │
-|   └─── Barn_trans.txt
-│ 
-└─── Caterpillar
-│   │
-......
+### Tanks and Temples (TnT)
+
+```bash
+# Training
+python train.py -s <path_to_preprocessed_tnt> -m <output_dir> -r 2 --use_decoupled_appearance 3
+
+# Mesh extraction
+python mesh_extract_tnt.py -m <output_dir>
+
+# Evaluation
+python eval_tnt/run.py \
+  --dataset-dir <path_to_gt_tnt> \
+  --traj-path <path_to_COLMAP_SfM.log> \
+  --ply-path <output_dir>/recon_post.ply \
+  --out-dir <output_dir>/mesh
 ```
 
-# 3. Training and Evalution
-## DTU Dataset
+### Novel View Synthesis
+
+```bash
+# Training
+python train.py -s <path_to_dataset> -m <output_dir> --eval
+
+# Rendering
+python render.py -m <output_dir>
+
+# Evaluation
+python metrics.py -m <output_dir>
 ```
-# training
-python train.py -s <path to DTU dataset> -m <output folder> -r 2 --use_decoupled_appearance
-# mesh extraction
-python mesh_extract.py -s <path to DTU dataset> -m <output folder> -r 2
-# evaluation
-python evaluate_dtu_mesh.py -s <path to DTU dataset> -m <output folder>
+
+### Objaverse
+```bash
+# Training
+python train.py -s <path_to_dataset> -m <output_dir> --eval
+
+# Evaluation
+python geometry_metric.py -m <output_dir>
 ```
-## TNT Dataset
-```
-# training
-python train.py -s <path to preprocessed TNT dataset> -m <output folder> -r 2 --eval --use_decoupled_appearance
-# mesh extraction
-python mesh_extract_tetrahedra.py -s <path to preprocessed TNT dataset> -m <output folder> -r 2 --eval
-# evaluation
-python eval_tnt/run.py --dataset-dir <path to GT TNT dataset> --traj-path <path to preprocessed TNT COLMAP_SfM.log file> --ply-path <output folder>/recon.ply
-```
+
 ### Generate synthetic polynomial datasets
 
 For quick experiments without real captures, you can procedurally create
@@ -184,7 +146,6 @@ training data:
 # 1) Generate multires meshes & point clouds
 python GenerateData/GenerateRawPolynomialMesh.py --base_resolution 800 --num_levels 4
 
-
 # 3) Render COLMAP-style images & cameras (outputs JPG + txt/bin/ply)
 python GenerateData/create_synthetic_colmap_dataset.py Paraboloid 1 \
     --data_root TrainData/raw --output_root data/synthetic_polys
@@ -193,34 +154,24 @@ python GenerateData/create_synthetic_colmap_dataset.py Paraboloid 1 \
 python train.py -s data/synthetic_polys/Paraboloid/level_01 -m output/poly_run
 ```
 
-The renderer relies on `pyrender` for realistic shading; install it with
-`pip install pyrender imageio` if it is not already available. Each dataset
-contains `images/*.jpg`, `sparse/0/{cameras,images,points3D}.{txt,bin}`, and
-`points3D.ply`; the script re-parses these files with the COLMAP loaders to
-confirm they match what `readColmapSceneInfo` expects.
-
-## Novel View Synthesis
-```
-python train.py -s <path to COLMAP or NeRF Synthetic dataset> --eval
-python render.py -m <path to pre-trained model> -s <path to dataset>
-python metrics.py -m <path to trained model> # Compute error metrics on renderings
-```
-Our model can directly render coordinate map for training, without the need to first render a depth map and then convert it. This feature can be activated by including `--use_coord_map` in the argument list of 'train.py'.
+---
 
 # 4. Viewer
-Current viewer in this repository is very similar to the original Gaussian Splatting viewer (with small modifications for 3D filters).
+Current viewer in this repository is very similar to the original Gaussian Splatting viewer, with minor updates for newer library versions and for loading 3D Gaussian models.
 You can build and use it in the same way as [Gaussian Splatting](https://github.com/graphdeco-inria/gaussian-splatting).
 
 
-# 5. Acknowledge
-We build this project based on [Gaussian Splatting](https://github.com/graphdeco-inria/gaussian-splatting).
+# 5. Acknowledgements
 
-We incorporate the filters proposed in [Mip-Splatting](https://github.com/autonomousvision/mip-splatting).
+This project is built upon the original implementation of 3D Gaussian Splatting (3DGS):
+https://github.com/graphdeco-inria/gaussian-splatting.
 
-We incorporate the loss functions of [2D GS](https://github.com/hbb1/2d-gaussian-splatting) and use the preprocessed DTU dataset.
+We integrate components and ideas from several recent works, including the filtering strategy from [Mip-Splatting](https://github.com/autonomousvision/mip-splatting), and regularization terms from [2DGS](https://github.com/hbb1/2d-gaussian-splatting) and [PGSR](https://github.com/zju3dv/PGSR).
 
-We incorporate the densification strategy, evalution and decoupled appearance modeling form [GOF](https://github.com/autonomousvision/gaussian-opacity-fields/tree/main)  and use the preprocessed TNT dataset.
+We also incorporate the densification strategy proposed in [GOF](https://github.com/autonomousvision/gaussian-opacity-fields), and adopt decoupled appearance modeling practices inspired by 3DGS, GOF, and PGSR.
 
-The evaluation scripts for the DTU and Tanks and Temples datasets are sourced from [DTUeval-python](https://github.com/jzhangbs/DTUeval-python) and [TanksAndTemples](https://github.com/isl-org/TanksAndTemples/tree/master/python_toolbox/evaluation), respectively.
+For geometric evaluation, we use the DTU and Tanks and Temples evaluation toolboxes from DTUeval-python
+(https://github.com/jzhangbs/DTUeval-python) and the TanksAndTemples Python evaluation scripts
+(https://github.com/isl-org/TanksAndTemples/tree/master/python_toolbox/evaluation), respectively.
 
-We thank the authors of Gaussian Splatting, Mip-Splatting, 2D GS, GOF， and the repos for their great works.
+We thank the authors of these projects for making their code publicly available.

@@ -421,7 +421,7 @@ namespace sibr {
 				std::cin.get();
 
 				_cameraRecorder.reset();
-				if (boost::filesystem::extension(filename) == ".out")
+				if (boost::filesystem::path(filename).extension().string() == ".out")
 					_cameraRecorder.loadBundle(filename, w, h);
 				else
 					_cameraRecorder.load(filename);
@@ -652,11 +652,12 @@ namespace sibr {
 						if (!selectedFile.empty()) {
 							SIBR_LOG << "Loading" << std::endl;
 							_cameraRecorder.reset();
-							if (boost::filesystem::extension(selectedFile) == ".out")
+							const std::string ext = boost::filesystem::path(selectedFile).extension().string();
+							if (ext == ".out")
 								_cameraRecorder.loadBundle(selectedFile, _currentCamera.w(), _currentCamera.h());
-							else if (boost::filesystem::extension(selectedFile) == ".lookat")
+							else if (ext == ".lookat")
 								_cameraRecorder.loadLookat(selectedFile, _currentCamera.w(), _currentCamera.h());
-							else if (boost::filesystem::extension(selectedFile) == ".txt")
+							else if (ext == ".txt")
 								_cameraRecorder.loadColmap(selectedFile, _currentCamera.w(), _currentCamera.h());
 							else
 								_cameraRecorder.load(selectedFile);

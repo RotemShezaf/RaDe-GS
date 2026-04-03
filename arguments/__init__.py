@@ -55,7 +55,7 @@ class ModelParams(ParamGroup):
         self._white_background = False
         self.data_device = "cuda"
         self.eval = False
-        self.use_decoupled_appearance = 3 # 0: NO, 1: GS, 2: GOF, 3: PGSR
+        self.use_decoupled_appearance = 0# 0: NO, 1: GS, 2: GOF, 3: PGSR
         self.use_coord_map = False
         self.disable_filter3D = False
         self.kernel_size = 0.0 # Size of 2D filter in mip-splatting
@@ -65,7 +65,7 @@ class ModelParams(ParamGroup):
         
         self.multi_view_num = 8
         self.multi_view_max_angle = 30
-        self.multi_view_min_dis = 0.01
+        self.multi_view_min_dis = 0.02
         self.multi_view_max_dis = 1.5
         super().__init__(parser, "Loading Parameters", sentinel)
 
@@ -107,13 +107,13 @@ class OptimizationParams(ParamGroup):
         self.densify_from_iter = 500
         self.densify_until_iter = 15_000
         self.regularization_from_iter = 7000
-        self.lambda_distortion = 0.05
-        self.densify_grad_threshold = 0.0002
+        self.lambda_distortion = 0.000
+        self.densify_grad_threshold = 0.0003
 
         self.lambda_multi_view_geo = 0.02
         self.lambda_multi_view_ncc = 0.3
         self.multi_view_patch_size = 3
-        self.multi_view_pixel_noise_th = 1.0
+        self.multi_view_pixel_noise_th = 1.5
 
         super().__init__(parser, "Optimization Parameters")
 

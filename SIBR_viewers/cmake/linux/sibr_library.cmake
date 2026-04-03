@@ -172,3 +172,43 @@ function(sibr_gitlibrary)
         message(FATAL "Error on sibr_gitlibrary for target ${args_TARGET}: missing git tag or git url.")
     endif()
 endfunction()
+
+
+
+function(sibr_pre_download_gitlibrary)
+    cmake_parse_arguments(args "" "TARGET;ROOT_DIR;SOURCE_DIR" "INCLUDE_DIRS" ${ARGN})
+    if(NOT args_TARGET)
+        message(FATAL "Error on sibr_gitlibrary : please define your target name.")
+        return()
+    endif()
+
+    if(NOT args_ROOT_DIR)
+        set(args_ROOT_DIR ${args_TARGET})
+    endif()
+
+    if(NOT args_SOURCE_DIR)
+        set(args_SOURCE_DIR ${args_TARGET})
+    endif()
+
+
+    add_subdirectory(${CMAKE_SOURCE_DIR}/extlibs/${args_ROOT_DIR}/${args_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extlibs/${args_ROOT_DIR}/build)
+
+    get_target_property(type ${args_TARGET} TYPE)
+    if(NOT (type STREQUAL "INTERFACE_LIBRARY"))
+        set_target_properties(${args_TARGET} PROPERTIES FOLDER "extlibs")
+
+        ibr_install_target(${args_TARGET}
+            COMPONENT   ${args_TARGET}_install  ## will create custom target to install only this project
+        )
+    endif()
+
+    list(APPEND ${args_TARGET}_INCLUDE_DIRS ${EXTLIBS_PACKAGE_FOLDER}/${args_ROOT_DIR})
+    list(APPEND ${args_TARGET}_INCLUDE_DIRS ${EXTLIBS_PACKAGE_FOLDER}/${args_ROOT_DIR}/${args_SOURCE_DIR})
+
+    foreach(args_INCLUDE_DIR ${args_INCLUDE_DIRS})
+        list(APPEND ${args_TARGET}_INCLUDE_DIRS ${EXTLIBS_PACKAGE_FOLDER}/${args_ROOT_DIR}/${args_SOURCE_DIR}/${args_INCLUDE_DIR})
+    endforeach()
+
+    include_directories(${${args_TARGET}_INCLUDE_DIRS})
+
+endfunction()

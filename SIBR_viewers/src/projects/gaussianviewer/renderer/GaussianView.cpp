@@ -409,6 +409,7 @@ sibr::GaussianView::GaussianView(const sibr::BasicIBRScene::Ptr & ibrScene, uint
 	CUDA_SAFE_CALL_ALWAYS(cudaMemcpy(opacity_cuda, opacity.data(), sizeof(float) * P, cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL_ALWAYS(cudaMalloc((void**)&scale_cuda, sizeof(Scale) * P));
 	CUDA_SAFE_CALL_ALWAYS(cudaMemcpy(scale_cuda, scale.data(), sizeof(Scale) * P, cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL_ALWAYS(cudaMalloc((void**)&mask_cuda, sizeof(float) * render_w * render_h));
 
 	// Create space for view parameters
 	CUDA_SAFE_CALL_ALWAYS(cudaMalloc((void**)&view_cuda, sizeof(sibr::Matrix4f)));
@@ -523,25 +524,28 @@ void sibr::GaussianView::onRenderIBR(sibr::IRenderTarget & dst, const sibr::Came
 			background_cuda,
 			_resolution.x(), _resolution.y(),
 			pos_cuda,
-			shs_cuda,
 			nullptr,
 			opacity_cuda,
 			scale_cuda,
-			_scalingModifier,
 			rot_cuda,
 			nullptr,
+			shs_cuda,
+			_scalingModifier,
 			view_cuda,
 			proj_cuda,
 			cam_pos_cuda,
 			tan_fovx,
 			tan_fovy,
+			0,
 			false,
 			image_cuda,
 			nullptr,
-			rects,
-			boxmin,
-			boxmax
-		);
+			nullptr,
+			mask_cuda,
+			nullptr,
+			nullptr,
+			false,
+			false);
 
 		if (!_interop_failed)
 		{

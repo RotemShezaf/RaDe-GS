@@ -119,6 +119,65 @@ class TestRefineBadTriangles:
             err_msg="Gaussian vertices must not be moved",
         )
 
+    def test_gaussian_index_ordering_preserved(self, surface_type):
+        """gaussian_vertex_indices[i] must map to Gaussian i after refinement.
+
+        Regression test for a bug where refine_bad_triangles() recomputed
+        gaussian_vertex_indices via np.where(is_gaussian)[0], which returns
+        indices sorted by vertex index and destroys the original
+        Gaussian-to-vertex ordering.  The bug was invisible when Gaussians
+        occupied vertices 0..N-1 (already sorted), so this test places
+        Gaussians at non-contiguous vertex indices with a deliberate
+        non-sorted ordering.
+        """
+        n_gauss = 150
+        gauss_pts = _make_surface_points(surface_type, n=n_gauss, seed=99)
+
+        # Build a Delaunay mesh from all points
+        verts, faces = build_surface_delaunay(gauss_pts, surface_type=surface_type)
+
+        # Add extra non-Gaussian vertices so Gaussian indices are scattered.
+        # Append grid-like points; Gaussians are at original indices 0..n_gauss-1.
+        rng = np.random.default_rng(77)
+        n_extra = 100
+        extra_xy = rng.uniform(-0.9, 0.9, (n_extra, 2))
+        extra_z = evaluate_polynomial(extra_xy[:, 0], extra_xy[:, 1], surface_type)
+        extra_pts = np.column_stack([extra_xy, extra_z])
+
+        # Interleave: put extra points BEFORE Gaussians so Gaussian vertex
+        # indices become n_extra .. n_extra+n_gauss-1 (not 0..n_gauss-1).
+        all_pts = np.vstack([extra_pts, verts])
+        gauss_idx = np.arange(n_extra, n_extra + n_gauss, dtype=np.int32)
+
+        # Shuffle the Gaussian index array so it's NOT sorted — this is
+        # the key: np.where(is_gaussian)[0] would return sorted order,
+        # breaking the per-Gaussian identity.
+        rng.shuffle(gauss_idx)
+
+        # Re-triangulate with all points
+        all_verts, all_faces = build_surface_delaunay(
+            all_pts, surface_type=surface_type,
+        )
+
+        gauss_positions_before = all_verts[gauss_idx].copy()
+
+        v2, f2, g2 = refine_bad_triangles(
+            all_verts, all_faces, surface_type,
+            max_edge_length=0.5,
+            gaussian_vertex_indices=gauss_idx,
+        )
+        assert len(g2) == n_gauss
+        gauss_positions_after = v2[g2]
+
+        # Per-index check: g2[i] must point to the same Gaussian as gauss_idx[i]
+        np.testing.assert_allclose(
+            gauss_positions_after, gauss_positions_before, atol=1e-12,
+            err_msg=(
+                "Gaussian ordering scrambled: g2[i] no longer maps to "
+                "the same Gaussian as the input gauss_idx[i]"
+            ),
+        )
+
     # ── 3. All Gaussian indices are preserved ────────────────────────
 
     def test_all_gaussians_retained(self, surface_type):

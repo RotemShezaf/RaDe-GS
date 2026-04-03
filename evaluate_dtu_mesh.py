@@ -1,4 +1,4 @@
-# The evalution code is fork from GOF https://github.com/autonomousvision/gaussian-opacity-fields/blob/main/evaluate_dtu_mesh.py
+# adapted from https://github.com/autonomousvision/gaussian-opacity-fields/blob/main/evaluate_dtu_mesh.py
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -95,13 +95,11 @@ def cull_mesh(cameras, mesh):
         c2w = (camera.world_view_transform.T).inverse()
         w2c = torch.inverse(c2w).cuda()
         mask = camera.gt_mask
-        fx = fov2focal(camera.FoVx, camera.image_width)
-        fy = fov2focal(camera.FoVy, camera.image_height)
         intrinsic = torch.eye(4)
-        intrinsic[0, 0] = fx
-        intrinsic[1, 1] = fy
-        intrinsic[0, 2] = camera.image_width / 2.
-        intrinsic[1, 2] = camera.image_height / 2.
+        intrinsic[0, 0] = camera.Fx
+        intrinsic[1, 1] = camera.Fy
+        intrinsic[0, 2] = camera.Cx
+        intrinsic[1, 2] = camera.Cy
         intrinsic = intrinsic.cuda()
 
         W, H = camera.image_width, camera.image_height
@@ -144,11 +142,10 @@ def evaluate_mesh(dataset : ModelParams, iteration : int, DTU_PATH : str):
     scene = Scene(dataset, gaussians, load_iteration=iteration, shuffle=False)
     
     train_cameras = scene.getTrainCameras()
-    test_cameras = scene.getTestCameras()
     dtu_cameras = load_dtu_camera(args.DTU)
     
     gt_points = np.array([cam[:, 3] for cam in dtu_cameras])
-    
+
     points = []
     for cam in train_cameras:
         c2w = (cam.world_view_transform.T).inverse()
@@ -165,16 +162,9 @@ def evaluate_mesh(dataset : ModelParams, iteration : int, DTU_PATH : str):
     
 
     # load mesh
-    # mesh_file = os.path.join(dataset.model_path, "test/ours_{}".format(iteration), mesh_dir, filename)
-    mesh_file = os.path.join(dataset.model_path, "recon.ply")
+    mesh_file = os.path.join(dataset.model_path, "recon_post.ply")
     print("load")
     mesh = trimesh.load(mesh_file)
-    
-    print("cull")
-    mesh = cull_mesh(train_cameras, mesh)
-    
-    culled_mesh_file = os.path.join(dataset.model_path, "recon_culled.ply")
-    mesh.export(culled_mesh_file)
     
     # align the mesh
     mesh.vertices = mesh.vertices * scale_gt_points / scale_points
