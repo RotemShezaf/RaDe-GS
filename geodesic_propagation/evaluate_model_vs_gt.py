@@ -238,14 +238,6 @@ def main():
 
     # ── 5. Build GaussianInputBuilder (ring computation + transforms) ─
     banner("5. Build GaussianInputBuilder")
-    config = yaml.safe_load(open(dataset_config_path)) if not isinstance(dataset_config_path, dict) else dataset_config_path
-    args.n_neighbors = config.get("n_neighbors", args.n_neighbors)
-    args.use_mahalanobis = config.get("use_mahalanobis", args.use_mahalanobis or False)
-    adaptive_target_ring = config.get("adaptive_target_ring", None)
-    adaptive_k_boost = config.get("adaptive_k_boost", None)
-    adaptive_target_neighbors = config.get("adaptive_target_neighbors", None)
-    adaptive_max_mean_cut = config.get("adaptive_max_mean_cut", 0)
-    adaptive_max_steps = config.get("adaptive_max_steps", 12)
 
     builder = GaussianInputBuilder(
         positions=positions,
@@ -255,13 +247,6 @@ def main():
         rotations=rotations,
         opacities=opacities,
         device=str(device),
-        n_neighbors=args.n_neighbors,
-        use_mahalanobis=args.use_mahalanobis,
-        adaptive_target_ring=adaptive_target_ring,
-        adaptive_target_neighbors=adaptive_target_neighbors,
-        adaptive_k_boost=adaptive_k_boost if adaptive_k_boost is not None else 20,
-        adaptive_max_mean_cut=adaptive_max_mean_cut,
-        adaptive_max_steps=adaptive_max_steps,
         transforms_config=transforms_cfg,
     )
 

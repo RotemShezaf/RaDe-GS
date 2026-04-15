@@ -19,6 +19,7 @@ from DataSets.utils.training_patches_helpers import (
     normalize_neighborhood,
     denormalize_neighborhood,
     build_inverse_ring1,
+    _filter_outliers_without_pu,
     GaussianData,
     PatchConfig,
 )
@@ -761,20 +762,19 @@ class TestDenormalizeNeighborhood:
         c_norm = 0.5
         nn_mean = 1.0
 
+        gdata = GaussianData(positions=positions)
+        pcfg = PatchConfig(
+            ring=2, normalization_factor=c_norm, nn_mean=nn_mean,
+            attributes=["xyz"], use_r1_min_val=True,
+            mask_constant=-10.0, ring_size_mapping=ring_size_mapping,
+        )
         example = create_train_example(
             point_idx=0,
-            positions=positions,
-            normals=None,
             geodesic_distances=geo_dists,
             ring_nbrs=ring2_nbrs,
             ring1_nbrs=ring1_nbrs,
-            ring=2,
-            normalization_factor=c_norm,
-            nn_mean=nn_mean,
-            attributes=["xyz"],
-            use_r1_min_val=True,
-            mask_constant=-10.0,
-            ring_size_mapping=ring_size_mapping,
+            gaussian_data=gdata,
+            patch_config=pcfg,
         )
         assert example is not None, "create_train_example returned None"
         # Target is the last value; must be a finite positive number after normalization
@@ -822,20 +822,19 @@ class TestOutlierFiltering:
         positions, geo_dists, ring1_nbrs, ring2_nbrs = self._build_fold_data()
 
         ring_size_mapping = {'euclidean': {2: 19}}
+        gdata = GaussianData(positions=positions)
+        pcfg = PatchConfig(
+            ring=2, normalization_factor=1.0, nn_mean=1.0,
+            attributes=["xyz"], use_r1_min_val=True,
+            mask_constant=-10.0, ring_size_mapping=ring_size_mapping,
+        )
         example = create_train_example(
             point_idx=0,
-            positions=positions,
-            normals=None,
             geodesic_distances=geo_dists,
             ring_nbrs=ring2_nbrs,
             ring1_nbrs=ring1_nbrs,
-            ring=2,
-            normalization_factor=1.0,
-            nn_mean=1.0,
-            attributes=["xyz"],
-            use_r1_min_val=True,
-            mask_constant=-10.0,
-            ring_size_mapping=ring_size_mapping,
+            gaussian_data=gdata,
+            patch_config=pcfg,
         )
         assert example is not None
 
@@ -877,20 +876,19 @@ class TestOutlierFiltering:
             ring2_nbrs[i] = idxs2[1:]
 
         ring_size_mapping = {'euclidean': {2: 19}}
+        gdata = GaussianData(positions=positions)
+        pcfg = PatchConfig(
+            ring=2, normalization_factor=1.0, nn_mean=1.0,
+            attributes=["xyz"], use_r1_min_val=True,
+            mask_constant=-10.0, ring_size_mapping=ring_size_mapping,
+        )
         example = create_train_example(
             point_idx=0,
-            positions=positions,
-            normals=None,
             geodesic_distances=geo_dists,
             ring_nbrs=ring2_nbrs,
             ring1_nbrs=ring1_nbrs,
-            ring=2,
-            normalization_factor=1.0,
-            nn_mean=1.0,
-            attributes=["xyz"],
-            use_r1_min_val=True,
-            mask_constant=-10.0,
-            ring_size_mapping=ring_size_mapping,
+            gaussian_data=gdata,
+            patch_config=pcfg,
         )
         assert example is not None
 
@@ -918,20 +916,19 @@ class TestRandomDuplicationPadding:
         max_neighbors = 20  # deliberately larger than available neighbors
         ring_size_mapping = {'euclidean': {2: max_neighbors}}
 
+        gdata = GaussianData(positions=positions)
+        pcfg = PatchConfig(
+            ring=2, normalization_factor=1.0, nn_mean=1.0,
+            attributes=["xyz"], use_r1_min_val=True,
+            mask_constant=-10.0, ring_size_mapping=ring_size_mapping,
+        )
         example = create_train_example(
             point_idx=0,
-            positions=positions,
-            normals=None,
             geodesic_distances=geo_dists,
             ring_nbrs=ring2_nbrs,
             ring1_nbrs=ring1_nbrs,
-            ring=2,
-            normalization_factor=1.0,
-            nn_mean=1.0,
-            attributes=["xyz"],
-            use_r1_min_val=True,
-            mask_constant=-10.0,
-            ring_size_mapping=ring_size_mapping,
+            gaussian_data=gdata,
+            patch_config=pcfg,
         )
         assert example is not None
 
@@ -1029,6 +1026,164 @@ class TestBuildInverseRing1:
         inv = build_inverse_ring1(ring1, 2)
         for v in inv.values():
             assert isinstance(v, np.ndarray)
+
+
+class TestFilterOutliersWithoutPu:
+    """Tests for _filter_outliers_without_pu, including regression tests for
+    the hard-cap bug where far-from-source points were incorrectly filtered."""
+
+    def test_far_from_source_points_preserved(self):
+        """Regression: far-from-source neighborhoods should NOT be wiped out.
+
+        Before the fix, the ratio `vis_u / euc_from_center` used raw geodesic
+        from source, so all far-from-source neighbors exceeded the hard cap.
+        """
+        rng = np.random.RandomState(42)
+        n = 20
+        nbrs_xyz = rng.randn(n, 3) * 0.01  # tight spatial cluster
+        nbrs_u = 1.0 + rng.randn(n) * 0.01  # all geodesics ~1.0 from source
+        r1_xyz = nbrs_xyz[:5]
+        r1_u = nbrs_u[:5]
+
+        mask = _filter_outliers_without_pu(nbrs_xyz, nbrs_u, r1_xyz, r1_u)
+        # All should be kept — this is a consistent neighborhood
+        assert mask.all(), (
+            f"Far-from-source: {mask.sum()}/{n} kept, expected all"
+        )
+
+    def test_genuine_outlier_detected(self):
+        """A single neighbor with much higher geodesic should be flagged."""
+        rng = np.random.RandomState(42)
+        n = 20
+        nbrs_xyz = rng.randn(n, 3) * 0.01
+        nbrs_u = 1.0 + rng.randn(n) * 0.01
+        nbrs_u[10] = 5.0  # genuine outlier
+        r1_xyz = nbrs_xyz[:5]
+        r1_u = nbrs_u[:5]
+
+        mask = _filter_outliers_without_pu(nbrs_xyz, nbrs_u, r1_xyz, r1_u)
+        assert not mask[10], "Genuine outlier at index 10 should be removed"
+        assert mask.sum() >= n - 2, "Only the outlier(s) should be removed"
+
+    def test_unvisited_neighbors_always_kept(self):
+        """Neighbors with geodesic >= sentinel should never be removed."""
+        rng = np.random.RandomState(42)
+        n = 10
+        nbrs_xyz = rng.randn(n, 3) * 0.1
+        nbrs_u = rng.uniform(0.5, 3.0, n)
+        nbrs_u[7] = 1e12  # unvisited
+        nbrs_u[8] = 1e12  # unvisited
+        r1_xyz = nbrs_xyz[:3]
+        r1_u = nbrs_u[:3]
+
+        mask = _filter_outliers_without_pu(nbrs_xyz, nbrs_u, r1_xyz, r1_u)
+        assert mask[7], "Unvisited neighbor should be kept"
+        assert mask[8], "Unvisited neighbor should be kept"
+
+    def test_few_ring1_references_fallback(self):
+        """With < 2 visited ring-1 refs, should fall back to hard cap only."""
+        rng = np.random.RandomState(42)
+        n = 10
+        nbrs_xyz = rng.randn(n, 3) * 0.01
+        nbrs_u = 1.0 + rng.randn(n) * 0.01
+        # All ring-1 unvisited → triggers fallback
+        r1_xyz = rng.randn(3, 3) * 0.01
+        r1_u = np.array([1e12, 1e12, 1e12])
+
+        mask = _filter_outliers_without_pu(nbrs_xyz, nbrs_u, r1_xyz, r1_u)
+        # Consistent neighborhood → all kept even in fallback
+        assert mask.all()
+
+    def test_max_removal_fraction_caps_removals(self):
+        """max_removal_fraction should limit how many neighbors are removed."""
+        rng = np.random.RandomState(42)
+        n = 20
+        nbrs_xyz = rng.randn(n, 3) * 0.1
+        nbrs_u = rng.uniform(0.5, 2.0, n)
+        # Make many outliers
+        for i in range(0, 10):
+            nbrs_u[i] = 50.0 + rng.uniform(0, 10)
+        r1_xyz = nbrs_xyz[10:15]
+        r1_u = nbrs_u[10:15]
+
+        mask_capped = _filter_outliers_without_pu(
+            nbrs_xyz, nbrs_u, r1_xyz, r1_u, max_removal_fraction=0.3
+        )
+        n_visited = (nbrs_u < 1e10).sum()
+        n_removed = n_visited - mask_capped[:n_visited].sum()
+        max_allowed = int(np.floor(n_visited * 0.3))
+        assert n_removed <= max_allowed, (
+            f"Removed {n_removed} but max allowed is {max_allowed}"
+        )
+
+    def test_disable_outlier_filtering_config_propagation(self):
+        """When disable_outlier_filtering=True in PatchConfig, outlier filtering
+        should be skipped in create_train_example."""
+        rng = np.random.RandomState(42)
+        n = 30
+        positions = rng.randn(n, 3).astype(np.float64)
+        # Create geo distances that would trigger outlier filtering
+        geo_dists = rng.uniform(0.5, 3.0, n).astype(np.float64)
+        geo_dists[3] = 80.0  # would be an outlier
+
+        from scipy.spatial import cKDTree
+        tree = cKDTree(positions)
+        ring1_nbrs = {}
+        ring2_nbrs = {}
+        for i in range(n):
+            _, idxs = tree.query(positions[i], k=min(6, n))
+            ring1_nbrs[i] = idxs[1:]
+            _, idxs2 = tree.query(positions[i], k=min(20, n))
+            ring2_nbrs[i] = idxs2[1:]
+
+        ring_size_mapping = {'euclidean': {2: 19}}
+        gdata = GaussianData(positions=positions)
+
+        # With filtering enabled (default)
+        pcfg_filtered = PatchConfig(
+            ring=2, nn_mean=1.0, attributes=["xyz"],
+            use_r1_min_val=True, mask_constant=-10.0,
+            ring_size_mapping=ring_size_mapping,
+            disable_outlier_filtering=False,
+        )
+        ex_filtered = create_train_example(
+            point_idx=0,
+            geodesic_distances=geo_dists,
+            ring_nbrs=ring2_nbrs,
+            ring1_nbrs=ring1_nbrs,
+            gaussian_data=gdata,
+            patch_config=pcfg_filtered,
+        )
+
+        # With filtering disabled
+        pcfg_unfiltered = PatchConfig(
+            ring=2, nn_mean=1.0, attributes=["xyz"],
+            use_r1_min_val=True, mask_constant=-10.0,
+            ring_size_mapping=ring_size_mapping,
+            disable_outlier_filtering=True,
+        )
+        ex_unfiltered = create_train_example(
+            point_idx=0,
+            geodesic_distances=geo_dists,
+            ring_nbrs=ring2_nbrs,
+            ring1_nbrs=ring1_nbrs,
+            gaussian_data=gdata,
+            patch_config=pcfg_unfiltered,
+        )
+
+        assert ex_filtered is not None
+        assert ex_unfiltered is not None
+        # The unfiltered version should have more valid neighbors
+        # (or at least not fewer) since filtering was skipped
+        entry_size = 4  # xyz(3) + geodesic(1)
+        max_nbrs = 19
+        geo_f = ex_filtered[:max_nbrs * entry_size].reshape(max_nbrs, entry_size)[:, -1]
+        geo_u = ex_unfiltered[:max_nbrs * entry_size].reshape(max_nbrs, entry_size)[:, -1]
+        valid_f = (geo_f != -10.0).sum()
+        valid_u = (geo_u != -10.0).sum()
+        assert valid_u >= valid_f, (
+            f"Unfiltered should have >= valid neighbors: {valid_u} vs {valid_f}"
+        )
 
 
 if __name__ == "__main__":

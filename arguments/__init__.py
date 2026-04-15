@@ -63,10 +63,10 @@ class ModelParams(ParamGroup):
         # self.depth_ratio = 0.6
         self.depth_ratio = 0.0
         
-        self.multi_view_num = 8
-        self.multi_view_max_angle = 30
-        self.multi_view_min_dis = 0.02
-        self.multi_view_max_dis = 1.5
+        self.multi_view_num = 12
+        self.multi_view_max_angle = 45
+        self.multi_view_min_dis = 0.01
+        self.multi_view_max_dis = 5
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -83,11 +83,11 @@ class PipelineParams(ParamGroup):
 
 class OptimizationParams(ParamGroup):
     def __init__(self, parser):
-        self.iterations = 30_000
+        self.iterations = 45_000
         self.position_lr_init = 0.00016
         self.position_lr_final = 0.0000016
         self.position_lr_delay_mult = 0.01
-        self.position_lr_max_steps = 30_000
+        self.position_lr_max_steps = 45_000
         self.feature_lr = 0.0025
         self.opacity_lr = 0.05
         self.scaling_lr = 0.005
@@ -99,21 +99,27 @@ class OptimizationParams(ParamGroup):
         self.gs_appearance_lr_final = 0.001
         self.gs_appearance_lr_delay_steps = 0
         self.gs_appearance_lr_delay_mult = 0.0
-        self.percent_dense = 0.01
+        self.percent_dense = 0.1
         self.lambda_dssim = 0.2
-        self.lambda_depth_normal = 0.05
+        self.lambda_depth_normal = 0.08
         self.densification_interval = 100
         self.opacity_reset_interval = 3000
         self.densify_from_iter = 500
-        self.densify_until_iter = 15_000
+        self.densify_until_iter = 25_000
         self.regularization_from_iter = 7000
-        self.lambda_distortion = 0.000
-        self.densify_grad_threshold = 0.0003
-
+        self.lambda_distortion = 0.001
+        self.densify_grad_threshold = 0.0004
+        self.min_opacity_prune = 0.1
+        self.big_point_scale_factor = 0.03
+        self.prune_min_scale_threshold = 0.00
+        self.prune_scale_anisotropy = 0.0
+        self.prune_big_point_from_iter = 3000
+        self.prune_scale_anisotropy_from_iter = 3000
+        self.prune_min_scale_threshold_from_iter = 3000
         self.lambda_multi_view_geo = 0.02
         self.lambda_multi_view_ncc = 0.3
-        self.multi_view_patch_size = 3
-        self.multi_view_pixel_noise_th = 1.5
+        self.multi_view_patch_size = 6
+        self.multi_view_pixel_noise_th = 1
 
         super().__init__(parser, "Optimization Parameters")
 

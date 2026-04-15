@@ -103,6 +103,7 @@ from utils.geodesic_utils import compute_exact_geodesic
 from GenerateData.utils.compute_gaussian_geodesic_distances_helper import (
     generate_source_mesh_and_map,
     compute_geodesic_distances_for_sources,
+    compute_and_save_geodesic_pipeline,
     save_mesh_geodesic_gt,
     load_mesh_geodesic_gt,
     find_missing_sources,
@@ -236,6 +237,12 @@ def parse_args() -> argparse.Namespace:
             "vertices, so geodesic distances are read directly."
         ),
     )
+    parser.add_argument(
+        "--geodesic_method", type=str, choices=["vtp", "mmp", "fmm"], default="mmp",
+        help="Geodesic computation method: 'vtp' (exact, requires manifold mesh), "
+             "'mmp' (MMP via pygeodesic, works on non-manifold meshes), "
+             "or 'fmm' (fast marching). Default: mmp.",
+    )
     
     args = parser.parse_args()
     
@@ -309,37 +316,26 @@ def _run_gaussian_mesh_path(
     print(f"\n  Computing geodesics for {len(source_indices)} sources "
           f"on a mesh with {len(vertices)} vertices …")
 
-    # ── Geodesic computation ──────────────────────────────────────────
-    mesh_geodesic_distances = compute_geodesic_distances_for_sources(
-        vertices=vertices,
-        faces=faces,
-        source_indices=source_indices,
-        verbose=args.verbose,
-        n_jobs=args.n_jobs,
-    )
-
-    # Extract distances at Gaussian vertices directly (no interpolation)
-    gaussian_geodesic_distances = mesh_geodesic_distances[:, gaussian_vertex_indices]
-
-    # ── Save ──────────────────────────────────────────────────────────
-    output_path = (
-        output_folder / "geodesic_distance" / "gt_partial"
-        / f"sources_range_{source_start}_{source_end}.npz"
-    )
-
     # closest_mesh_indices/distances: each Gaussian IS its own vertex
     closest_mesh_indices = gaussian_vertex_indices.copy()
     closest_mesh_distances = np.zeros(n_gauss, dtype=np.float64)
 
-    save_partial_results(
-        output_path=output_path,
-        gaussian_positions=gaussian_positions,
+    # ── Pipeline: compute, transfer, and save in parallel batches ─────
+    compute_and_save_geodesic_pipeline(
+        vertices=vertices,
+        faces=faces,
         source_indices=source_indices,
         source_positions=source_positions,
-        geodesic_distances=gaussian_geodesic_distances,
-        closest_mesh_indices=closest_mesh_indices,
-        closest_mesh_distances=closest_mesh_distances,
         source_gaussian_indices=source_gaussian_indices,
+        gaussian_positions=gaussian_positions,
+        gaussian_to_mesh_indices=closest_mesh_indices,
+        gaussian_to_mesh_distances=closest_mesh_distances,
+        geodesic_method=args.geodesic_method,
+        n_jobs=args.n_jobs,
+        partial_save_dir=str(output_folder / "geodesic_distance" / "mesh_batch_cache"),
+        output_dir=str(output_folder / "geodesic_distance" / "gt_partial"),
+        gaussian_vertex_indices=gaussian_vertex_indices,
+        verbose=args.verbose,
     )
 
     save_computation_metadata(
@@ -349,7 +345,7 @@ def _run_gaussian_mesh_path(
         num_sources=len(all_source_indices),
     )
 
-    print(f"\n  Results saved to {output_path}")
+    print(f"\n  Results saved to {output_folder / 'geodesic_distance' / 'gt_partial'}")
     print(f"  (Gaussian-mesh mode: zero interpolation error)")
 
 
@@ -383,6 +379,7 @@ def main() -> None:
         return
 
     # ── Standard path (GT mesh + barycentric interpolation) ──────────────
+    data_root = Path(args.data_root)
     
     # Step 2: Load ground truth mesh
     mesh_vertices, mesh_faces = load_ground_truth_mesh(data_root, args.surface, args.mesh_level)
@@ -414,18 +411,6 @@ def main() -> None:
         mesh_vertices=mesh_vertices,
     )
     
-    # Step 4.5: Load existing mesh geodesic data if --load is specified
-    existing_mesh_geodesic_data = None
-    if args.load:
-        result = load_mesh_geodesic_gt(
-            data_root=data_root,
-            surface=args.surface,
-            mesh_level=args.mesh_level
-        )
-        if result is not None:
-            existing_mesh_geodesic_data = result
-
-        
     # Determine source range for this run
     if args.source_start is not None and args.source_end is not None:
         source_start = args.source_start
@@ -437,22 +422,6 @@ def main() -> None:
         source_end = len(all_source_indices) 
         source_indices = all_source_indices
         source_positions_subset = all_source_positions
-
-    # Determine which sources need to be computed
-    if existing_mesh_geodesic_data is not None:
-        existing_source_indices, existing_source_positions, existing_geodesic_distances\
-              = existing_mesh_geodesic_data
-        # Find missing sources
-        missing_source_indices, missing_mask = find_missing_sources(
-            all_source_indices=source_indices,
-            existing_source_indices=existing_source_indices
-        )
-        source_positions_subset = source_positions_subset[missing_mask]
-        
-        print(f"\n  Sources to compute in mesh in this run: {len(missing_source_indices)}")
-    else:
-        existing_source_indices, existing_source_positions, existing_geodesic_distances = np.array([]), np.array([]), np.array([])
-        missing_source_indices = source_indices
 
     # Step 5: Find closest mesh vertices for Gaussians
     # (must run BEFORE source→Gaussian mapping so we can use the mesh footprint)
@@ -474,45 +443,6 @@ def main() -> None:
         closest_vertex_indices=gaussian_to_mesh_indices,
     )
 
-    # Step 6: Compute geodesic distances on mesh
-    mesh_geodesic_distances_new = compute_geodesic_distances_for_sources(
-        vertices=mesh_vertices,
-        faces=mesh_faces,
-        source_indices=missing_source_indices,
-        verbose=args.verbose,
-        n_jobs=args.n_jobs
-    )
-    # Merge with existing data if applicable
-    source_indices_for_mesh, source_positions_for_mesh, mesh_geodesic_distances = merge_geodesic_data(
-        existing_source_indices=existing_source_indices,
-        existing_source_positions=existing_source_positions,
-        existing_geodesic_distances=existing_geodesic_distances,
-        new_source_indices=missing_source_indices,
-        new_source_positions=source_positions_subset,
-        new_geodesic_distances=mesh_geodesic_distances_new
-    )
-    
-    if len(missing_source_indices) == 0:
-        print(f"\n  No new sources were computed. Using existing mesh geodesic data.")
-        # Save mesh geodesic ground truth
-        save_mesh_geodesic_gt(
-            data_root=data_root,
-            surface=args.surface,
-            mesh_level=args.mesh_level,
-            source_indices=source_indices_for_mesh,
-            source_positions=source_positions_for_mesh,
-            geodesic_distances=mesh_geodesic_distances,
-            mesh_vertices=mesh_vertices
-        )
-
-        
-    #use range mask on indexes
-    
-    range_mask = np.isin(source_indices_for_mesh, source_indices)
-    source_indices = source_indices_for_mesh[range_mask]
-    source_positions_subset = source_positions_for_mesh[range_mask]
-    mesh_geodesic_distances_for_gaussians = mesh_geodesic_distances[range_mask]
-
     # Recover source_gaussian_indices for the final source set using the lookup
     # built from all_source_indices → all_source_gaussian_indices.
     _src_mesh_to_gauss = dict(zip(all_source_indices.tolist(),
@@ -522,31 +452,24 @@ def main() -> None:
         dtype=np.intp
     )
 
-
-
-    
-    # Step 7: Transfer geodesic distances to Gaussians (barycentric interpolation)
-    gaussian_geodesic_distances = transfer_geodesic_to_gaussians(
-        mesh_geodesic_distances=mesh_geodesic_distances_for_gaussians,
-        gaussian_to_mesh_indices=gaussian_to_mesh_indices,
-        source_mesh_indices=source_indices,
+    # Step 6–8: Compute geodesics, transfer to Gaussians, and save —
+    # all done in parallel batches via the unified pipeline.
+    compute_and_save_geodesic_pipeline(
+        vertices=mesh_vertices,
+        faces=mesh_faces,
+        source_indices=source_indices,
+        source_positions=source_positions_subset,
         source_gaussian_indices=source_gaussian_indices,
+        gaussian_positions=gaussian_positions,
+        gaussian_to_mesh_indices=gaussian_to_mesh_indices,
+        gaussian_to_mesh_distances=gaussian_to_mesh_distances,
+        geodesic_method=args.geodesic_method,
+        n_jobs=args.n_jobs,
+        partial_save_dir=str(output_folder / "geodesic_distance" / "mesh_batch_cache"),
+        output_dir=str(output_folder / "geodesic_distance" / "gt_partial"),
         barycentric_face_vertices=barycentric_face_vertices,
         barycentric_weights=barycentric_weights,
-    )
-    
-    # Step 8: Save results
-    output_path = output_folder / "geodesic_distance" / "gt_partial" / f"sources_range_{source_start}_{source_end}.npz"
-    
-    save_partial_results(
-        output_path=output_path,
-        gaussian_positions=gaussian_positions,
-        source_indices=source_indices,
-        source_positions=source_positions_subset,  # Use actual source mesh positions
-        geodesic_distances=gaussian_geodesic_distances,
-        closest_mesh_indices=gaussian_to_mesh_indices,
-        closest_mesh_distances=gaussian_to_mesh_distances,
-        source_gaussian_indices=source_gaussian_indices
+        verbose=args.verbose,
     )
     
     # Save computation metadata
@@ -561,7 +484,7 @@ def main() -> None:
     print(f"# Computation Complete")
     print(f"{'#'*80}")
     print(f"\nPartial results saved to:")
-    print(f"  {output_path}")
+    print(f"  {output_folder / 'geodesic_distance' / 'gt_partial'}")
     print(f"\nTo merge all partial results, run:")
     print(f"  python {Path(__file__).name} --gaussian_output {args.gaussian_output} --merge_only")
 

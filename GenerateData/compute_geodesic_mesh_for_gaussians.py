@@ -89,9 +89,16 @@ from GenerateData.utils.geodesic_mesh_utils import (
     insert_gaussians_into_grid_mesh,
     insert_steiner_points,
     fix_orphaned_gaussians,
+    repair_orphan_gaussians,
+    fix_face_winding,
+    prepare_mesh_for_vtp,
     refine_bad_triangles,
     save_geodesic_mesh,
     _filter_boundary_long_edges,
+    _count_mesh_holes,
+    _detect_non_manifold_edges,
+    _detect_duplicate_faces,
+    fix_non_manifold_mesh,
 )
 
 
@@ -280,7 +287,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_min_angle",
         type=float,
-        default=10.0,
+        default=20.0,
         help="Min-angle threshold (degrees) for bad triangles (default: 20.0).",
     )
     parser.add_argument(
@@ -301,10 +308,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_gauss_min_angle",
         type=float,
-        default=20.0,
+        default=30.0,
         help=(
             "Min-angle threshold for Gaussian-touching triangles. "
-            "Default: 20.0° (matches general threshold for balanced quality)."
+            "Default: 30.0° (matches general threshold for balanced quality)."
         ),
     )
     parser.add_argument(
@@ -391,17 +398,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--refine_max_splits",
         type=int,
-        default=50000,
+        default=30000,
         help=(
             "Maximum number of edge midpoints to insert per refinement "
-            "iteration. Worst triangles are prioritised. Default: 50000."
+            "iteration. Worst triangles are prioritised. Default: 10000."
         ),
     )
 
     parser.add_argument(
         "--refine_smoothing_passes",
         type=int,
-        default=4,
+        default=60,
         help=(
             "Number of Laplacian smoothing passes per refinement iteration. "
             "Default: 3."
@@ -414,6 +421,58 @@ def parse_args() -> argparse.Namespace:
         help=(
             "If set, apply Delaunay edge-flipping as a post-refinement "
             "quality polish pass. Improves angles without adding vertices."
+        ),
+    )
+
+    # Extreme triangle cleanup
+    parser.add_argument(
+        "--refine_extreme_cleanup_passes",
+        type=int,
+        default=50,
+        help=(
+            "Number of extreme-triangle cleanup passes after the main "
+            "refinement loop. Collapses extreme-AR slivers, ring-fixes "
+            "Gaussian-touching extremes, splits remaining. 0 = off. Default: 3."
+        ),
+    )
+    parser.add_argument(
+        "--refine_extreme_ar_threshold",
+        type=float,
+        default= 1e6,
+        help=(
+            "Aspect-ratio threshold for extreme slivers. Triangles with "
+            "AR above this get edge-collapsed (non-Gaussian) or ring-fixed "
+            "(Gaussian-touching). Default: 20.0."
+        ),
+    )
+    parser.add_argument(
+        "--refine_extreme_min_angle",
+        type=float,
+        default=10.0,
+        help=(
+            "Min-angle threshold (degrees) for extreme triangles. "
+            "Triangles with min angle below this are targeted by the "
+            "extreme cleanup pass. Default: 9.0."
+        ),
+    )
+    parser.add_argument(
+        "--refine_extreme_max_splits",
+        type=int,
+        default=5000,
+        help=(
+            "Maximum number of midpoint insertions per extreme-cleanup pass. "
+            "Worst (longest-edge) triangles are prioritised. "
+            "0 = unlimited (default)."
+        ),
+    )
+    parser.add_argument(
+        "--refine_extreme_smoothing_passes",
+        type=int,
+        default=5,
+        help=(
+            "Number of Laplacian smoothing passes for non-Gaussian vertices "
+            "of extreme triangles at the end of each extreme cleanup pass. "
+            "0 = disabled (default)."
         ),
     )
 
@@ -688,6 +747,11 @@ def main() -> None:
             gaussian_vertex_indices=gaussian_vertex_indices,
             use_3d_delaunay=(args.mesh_method == "delaunay_3d"),
             delaunay_flip_polish=args.refine_delaunay_flip,
+            extreme_cleanup_passes=args.refine_extreme_cleanup_passes,
+            extreme_ar_threshold=args.refine_extreme_ar_threshold,
+            extreme_min_angle_deg=args.refine_extreme_min_angle,
+            extreme_max_splits_per_pass=args.refine_extreme_max_splits,
+            extreme_smoothing_passes=args.refine_extreme_smoothing_passes,
             verbose=True,
         )
         n_delta_verts = len(vertices) - n_verts_before
@@ -700,6 +764,73 @@ def main() -> None:
         # any vertex removals; do NOT recompute from n_gauss here.
     else:
         print(f"\n  [4b/6] Refinement not requested — skipped")
+
+    # ── Remove valence-1 non-Gaussian vertices (boundary ear triangles) ──
+    gauss_idx_set = set(gaussian_vertex_indices.tolist())
+    _val = np.zeros(len(vertices), dtype=np.int32)
+    for _c in range(3):
+        np.add.at(_val, faces[:, _c], 1)
+    v1_mask = _val == 1
+    v1_nongauss = np.array([i for i in np.where(v1_mask)[0] if i not in gauss_idx_set])
+    if len(v1_nongauss) > 0:
+        # Remove faces that contain any valence-1 non-Gaussian vertex
+        v1_set = set(v1_nongauss.tolist())
+        keep = np.array(
+            [not any(int(v) in v1_set for v in f) for f in faces], dtype=bool
+        )
+        n_removed_v1 = int((~keep).sum())
+        faces = faces[keep]
+        # Compact unreferenced vertices
+        used_v = np.unique(faces.ravel())
+        if len(used_v) < len(vertices):
+            remap = np.full(len(vertices), -1, dtype=np.int32)
+            remap[used_v] = np.arange(len(used_v), dtype=np.int32)
+            vertices = vertices[used_v]
+            faces = remap[faces]
+            gaussian_vertex_indices = remap[gaussian_vertex_indices]
+            assert (gaussian_vertex_indices >= 0).all(), "valence-1 cleanup removed a Gaussian"
+        print(f"        → removed {n_removed_v1} boundary ear faces "
+              f"({len(v1_nongauss)} valence-1 non-Gaussian vertices)")
+
+    # ── Topology cleanup: duplicate faces / non-manifold edges ───────
+    n_dup_before, _ = _detect_duplicate_faces(faces)
+    n_nm_before, _ = _detect_non_manifold_edges(faces)
+    if n_dup_before > 0 or n_nm_before > 0:
+        print(f"\n  [4c/6] Fixing mesh topology "
+              f"({n_dup_before} duplicate faces, "
+              f"{n_nm_before} non-manifold edges) ...")
+        faces, vertices = fix_non_manifold_mesh(
+            faces, gaussian_vertex_indices, verbose=True,
+            vertices=vertices, surface_type=args.surface,
+        )
+    else:
+        print(f"\n  [4c/6] Mesh topology clean — no duplicates or non-manifold edges")
+
+    # ── Final repair: fix any Gaussian vertices left with valence 0 ──
+    faces = repair_orphan_gaussians(
+        vertices, faces, gaussian_vertex_indices, verbose=True,
+    )
+
+    # ── Prepare mesh for VTP geodesic (connectivity + winding) ──
+    print(f"\n  [4d/6] Preparing mesh for VTP geodesic ...")
+    faces = prepare_mesh_for_vtp(
+        vertices, faces, gaussian_vertex_indices, verbose=True,
+    )
+
+    # ── Compact unreferenced vertices after VTP preparation ──
+    used_verts = np.unique(faces.ravel())
+    if len(used_verts) < len(vertices):
+        n_orphan = len(vertices) - len(used_verts)
+        remap = np.full(len(vertices), -1, dtype=np.int32)
+        remap[used_verts] = np.arange(len(used_verts), dtype=np.int32)
+        vertices = vertices[used_verts]
+        faces = remap[faces]
+        gaussian_vertex_indices = remap[gaussian_vertex_indices]
+        assert (gaussian_vertex_indices >= 0).all(), \
+            "VTP preparation orphaned a Gaussian vertex"
+        if args.verbose:
+            print(f"        → compacted {n_orphan} unreferenced vertices "
+                  f"after VTP preparation")
 
     # ── Mesh quality statistics ────────────────────────────────────────
     print(f"\n  [5/6] Computing mesh quality statistics ...")
@@ -744,6 +875,70 @@ def main() -> None:
     valence = np.zeros(len(vertices), dtype=np.int32)
     for col in range(3):
         np.add.at(valence, faces[:, col], 1)
+
+    # Hole count
+    n_holes = _count_mesh_holes(faces)
+
+    # Non-manifold / duplicate detection (post-fix — should be 0)
+    n_nm_edges, nm_edge_details = _detect_non_manifold_edges(faces)
+    n_dup_faces, _ = _detect_duplicate_faces(faces)
+
+    # Area outlier detection (watered-down regions)
+    median_area = float(np.median(areas))
+    n_area_10x = int((areas > 10.0 * median_area).sum()) if median_area > 0 else 0
+    n_area_50x = int((areas > 50.0 * median_area).sum()) if median_area > 0 else 0
+    pct_area_10x = 100.0 * n_area_10x / len(faces) if len(faces) > 0 else 0.0
+
+    # Connected component detection (watered regions)
+    from collections import defaultdict, deque
+    vert_adj: dict = defaultdict(set)
+    for fi in range(len(faces)):
+        a, b, c = int(faces[fi, 0]), int(faces[fi, 1]), int(faces[fi, 2])
+        vert_adj[a].update([b, c])
+        vert_adj[b].update([a, c])
+        vert_adj[c].update([a, b])
+    visited_cc: set = set()
+    n_components = 0
+    component_sizes = []
+    for node in vert_adj:
+        if node not in visited_cc:
+            n_components += 1
+            size = 0
+            queue = deque([node])
+            while queue:
+                vv = queue.popleft()
+                if vv in visited_cc:
+                    continue
+                visited_cc.add(vv)
+                size += 1
+                for nb in vert_adj[vv]:
+                    if nb not in visited_cc:
+                        queue.append(nb)
+            component_sizes.append(size)
+
+    # Projected-to-mesh-vertex distance (Gaussians only)
+    gauss_mesh_verts = vertices[gaussian_vertex_indices]
+    projected_to_mesh_dist = np.linalg.norm(
+        projected - gauss_mesh_verts, axis=1,
+    )
+
+    # Gaussians to projected Gaussians distance
+    gauss_to_proj_dist = np.linalg.norm(
+        projected - positions, axis=1,
+    )
+
+    # Check ALL mesh vertices lie on the surface (not just Gaussians)
+    from GenerateData.GenerateRawPolynomialMesh import evaluate_polynomial
+    all_xy = vertices[:, :2]
+    all_z_surface = evaluate_polynomial(all_xy[:, 0], all_xy[:, 1], args.surface)
+    all_z_residual = np.abs(vertices[:, 2] - all_z_surface)
+    vertex_proj_mismatch_mask = all_z_residual > 1e-6
+    n_vertex_proj_mismatch = int(vertex_proj_mismatch_mask.sum())
+
+    # Gaussian-specific z residual (for backward compat)
+    gauss_xy = gauss_mesh_verts[:, :2]
+    gauss_z_surface = evaluate_polynomial(gauss_xy[:, 0], gauss_xy[:, 1], args.surface)
+    gauss_z_residual = np.abs(gauss_mesh_verts[:, 2] - gauss_z_surface)
 
     # Per-triangle classification: touches Gaussian vertex?
     gauss_set = set(gaussian_vertex_indices.tolist())
@@ -866,35 +1061,112 @@ def main() -> None:
                 "min_angle_lt_5deg": int(np.sum(min_angle < 5)),
                 "min_angle_lt_10deg": int(np.sum(min_angle < 10)),
             },
-            "valence": _scalar_stats(valence.astype(float)),
+            "valence": {
+                **_scalar_stats(valence.astype(float)),
+                "n_valence_1": int(np.sum(valence == 1)),
+                "n_valence_2": int(np.sum(valence == 2)),
+                "n_valence_3": int(np.sum(valence == 3)),
+            },
+            "holes": n_holes,
+            "non_manifold_edges": n_nm_edges,
+            "duplicate_faces": n_dup_faces,
+            "connected_components": n_components,
+            "component_sizes": sorted(component_sizes, reverse=True)[:5],
+            "area_outliers": {
+                "median_area": float(median_area),
+                "n_gt_10x_median": n_area_10x,
+                "n_gt_50x_median": n_area_50x,
+                "pct_gt_10x_median": round(pct_area_10x, 3),
+            },
+        },
+        "projected_to_mesh_distance": {
+            **_scalar_stats(projected_to_mesh_dist),
+            "pct_exact_match": float(
+                100.0 * (projected_to_mesh_dist < 1e-10).sum()
+                / max(len(projected_to_mesh_dist), 1)
+            ),
+            "n_mismatch_gt_1e6": int((projected_to_mesh_dist > 1e-6).sum()),
+        },
+        "gauss_to_proj_distance": {
+            **_scalar_stats(gauss_to_proj_dist),
+        },
+        "vertex_projection": {
+            "z_residual": _scalar_stats(gauss_z_residual),
+            "all_vertex_z_residual": _scalar_stats(all_z_residual),
+            "n_vertex_proj_mismatch": n_vertex_proj_mismatch,
+            "mismatch_max_z_residual": float(
+                all_z_residual[vertex_proj_mismatch_mask].max()
+                if n_vertex_proj_mismatch > 0
+                else 0.0
+            ),
         },
     }
 
     # Print summary
     s = mesh_stats["overall"]
+    g = mesh_stats.get("gaussian_triangles", {})
+    mq = mesh_stats["mesh_quality"]
+    kc = mesh_stats["curvature"]
+    degen = mq["degenerate_triangles"]
+    val = mq["valence"]
+    ao = mq["area_outliers"]
+
+    print(f"        ── Overall ({mesh_stats['n_vertices']:,} verts, "
+          f"{mesh_stats['n_faces']:,} faces, "
+          f"{mesh_stats['n_gaussians']:,} Gaussians) ──")
     print(f"        Aspect ratio : median={s['aspect_ratio']['median']:.3f}, "
           f"max={s['aspect_ratio']['max']:.1f}, "
-          f"<3: {s['aspect_ratio']['pct_lt_3']:.1f}%")
+          f"<2: {s['aspect_ratio']['pct_lt_2']:.1f}%, "
+          f"<3: {s['aspect_ratio']['pct_lt_3']:.1f}%, "
+          f"<5: {s['aspect_ratio']['pct_lt_5']:.1f}%")
     print(f"        Min angle    : median={s['min_angle_deg']['median']:.2f}°, "
           f"min={s['min_angle_deg']['min']:.2f}°, "
+          f">30°: {s['min_angle_deg']['pct_gt_30']:.1f}%, "
           f">20°: {s['min_angle_deg']['pct_gt_20']:.1f}%, "
-          f"<5°: {s['min_angle_deg']['pct_lt_5']:.1f}%")
+          f"<5°: {s['min_angle_deg']['pct_lt_5']:.2f}%")
     print(f"        Edge lengths : min={s['edge_length']['min']:.6f}, "
           f"median={s['edge_length']['median']:.6f}, "
           f"max={s['edge_length']['max']:.6f}")
     print(f"        Radius ratio : median={s['radius_ratio']['median']:.4f}, "
           f"min={s['radius_ratio']['min']:.4f}, "
-          f">0.5: {s['radius_ratio']['pct_gt_0.5']:.1f}%")
-    kc = mesh_stats["curvature"]
-    print(f"        |K| (Gauss)  : median={kc['gaussian_K']['median']:.6f}, "
-          f"max={kc['gaussian_K']['max']:.6f}")
-    degen = mesh_stats["mesh_quality"]["degenerate_triangles"]
+          f">0.5: {s['radius_ratio']['pct_gt_0.5']:.1f}%, "
+          f">0.3: {s['radius_ratio']['pct_gt_0.3']:.1f}%")
+    if g:
+        print(f"        ── Gaussian-touching triangles ({g['count']:,}) ──")
+        print(f"        Gauss AR     : median={g['aspect_ratio']['median']:.3f}, "
+              f"max={g['aspect_ratio']['max']:.1f}, "
+              f"<2: {g['aspect_ratio']['pct_lt_2']:.1f}%")
+        print(f"        Gauss angle  : median={g['min_angle_deg']['median']:.2f}°, "
+              f"min={g['min_angle_deg']['min']:.2f}°, "
+              f">20°: {g['min_angle_deg']['pct_gt_20']:.1f}%")
+    print(f"        ── Quality checks ──")
+    print(f"        Holes        : {mq['holes']}")
+    print(f"        Non-manifold : {mq['non_manifold_edges']} edges, "
+          f"{mq['duplicate_faces']} duplicate faces")
+    print(f"        Components   : {mq['connected_components']}")
     print(f"        Degenerate   : <1°: {degen['min_angle_lt_1deg']}, "
           f"<5°: {degen['min_angle_lt_5deg']}, "
           f"<10°: {degen['min_angle_lt_10deg']}")
-    val = mesh_stats["mesh_quality"]["valence"]
-    print(f"        Valence      : median={val['median']:.1f}, "
-          f"min={val['min']:.0f}, max={val['max']:.0f}")
+    print(f"        Valence      : min={val['min']:.0f}, median={val['median']:.1f}, "
+          f"max={val['max']:.0f}, "
+          f"v1={val['n_valence_1']}, v2={val['n_valence_2']}, v3={val['n_valence_3']}")
+    print(f"        Area outliers: >10× median: {ao['n_gt_10x_median']} ({ao['pct_gt_10x_median']:.2f}%), "
+          f">50×: {ao['n_gt_50x_median']}")
+    print(f"        |K| (Gauss)  : median={kc['gaussian_K']['median']:.6f}, "
+          f"max={kc['gaussian_K']['max']:.6f}")
+
+    pmd = mesh_stats["projected_to_mesh_distance"]
+    vp = mesh_stats["vertex_projection"]
+    g2p = mesh_stats["gauss_to_proj_distance"]
+    print(f"        ── Distance statistics ──")
+    print(f"        Proj→mesh    : mean={pmd['mean']:.2e}, max={pmd['max']:.2e}, "
+          f"exact: {pmd['pct_exact_match']:.1f}%")
+    print(f"        Gauss→proj   : mean={g2p['mean']:.2e}, max={g2p['max']:.2e}")
+    print(f"        Z residual   : mean={vp['z_residual']['mean']:.2e}, "
+          f"max={vp['z_residual']['max']:.2e}")
+    if vp['n_vertex_proj_mismatch'] > 0:
+        print(f"        ⚠ {vp['n_vertex_proj_mismatch']} vertices off-surface "
+              f"(max z residual={vp['mismatch_max_z_residual']:.2e})")
 
     # 6. Save -----------------------------------------------------------
     mesh_dir = output_folder / "geodesic_mesh"

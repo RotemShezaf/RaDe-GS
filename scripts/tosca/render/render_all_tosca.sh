@@ -72,21 +72,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/../tosca_animal_map.sh"
 # ============================================================================
 # Default values
 # ============================================================================
-SHAPES="cat0,centaur0,dog0,horse0"
-ANIMALS="cat,centaur,david,dog,gorilla,horse,lioness,michael,seahorse,shark,victoria,wolf"
+SHAPES=""           # Auto-detected from MATLAB_SHAPES_DIR when empty
+ANIMALS=""          # Unused by default; shapes come from matlab/high_res
+MATLAB_SHAPES_DIR="TrainData/TOSCA/matlab/high_res"  # Source of truth for available shapes
 ALL_SHAPES=false
 TEXTURES="colors"
 COLMAP_RESOLUTIONS="high_res"
 IMAGE_MESH_RESOLUTION="high_res"
-LIGHT_IDS="0,1,2,3,4"  # Empty means default_light, otherwise comma-separated like "0,1,2,3,4"
+LIGHT_IDS="0" #,1,2,3,4"  # Empty means default_light, otherwise comma-separated like "0,1,2,3,4"
 USE_DECOUPLED_APPEARANCE=false  # When true, passes --use_decoupled_appearance and ignores LIGHT_IDS
 NUM_VIEWS=600
-IMAGE_WIDTH=1024
-IMAGE_HEIGHT=1024
+IMAGE_WIDTH=768
+IMAGE_HEIGHT=768
 CAMERA_RADIUS=250
 AUTO_CAMERA_RADIUS=false
 DATA_ROOT="TrainData/TOSCA/processed"
 OUTPUT_ROOT="TrainData/TOSCA/SyntheticColmapData"
+CIRCLE_ELEVATIONS="90,25,115"  # For camera_distribution n_circles
 
 # Use geo_splat conda Python explicitly to avoid .venv taking precedence
 CONDA_BASE=$(conda info --base 2>/dev/null || echo "$HOME/miniconda3")
@@ -96,7 +98,7 @@ if [ ! -x "$PYTHON3" ]; then
 fi
 
 # Auto-detect number of CPUs, use (nproc - 1) as default
-MAX_PARALLEL=4 #$(($(nproc) - 1))
+MAX_PARALLEL=2 #$(($(nproc) - 1))
 if [ $MAX_PARALLEL -lt 1 ]; then
     MAX_PARALLEL=1
 fi
@@ -151,6 +153,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --image_height)
             IMAGE_HEIGHT="$2"
+            shift 2
+            ;;
+        --circle_elevations)
+            CIRCLE_ELEVATIONS="$2"
             shift 2
             ;;
         --camera_radius)
@@ -222,8 +228,22 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$PROJECT_ROOT" || exit 1
 
 # ============================================================================
-# Expand --animals to indexed shape names using ANIMAL_INDEX_MAP
-# (edit scripts/tosca/tosca_animal_map.sh to add/remove indices per animal)
+# If no shapes/animals specified, auto-detect from matlab/high_res
+# ============================================================================
+if [ -z "$SHAPES" ] && [ -z "$ANIMALS" ] && [ "$ALL_SHAPES" = false ]; then
+    if [ ! -d "$MATLAB_SHAPES_DIR" ]; then
+        echo "Error: MATLAB shapes dir '$MATLAB_SHAPES_DIR' does not exist!"
+        exit 1
+    fi
+    SHAPES=$(ls "$MATLAB_SHAPES_DIR"/*.mat 2>/dev/null | xargs -n1 basename | sed 's/\.mat$//' | sort | tr '\n' ',')
+    SHAPES="${SHAPES%,}"
+    if [ -z "$SHAPES" ]; then
+        echo "Error: No .mat files found in '$MATLAB_SHAPES_DIR'!"
+        exit 1
+    fi
+    echo "Auto-detected shapes from $MATLAB_SHAPES_DIR: $SHAPES"
+fi
+
 # ============================================================================
 if [ -n "$ANIMALS" ]; then
     SHAPES="$(expand_animals "$ANIMALS")"
@@ -309,6 +329,7 @@ else
 fi
 echo "  Number of views:        $NUM_VIEWS"
 echo "  Image size:             ${IMAGE_WIDTH}x${IMAGE_HEIGHT}"
+echo "  Camera circles (elevations): $CIRCLE_ELEVATIONS"
 if [ "$AUTO_CAMERA_RADIUS" = true ]; then
     echo "  Camera radius:          auto"
 else
@@ -390,6 +411,9 @@ for texture in "${TEXTURE_ARRAY[@]}"; do
                 elif [ -n "$light_iter" ]; then
                     CMD="$CMD --light_id $light_iter"
                 fi
+
+                # Add two-circles camera distribution by default
+                #CMD="$CMD --camera_distribution n_circles --circle_elevations \"$CIRCLE_ELEVATIONS\""
 
                 if [ "$DRY_RUN" = true ]; then
                     echo "  [DRY RUN] $CMD"

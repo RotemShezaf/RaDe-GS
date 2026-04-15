@@ -1,6 +1,7 @@
 
 import struct
 import numpy as np
+import cv2
 import open3d as o3d
 from typing import Tuple
 import math
@@ -140,8 +141,8 @@ def _render_images_open3d(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, 
         material.albedo_img = texture_image
         material.shader = "defaultLit"
     material.base_metallic = 0.0  # Non-metallic for better diffuse shading
-    material.base_roughness = 0.6  # Slightly rough for better form perception
-    material.base_reflectance = 0.4 # Moderate reflectance
+    material.base_roughness = 0.95  # Very rough/matte for clear geometry shading
+    material.base_reflectance = 0.0 # No specular reflections
         #print(f"Texture loaded: {texture_image.width}x{texture_image.height}")
     
     # Add geometry once
@@ -237,9 +238,9 @@ def _render_images_open3d(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, 
         # This allows generating datasets with different but consistent lighting
         num_groups = 1
         view_to_group = None
-        if light_id < 0 or light_id > 4:
-            print(f"⚠️  Warning: light_id={light_id} out of range [0-4], clamping to valid range")
-            light_id = max(0, min(4, light_id))
+        if light_id < 0 or light_id > 5:
+            print(f"⚠️  Warning: light_id={light_id} out of range [0-5], clamping to valid range")
+            light_id = max(0, min(5, light_id))
         print(f"\n🎨 FIXED LIGHTING MODE: Using lighting preset {light_id} (0=default balanced)")
     else:
         # Single lighting setup for all views
@@ -303,17 +304,25 @@ def _render_images_open3d(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, 
         
         # Render image
         img = renderer.render_to_image()
-        
-        # Convert to numpy array for processing (Open3D returns 0-255 range)
         img_np = np.array(img, dtype=np.float32)
+        
+        # Foreground detection: depth buffer + dilation for edge/shadow pixels.
+        # The depth buffer gives clean interior detection but misses anti-aliased
+        # edge pixels and shadow fringe at silhouettes. Dilating the depth mask
+        # by a few pixels captures those, then we intersect with a permissive
+        # color threshold to avoid extending into true background.
+        depth = np.asarray(renderer.render_to_depth_image(), dtype=np.float32)
+        depth_fg = (depth < 1.0).astype(np.uint8)
+        # Dilate depth mask by 2 pixels to cover edge/shadow fringe
+        #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        #dilated_fg = cv2.dilate(depth_fg, kernel, iterations=1)
+        # Only keep dilated pixels that actually have some color (not pure black bg)
+        #has_color = np.sum(img_np , axis=2)>60
+        is_foreground = (depth_fg > 0)# & has_color
         
         # CRITICAL: Apply minimum brightness to foreground pixels to prevent completely black regions
         # This ensures all surface areas are visible for Gaussian splat training
         min_brightness_255 = 20.0  # Minimum brightness level in 0-255 range (8% of 255 = ~20)
-        
-        # Detect foreground pixels (any channel > threshold)
-        background_threshold = 2.0  # Threshold in 0-255 range
-        is_foreground = np.any(img_np > background_threshold, axis=2)
         
         # For foreground pixels, ensure minimum brightness while preserving color ratios
         if is_foreground.any():
@@ -338,17 +347,18 @@ def _render_images_open3d(mesh: o3d.geometry.TriangleMesh, centers: np.ndarray, 
                 
                 # For pixels with some brightness, scale proportionally
                 has_brightness = dark_lum > 0.5  # Small threshold in 0-255 range
-                if has_brightness.any():
-                    boost_factors = min_brightness_255 / dark_lum[has_brightness]
-                    dark_pixels[has_brightness] = np.clip(
-                        dark_pixels[has_brightness] * boost_factors[:, np.newaxis],
-                        0, 255
-                    )
+                
+                #if has_brightness.any():
+                #    boost_factors = min_brightness_255 / dark_lum[has_brightness]
+                #    dark_pixels[has_brightness] = np.clip(
+                #        dark_pixels[has_brightness] * boost_factors[:, np.newaxis],
+                #        0, 255
+                #    )
                 
                 # For completely black pixels, set to uniform gray
                 completely_black = ~has_brightness
                 if completely_black.any():
-                    dark_pixels[completely_black] = min_brightness_255 / 3  # Distribute across RGB
+                    dark_pixels[completely_black] = 0 / 3  # Distribute across RGB
                 
                 # Write back to image
                 foreground_rgb[too_dark] = dark_pixels

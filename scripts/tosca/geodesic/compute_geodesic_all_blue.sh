@@ -10,7 +10,7 @@
 #
 # OPTIONS:
 #   --shapes LIST        Comma-separated shapes (default: auto-detect)
-#   --n_batches N        Batches for parallel processing (default: 8)
+#   --num_parallel_outputs N  Number of outputs to run concurrently (default: 4)
 #   --num_sources N      FPS source vertices (default: 32)
 #   --dry_run            Print commands without executing
 #   --sequential         Run sequentially
@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SHAPES=""
 ANIMALS=""
-N_BATCHES=""
+NUM_PARALLEL_OUTPUTS=""
 NUM_SOURCES=""
 DRY_RUN=""
 SEQUENTIAL=""
@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --shapes)       SHAPES="--shapes $2";           shift 2 ;;
         --animals)      ANIMALS="--animals $2";          shift 2 ;;
-        --n_batches)    N_BATCHES="--n_batches $2";     shift 2 ;;
+        --n_batches|--num_parallel_outputs)  NUM_PARALLEL_OUTPUTS="--num_parallel_outputs $2"; shift 2 ;;
         --num_sources)  NUM_SOURCES="--num_sources $2"; shift 2 ;;
         --dry_run)      DRY_RUN="--dry_run";            shift   ;;
         --sequential)   SEQUENTIAL="--sequential";      shift   ;;
@@ -51,7 +51,7 @@ CMD="bash $SCRIPT_DIR/compute_geodesic_tosca_all.sh \
     --colmap_resolutions high_res \
     --use_decoupled_appearance \
     --outputs output \
-    $SHAPES $ANIMALS $N_BATCHES $NUM_SOURCES $DRY_RUN $SEQUENTIAL"
+    $SHAPES $ANIMALS $NUM_PARALLEL_OUTPUTS $NUM_SOURCES $DRY_RUN $SEQUENTIAL"
 
 echo "============================================================"
 echo "TOSCA Geodesic All (blue_texture, decoupled_appearance)"

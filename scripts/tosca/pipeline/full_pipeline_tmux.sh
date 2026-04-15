@@ -83,22 +83,25 @@ SHAPE_ARG=""
 PIPELINE_CMDS=""
 
 if [ "$SKIP_RENDER" = false ]; then
-    PIPELINE_CMDS+="echo '========== Stage 1/4: Rendering ==========' && "
+    PIPELINE_CMDS+="echo '========== Stage 1/5: Rendering ==========' && "
     PIPELINE_CMDS+="bash scripts/tosca/render/render_all_blue.sh $SHAPE_ARG && "
 fi
 
 if [ "$SKIP_TRAIN" = false ]; then
-    PIPELINE_CMDS+="echo '========== Stage 2/4: Training + Mesh ==========' && "
+    PIPELINE_CMDS+="echo '========== Stage 2/5: Training + Mesh ==========' && "
     PIPELINE_CMDS+="bash scripts/tosca/train_gaussians/train_all_blue.sh $SHAPE_ARG --skip_existing && "
 fi
 
+PIPELINE_CMDS+="echo '========== Stage 3/5: Evaluate Mesh Quality ==========' && "
+PIPELINE_CMDS+="bash scripts/tosca/train_gaussians/evaluate_gaussian_mesh_quality_all.sh $SHAPE_ARG && "
+
 if [ "$SKIP_GEODESIC" = false ]; then
-    PIPELINE_CMDS+="echo '========== Stage 3/4: Geodesic Distances ==========' && "
+    PIPELINE_CMDS+="echo '========== Stage 4/5: Geodesic Distances ==========' && "
     PIPELINE_CMDS+="bash scripts/tosca/geodesic/compute_geodesic_all_blue.sh $SHAPE_ARG && "
 fi
 
 if [ "$SKIP_PATCHES" = false ]; then
-    PIPELINE_CMDS+="echo '========== Stage 4/4: Training Patches ==========' && "
+    PIPELINE_CMDS+="echo '========== Stage 5/5: Training Patches ==========' && "
     PIPELINE_CMDS+="bash scripts/tosca/patches/generate_training_patches.sh && "
 fi
 
@@ -125,8 +128,9 @@ echo ""
 echo "  Stages:"
 [ "$SKIP_RENDER" = false ]   && echo "    1. Render (blue_texture)"      || echo "    1. Render [SKIPPED]"
 [ "$SKIP_TRAIN" = false ]    && echo "    2. Train + Mesh Extract"       || echo "    2. Train [SKIPPED]"
-[ "$SKIP_GEODESIC" = false ] && echo "    3. Geodesic Distances (MMP)"   || echo "    3. Geodesic [SKIPPED]"
-[ "$SKIP_PATCHES" = false ]  && echo "    4. Training Patches"           || echo "    4. Patches [SKIPPED]"
+echo "    3. Evaluate Mesh Quality"
+[ "$SKIP_GEODESIC" = false ] && echo "    4. Geodesic Distances (MMP)"   || echo "    4. Geodesic [SKIPPED]"
+[ "$SKIP_PATCHES" = false ]  && echo "    5. Training Patches"           || echo "    5. Patches [SKIPPED]"
 echo ""
 echo "  srun command:"
 echo "    $SRUN_CMD"

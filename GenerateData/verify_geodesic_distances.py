@@ -38,6 +38,8 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial import KDTree
 
+INF_THRESHOLD = 1e6  # distances above this are treated as effectively infinite
+
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -299,7 +301,12 @@ def check_symmetry(
 
 
 def check_distance_statistics(distances: np.ndarray) -> dict:
+    n_inf = int(np.sum(np.isinf(distances)))
+    n_nan = int(np.sum(np.isnan(distances)))
+    n_above_threshold = int(np.sum(distances >= INF_THRESHOLD))
+    passed = (n_inf == 0) and (n_nan == 0) and (n_above_threshold == 0)
     return {
+        "passed": passed,
         "shape": list(distances.shape),
         "min": float(np.min(distances)),
         "max": float(np.max(distances)),
@@ -311,8 +318,10 @@ def check_distance_statistics(distances: np.ndarray) -> dict:
         "p75": float(np.percentile(distances, 75)),
         "p95": float(np.percentile(distances, 95)),
         "n_zeros": int(np.sum(distances == 0)),
-        "n_inf": int(np.sum(np.isinf(distances))),
-        "n_nan": int(np.sum(np.isnan(distances))),
+        "n_inf": n_inf,
+        "n_nan": n_nan,
+        "n_above_threshold": n_above_threshold,
+        "inf_threshold": INF_THRESHOLD,
     }
 
 
@@ -332,6 +341,234 @@ def check_closest_mesh_mapping(
             "(Gaussians ARE mesh vertices)"
         ),
     }
+
+
+def check_gaussian_consistency(
+    output_dir: Path,
+    gaussian_positions: np.ndarray,
+    closest_mesh_indices: np.ndarray,
+    closest_mesh_distances: np.ndarray,
+    mesh_vertices: np.ndarray | None,
+    gaussian_vertex_indices: np.ndarray | None,
+    surface_type: str | None,
+    tolerance: float = 1e-4,
+) -> dict:
+    """Cross-check PLY, mesh, and geodesic data for consistency.
+
+    Checks:
+    1. PLY positions == geodesic gaussian_positions (exact)
+    2. Gaussian count consistent across PLY, mesh, and geodesic data
+    3. closest_mesh_indices == gaussian_vertex_indices (Gaussian-mesh mode)
+    4. closest_mesh_distances all == 0 (Gaussian-mesh mode)
+    5. gaussian_vertex_indices valid (in range, unique)
+    6. mesh_vertices[gi] == project(ply_positions, surface) (if surface provided)
+    """
+    from GenerateData.utils.geodesic_mesh_utils import project_gaussians_to_surface
+
+    result: dict = {"sub_checks": {}}
+    all_passed = True
+
+    # ── 1. Load PLY and compare with geodesic gaussian_positions ──────
+    try:
+        from utils.load_utils import find_available_iterations
+        from plyfile import PlyData
+
+        point_cloud_dir = output_dir / "point_cloud"
+        iterations = find_available_iterations(output_dir)
+        if not iterations:
+            result["sub_checks"]["ply_match"] = {
+                "passed": None,
+                "note": "No PLY iterations found",
+            }
+        else:
+            highest_iter = max(iterations)
+            ply_path = point_cloud_dir / f"iteration_{highest_iter}" / "point_cloud.ply"
+            plydata = PlyData.read(str(ply_path))
+            vertex = plydata.elements[0]
+            ply_xyz = np.stack([
+                np.asarray(vertex["x"]),
+                np.asarray(vertex["y"]),
+                np.asarray(vertex["z"]),
+            ], axis=1).astype(np.float32)
+
+            # Count match
+            count_match = len(ply_xyz) == len(gaussian_positions)
+            # Value match
+            if count_match:
+                exact = np.array_equal(ply_xyz, gaussian_positions)
+                max_diff = float(np.max(np.abs(ply_xyz - gaussian_positions)))
+            else:
+                exact = False
+                max_diff = float("inf")
+
+            ply_passed = count_match and exact
+            if not ply_passed:
+                all_passed = False
+            result["sub_checks"]["ply_match"] = {
+                "passed": ply_passed,
+                "ply_iteration": highest_iter,
+                "ply_count": int(len(ply_xyz)),
+                "geodesic_count": int(len(gaussian_positions)),
+                "count_match": count_match,
+                "exact_match": exact,
+                "max_diff": max_diff,
+            }
+    except Exception as e:
+        result["sub_checks"]["ply_match"] = {
+            "passed": None,
+            "note": f"Could not load PLY: {e}",
+        }
+
+    # ── 2. Gaussian count consistency across mesh and geodesic ────────
+    n_geodesic = len(gaussian_positions)
+    counts = {"geodesic_gaussian_positions": n_geodesic}
+    if gaussian_vertex_indices is not None:
+        counts["mesh_gaussian_vertex_indices"] = int(len(gaussian_vertex_indices))
+    counts["closest_mesh_indices"] = int(len(closest_mesh_indices))
+    all_same = len(set(counts.values())) == 1
+    if not all_same:
+        all_passed = False
+    result["sub_checks"]["count_consistency"] = {
+        "passed": all_same,
+        "counts": counts,
+    }
+
+    # ── 3. closest_mesh_indices == gaussian_vertex_indices ────────────
+    if gaussian_vertex_indices is not None:
+        idx_match = np.array_equal(closest_mesh_indices, gaussian_vertex_indices)
+        if not idx_match:
+            all_passed = False
+            n_differ = int(np.sum(closest_mesh_indices != gaussian_vertex_indices))
+        else:
+            n_differ = 0
+        result["sub_checks"]["indices_match"] = {
+            "passed": idx_match,
+            "n_differ": n_differ,
+        }
+    else:
+        result["sub_checks"]["indices_match"] = {
+            "passed": None,
+            "note": "No mesh gaussian_vertex_indices available",
+        }
+
+    # ── 4. closest_mesh_distances all zero (Gaussian-mesh mode) ──────
+    all_zero = bool(np.all(closest_mesh_distances == 0))
+    if not all_zero:
+        all_passed = False
+    result["sub_checks"]["distances_zero"] = {
+        "passed": all_zero,
+        "max": float(np.max(closest_mesh_distances)),
+        "n_nonzero": int(np.sum(closest_mesh_distances != 0)),
+    }
+
+    # ── 5. gaussian_vertex_indices valid and unique ──────────────────
+    if gaussian_vertex_indices is not None and mesh_vertices is not None:
+        n_verts = len(mesh_vertices)
+        in_range = bool((gaussian_vertex_indices >= 0).all()
+                        and (gaussian_vertex_indices < n_verts).all())
+        n_unique = int(len(np.unique(gaussian_vertex_indices)))
+        is_unique = n_unique == len(gaussian_vertex_indices)
+        gi_ok = in_range and is_unique
+        if not gi_ok:
+            all_passed = False
+        result["sub_checks"]["vertex_indices_valid"] = {
+            "passed": gi_ok,
+            "in_range": in_range,
+            "n_unique": n_unique,
+            "n_total": int(len(gaussian_vertex_indices)),
+            "is_unique": is_unique,
+            "n_mesh_vertices": n_verts,
+        }
+    else:
+        result["sub_checks"]["vertex_indices_valid"] = {
+            "passed": None,
+            "note": "No mesh data available",
+        }
+
+    # ── 6. mesh_vertices[gi] == project(positions, surface) ─────────
+    if (surface_type is not None and gaussian_vertex_indices is not None
+            and mesh_vertices is not None):
+        projected = project_gaussians_to_surface(
+            gaussian_positions, surface_type,
+        )
+        mesh_at_gi = mesh_vertices[gaussian_vertex_indices]
+        diff = np.linalg.norm(mesh_at_gi - projected, axis=1)
+        n_exceed = int(np.sum(diff > tolerance))
+        proj_ok = n_exceed == 0
+        if not proj_ok:
+            all_passed = False
+        result["sub_checks"]["projection_match"] = {
+            "passed": proj_ok,
+            "n_exceed_tolerance": n_exceed,
+            "tolerance": tolerance,
+            "max_diff": float(diff.max()),
+            "mean_diff": float(diff.mean()),
+        }
+    else:
+        result["sub_checks"]["projection_match"] = {
+            "passed": None,
+            "note": "Skipped (no surface type or mesh)",
+        }
+
+    result["passed"] = all_passed
+    return result
+
+
+def check_batch_cache(output_dir: Path) -> dict:
+    """Scan mesh_batch_cache for inf/NaN values and report per-file details."""
+    cache_dir = output_dir / "geodesic_distance" / "mesh_batch_cache"
+    if not cache_dir.is_dir():
+        return {"passed": None, "note": "No mesh_batch_cache directory found"}
+
+    batch_files = sorted(cache_dir.glob("mesh_batch_*.npz"))
+    if not batch_files:
+        return {"passed": None, "note": "No batch files found in cache"}
+
+    total_files = len(batch_files)
+    bad_files = []
+    total_inf = 0
+    total_nan = 0
+    total_above_threshold = 0
+    total_values = 0
+
+    for bf in batch_files:
+        d = np.load(bf)
+        if "distances" not in d:
+            continue
+        dists = d["distances"]
+        n_inf = int(np.isinf(dists).sum())
+        n_nan = int(np.isnan(dists).sum())
+        n_above = int((dists >= INF_THRESHOLD).sum())
+        total_inf += n_inf
+        total_nan += n_nan
+        total_above_threshold += n_above
+        total_values += dists.size
+
+        if n_inf > 0 or n_nan > 0 or n_above > 0:
+            source_indices = d["source_indices"].tolist() if "source_indices" in d else []
+            bad_files.append({
+                "file": bf.name,
+                "source_indices": source_indices,
+                "n_inf": n_inf,
+                "n_nan": n_nan,
+                "n_above_threshold": n_above,
+                "n_values": int(dists.size),
+            })
+
+    passed = total_inf == 0 and total_nan == 0 and total_above_threshold == 0
+    result = {
+        "passed": passed,
+        "total_batch_files": total_files,
+        "total_values_checked": total_values,
+        "total_inf": total_inf,
+        "total_nan": total_nan,
+        "total_above_threshold": total_above_threshold,
+        "inf_threshold": INF_THRESHOLD,
+        "n_bad_files": len(bad_files),
+    }
+    if bad_files:
+        result["bad_files"] = bad_files
+    return result
 
 
 def compare_with_reference(
@@ -397,6 +634,76 @@ def compare_with_reference(
     }
 
 
+def check_source_projection(
+    source_positions: np.ndarray,
+    source_indices: np.ndarray,
+    gaussian_positions: np.ndarray,
+    source_gaussian_indices: np.ndarray,
+    surface_type: str,
+    mesh_vertices: np.ndarray | None,
+    tolerance: float = 1e-4,
+) -> dict:
+    """Verify source/Gaussian relationship on a polynomial surface.
+
+    ``source_positions`` are the original parametric grid vertices used to
+    select sources.  The actual geodesic source vertex on the mesh is
+    ``mesh_vertices[source_indices[i]]``.  We check:
+
+    1. **Source-to-mesh distance** — how far the original grid point is from
+       the mesh vertex that represents it.
+    2. **Mesh vertex ≈ projection** — the mesh source vertex should equal
+       ``project_gaussians_to_surface(gaussian_positions[sgi], surface_type)``
+       (i.e. the closest point on the surface to the associated Gaussian).
+    3. **Gaussian off-surface distance** — how far each Gaussian source
+       center is from its projection onto the surface.
+    """
+    from GenerateData.utils.geodesic_mesh_utils import project_gaussians_to_surface
+
+    result: dict = {"n_sources": int(len(source_positions))}
+
+    # ── 1. source_positions vs mesh vertices at source_indices ─────────
+    if mesh_vertices is not None:
+        mesh_src = mesh_vertices[source_indices]
+        src_mesh_dist = np.linalg.norm(source_positions - mesh_src, axis=1)
+        result["source_to_mesh_vertex"] = {
+            "min": float(src_mesh_dist.min()),
+            "mean": float(src_mesh_dist.mean()),
+            "max": float(src_mesh_dist.max()),
+        }
+    else:
+        mesh_src = None
+        result["source_to_mesh_vertex"] = {"note": "no mesh available"}
+
+    # ── 2. mesh vertex ≈ projection of Gaussian onto surface ──────────
+    gauss_at_src = gaussian_positions[source_gaussian_indices]
+    projected = project_gaussians_to_surface(gauss_at_src, surface_type)
+
+    if mesh_src is not None:
+        proj_mesh_dist = np.linalg.norm(mesh_src - projected, axis=1)
+        n_proj_mismatch = int(np.sum(proj_mesh_dist > tolerance))
+        result["mesh_vs_projection"] = {
+            "n_exceed_tolerance": n_proj_mismatch,
+            "tolerance": tolerance,
+            "dist_max": float(proj_mesh_dist.max()),
+            "dist_mean": float(proj_mesh_dist.mean()),
+        }
+    else:
+        n_proj_mismatch = 0
+        result["mesh_vs_projection"] = {"note": "no mesh available; skipped"}
+
+    # ── 3. Gaussian source → projection distance (off-surface offset) ─
+    gauss_proj_dist = np.linalg.norm(gauss_at_src - projected, axis=1)
+    result["gaussian_to_projection"] = {
+        "min": float(gauss_proj_dist.min()),
+        "mean": float(gauss_proj_dist.mean()),
+        "max": float(gauss_proj_dist.max()),
+        "median": float(np.median(gauss_proj_dist)),
+    }
+
+    result["passed"] = n_proj_mismatch == 0
+    return result
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 def parse_args() -> argparse.Namespace:
@@ -411,6 +718,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reference", type=str, default=None,
         help="Path to a reference gt_geodesic.npz for comparison.",
+    )
+    parser.add_argument(
+        "--surface", type=str, default=None,
+        choices=["Paraboloid", "Saddle", "HyperbolicParaboloid"],
+        help="Polynomial surface type.  When provided, verifies that "
+             "source positions are correct projections onto the surface.",
     )
     parser.add_argument(
         "--verbose", action="store_true",
@@ -466,7 +779,7 @@ def main() -> None:
         "checks": {},
     }
 
-    n_checks = 8 if args.reference else 7
+    n_checks = 9 + bool(args.surface) + bool(args.reference)
 
     # ── 1. Non-negativity ──────────────────────────────────────────────
     print(f"\n  [1/{n_checks}] Non-negativity ... ", end="", flush=True)
@@ -543,12 +856,21 @@ def main() -> None:
     # ── 6. Distance statistics ─────────────────────────────────────────
     print(f"  [6/{n_checks}] Distance statistics ... ", end="", flush=True)
     result = check_distance_statistics(distances)
-    has_issues = result["n_nan"] > 0 or result["n_inf"] > 0
-    print("WARN" if has_issues else "OK")
+    if result["passed"]:
+        print("PASS")
+    else:
+        parts = []
+        if result["n_nan"] > 0:
+            parts.append(f"{result['n_nan']} NaN")
+        if result["n_inf"] > 0:
+            parts.append(f"{result['n_inf']} Inf")
+        if result["n_above_threshold"] > 0:
+            parts.append(f"{result['n_above_threshold']} above {INF_THRESHOLD:.0e}")
+        print(f"FAIL ({', '.join(parts)})")
     if args.verbose:
         print(f"        range: [{result['min']:.4f}, {result['max']:.4f}]")
         print(f"        mean={result['mean']:.4f}, std={result['std']:.4f}")
-        print(f"        NaN: {result['n_nan']}, Inf: {result['n_inf']}, Zeros: {result['n_zeros']}")
+        print(f"        NaN: {result['n_nan']}, Inf: {result['n_inf']}, Zeros: {result['n_zeros']}, >threshold: {result['n_above_threshold']}")
     report["checks"]["distance_statistics"] = result
 
     # ── 7. Closest mesh mapping ────────────────────────────────────────
@@ -559,11 +881,92 @@ def main() -> None:
           else f"OK (max_dist={result['closest_distance_max']:.6f})")
     report["checks"]["closest_mesh_mapping"] = result
 
-    # ── 8. Reference comparison ────────────────────────────────────────
+    # ── 8. Gaussian consistency (PLY ↔ mesh ↔ geodesic) ──────────────
+    print(f"  [8/{n_checks}] Gaussian consistency (PLY ↔ mesh ↔ geodesic) ... ", end="", flush=True)
+    result = check_gaussian_consistency(
+        output_dir, gaussian_positions,
+        closest_mesh_indices, closest_mesh_distances,
+        mesh_verts, gauss_vi, args.surface,
+    )
+    if result["passed"]:
+        print("PASS")
+    elif result["passed"] is False:
+        failed_subs = [k for k, v in result["sub_checks"].items()
+                       if v.get("passed") is False]
+        print(f"FAIL ({', '.join(failed_subs)})")
+    else:
+        print("SKIP")
+    if args.verbose:
+        for name, sub in result["sub_checks"].items():
+            status = "PASS" if sub.get("passed") is True else (
+                "FAIL" if sub.get("passed") is False else "SKIP")
+            extra = ""
+            if name == "ply_match" and "ply_count" in sub:
+                extra = f" (PLY iter {sub['ply_iteration']}: {sub['ply_count']} gaussians, max_diff={sub['max_diff']:.2e})"
+            elif name == "count_consistency":
+                extra = f" ({sub['counts']})"
+            elif name == "indices_match" and "n_differ" in sub:
+                extra = f" ({sub['n_differ']} differ)"
+            elif name == "distances_zero":
+                extra = f" (max={sub['max']:.2e}, {sub['n_nonzero']} nonzero)"
+            elif name == "vertex_indices_valid" and "n_unique" in sub:
+                extra = f" ({sub['n_unique']}/{sub['n_total']} unique, in_range={sub['in_range']})"
+            elif name == "projection_match" and "max_diff" in sub:
+                extra = f" (max_diff={sub['max_diff']:.2e}, {sub['n_exceed_tolerance']} exceed tol)"
+            print(f"        {name}: {status}{extra}")
+    report["checks"]["gaussian_consistency"] = result
+
+    # ── 9. Batch cache inf/NaN check ──────────────────────────────────
+    print(f"  [9/{n_checks}] Batch cache inf/NaN scan ... ", end="", flush=True)
+    result = check_batch_cache(output_dir)
+    if result.get("passed") is None:
+        print("SKIP (no cache)")
+    elif result["passed"]:
+        print(f"PASS ({result['total_batch_files']} files, {result['total_values_checked']:,} values)")
+    else:
+        parts = []
+        if result['total_inf'] > 0:
+            parts.append(f"{result['total_inf']} inf")
+        if result['total_nan'] > 0:
+            parts.append(f"{result['total_nan']} nan")
+        if result['total_above_threshold'] > 0:
+            parts.append(f"{result['total_above_threshold']} above {INF_THRESHOLD:.0e}")
+        print(f"FAIL ({result['n_bad_files']} bad files: {', '.join(parts)})")
+        if args.verbose and result.get("bad_files"):
+            for bf in result["bad_files"]:
+                print(f"        {bf['file']}: sources={bf['source_indices']}, "
+                      f"inf={bf['n_inf']}, nan={bf['n_nan']}, >thr={bf['n_above_threshold']}")
+    report["checks"]["batch_cache"] = result
+
+    # ── 10 (optional). Source projection onto polynomial surface ────────
+    check_idx = 10
+    if args.surface:
+        print(f"  [{check_idx}/{n_checks}] Source projection check ({args.surface}) ... ", end="", flush=True)
+        result = check_source_projection(
+            source_positions, source_indices, gaussian_positions,
+            source_gaussian_indices, args.surface, mesh_verts,
+        )
+        if result["passed"]:
+            smv = result.get("source_to_mesh_vertex", {})
+            gtp = result["gaussian_to_projection"]
+            print(f"PASS (src→mesh_vert max={smv.get('max', 0):.4f}, gauss→proj max={gtp['max']:.4f})")
+        else:
+            mp = result["mesh_vs_projection"]
+            print(f"FAIL ({mp['n_exceed_tolerance']} mesh-vs-projection exceed tol={mp['tolerance']:.0e}, max={mp['dist_max']:.6f})")
+        if args.verbose:
+            smv = result.get("source_to_mesh_vertex", {})
+            if "max" in smv:
+                print(f"        source_pos → mesh vertex: mean={smv['mean']:.6f}, max={smv['max']:.6f}")
+            gtp = result["gaussian_to_projection"]
+            print(f"        gauss source → projection: mean={gtp['mean']:.6f}, max={gtp['max']:.6f}, median={gtp['median']:.6f}")
+        report["checks"]["source_projection"] = result
+        check_idx += 1
+
+    # ── Reference comparison (optional) ────────────────────────────────
     if args.reference:
         ref_path = Path(args.reference)
         if ref_path.exists():
-            print(f"\n  [8/{n_checks}] Comparing with reference: {ref_path.name}")
+            print(f"\n  [{check_idx}/{n_checks}] Comparing with reference: {ref_path.name}")
             ref_data = load_geodesic_data(ref_path)
             result = compare_with_reference(
                 distances=distances,
@@ -588,7 +991,7 @@ def main() -> None:
             else:
                 print(f"        No matching sources found")
         else:
-            print(f"\n  [8/{n_checks}] Reference file not found: {ref_path}")
+            print(f"\n  [{check_idx}/{n_checks}] Reference file not found: {ref_path}")
 
     # ── Summary ────────────────────────────────────────────────────────
     all_checks = report["checks"]
@@ -612,6 +1015,9 @@ def main() -> None:
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
     print(f"\n  Report saved to: {report_path}\n")
+
+    if n_fail > 0:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

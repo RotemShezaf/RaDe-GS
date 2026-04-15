@@ -58,7 +58,6 @@ class GaussianPatchDataset(Dataset):
         ring: int = 2,
         use_r1_min: bool = False,
         transform: Optional[callable] = None,
-        mask_constant: float = -10.0,
         lazy_loading: bool = False,
         inference_only: bool = False,
         normalize_all_neighbors: Optional[bool] = None,
@@ -74,7 +73,6 @@ class GaussianPatchDataset(Dataset):
             ring: Ring number to load (required).
             use_r1_min: If True, data includes r1_min_val for dropout augmentation.
             transform: Optional transform to apply to the features.
-            mask_constant: Value used to mark masked/padded entries (default: -10.0).
             lazy_loading: If True, use memory-mapped loading (data read from disk
                 on demand per sample). Useful for very large datasets that don't
                 fit in RAM. If False (default), load the entire dataset into a
@@ -94,7 +92,6 @@ class GaussianPatchDataset(Dataset):
         # mask_constant, so they must run BEFORE normalization so that
         # max_dist is computed only from the surviving valid neighbours.
         self._pre_norm_transform, self._post_norm_transform = self._split_transforms(transform)
-        self.mask_constant = mask_constant
         self.lazy_loading = lazy_loading
         
         # Handle both config_path (legacy) and config (new) parameters
@@ -122,6 +119,9 @@ class GaussianPatchDataset(Dataset):
             self.normalize_all_neighbors = normalize_all_neighbors
         else:
             self.normalize_all_neighbors = self.config.get('normalize_all_neighbors', False)
+
+        # Resolve mask_constant from config (always)
+        self.mask_constant = float(self.config.get('mask_constant', -10.0))
 
         # Get data directory from config
         if 'output_dir' not in self.config:
@@ -1196,7 +1196,6 @@ class CombinedGaussianPatchDataset(Dataset):
         ring: int = 2,
         use_r1_min: bool = False,
         transform: Optional[callable] = None,
-        mask_constant: float = -10.0,
         weights: Optional[List[float]] = None,
         lazy_loading: bool = False,
     ):
@@ -1211,7 +1210,6 @@ class CombinedGaussianPatchDataset(Dataset):
             ring: Ring number to load
             use_r1_min: If True, data includes r1_min_val
             transform: Optional transform to apply to features
-            mask_constant: Value used for masked/padded entries
             weights: Optional sampling weights (used with WeightedRandomSampler, only for config list mode)
             lazy_loading: If True, use memory-mapped loading in each sub-dataset.
         """
@@ -1246,7 +1244,6 @@ class CombinedGaussianPatchDataset(Dataset):
                         ring=ring,
                         use_r1_min=use_r1_min,
                         transform=transform,
-                        mask_constant=mask_constant,
                         lazy_loading=lazy_loading,
                     )
                     self.datasets.append(dataset)
@@ -1261,7 +1258,6 @@ class CombinedGaussianPatchDataset(Dataset):
                     ring=ring,
                     use_r1_min=use_r1_min,
                     transform=transform,
-                    mask_constant=mask_constant,
                     lazy_loading=lazy_loading,
                 )
                 self.datasets.append(dataset)
@@ -1286,7 +1282,6 @@ class CombinedGaussianPatchDataset(Dataset):
                     ring=ring,
                     use_r1_min=use_r1_min,
                     transform=transform,
-                    mask_constant=mask_constant,
                     lazy_loading=lazy_loading,
                 )
                 self.datasets.append(dataset)

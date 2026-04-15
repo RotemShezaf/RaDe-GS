@@ -24,8 +24,8 @@
 set -e
 
 NODE="gipdeep10"
-CPUS=10
-GPUS=4
+CPUS=1
+GPUS=2
 TIME="24:00:00"
 SESSION_NAME="tosca_render"
 CONDA_ENV="geo_splat"

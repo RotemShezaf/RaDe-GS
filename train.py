@@ -59,6 +59,7 @@ def training(
     gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
+    gaussians.percent_dense = opt.percent_dense
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
         gaussians.restore(model_params, opt)
@@ -199,15 +200,21 @@ def training(
                 num_valid_pixels = valid_mask.sum() + 1e-6
                 depth_normal_loss = normal_error_masked.sum() / num_valid_pixels
 
-            # Depth distortion loss: squared difference between expected and median
-            # depth as a surrogate for multi-modal depth distribution along the ray.
-            if opt.lambda_distortion > 0:
-                distortion_map = (rendered_expected_depth - rendered_median_depth) ** 2
-                distortion_loss = (distortion_map * valid_mask).sum() / num_valid_pixels
-            else:
-                distortion_loss = torch.tensor([0], dtype=torch.float32, device="cuda")
         else:
             depth_normal_loss = torch.tensor([0], dtype=torch.float32, device="cuda")
+
+        # Depth distortion loss (decoupled from depth-normal, following GOF approach).
+        # Since the rasterizer does not output a distortion map, we approximate
+        # it with |expected_depth - median_depth| weighted by alpha so that
+        # background pixels (alpha ≈ 0) contribute ~0, matching the GOF
+        # rasterizer's behavior where distortion is naturally zero for empty rays.
+        if reg_kick_on and opt.lambda_distortion > 0:
+            rendered_expected_depth = render_pkg["expected_depth"]
+            rendered_median_depth = render_pkg["median_depth"]
+            rendered_alpha = render_pkg["mask"]
+            distortion_map = torch.abs(rendered_expected_depth - rendered_median_depth)
+            distortion_loss = (distortion_map * rendered_alpha).mean()
+        else:
             distortion_loss = torch.tensor([0], dtype=torch.float32, device="cuda")
 
         # patch match loss
@@ -278,12 +285,19 @@ def training(
                 gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
 
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
-                    size_threshold = 20 if iteration > opt.opacity_reset_interval else None
+                    size_threshold = 20 if iteration > opt.prune_big_point_from_iter else None
+                    # Only apply pruning strategies after their respective from_iter
+                    # (early Gaussians are still round; need time to flatten into surface pancakes)
+                    psa = opt.prune_scale_anisotropy if iteration > opt.prune_scale_anisotropy_from_iter else 0.0
+                    pmst = opt.prune_min_scale_threshold if iteration > opt.prune_min_scale_threshold_from_iter else 0.0
                     gaussians.densify_and_prune(
                         opt.densify_grad_threshold,
-                        0.05,
+                        opt.min_opacity_prune,
                         scene.cameras_extent,
                         size_threshold,
+                        big_point_scale_factor=opt.big_point_scale_factor,
+                        prune_min_scale_threshold=pmst,
+                        prune_scale_anisotropy=psa,
                     )
                     if dataset.disable_filter3D:
                         gaussians.reset_3D_filter()
@@ -423,8 +437,8 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=6009)
     parser.add_argument("--debug_from", type=int, default=-1)
     parser.add_argument("--detect_anomaly", action="store_true", default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000, 30_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000, 30_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000, 45_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000, 45_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[15000])
     parser.add_argument("--start_checkpoint", type=str, default=None)

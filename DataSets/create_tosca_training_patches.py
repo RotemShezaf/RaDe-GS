@@ -550,6 +550,7 @@ def _process_output_worker(worker_args):
             mask_attributes=args.mask_attributes, mask_constant=args.mask_constant,
             ring_size_mapping=getattr(args, 'ring_size_mapping', None),
             normalize_per_patch=args.normalize_per_patch,
+            disable_outlier_filtering=getattr(args, 'disable_outlier_filtering', False),
         )
         examples = generate_training_examples(
             geodesic_data, ring_nbrs_dict, ring1_nbrs,
@@ -691,6 +692,7 @@ def process_single_source(
                     mask_attributes=args.mask_attributes, mask_constant=args.mask_constant,
                     ring_size_mapping=getattr(args, 'ring_size_mapping', None),
                     normalize_per_patch=args.normalize_per_patch,
+                    disable_outlier_filtering=getattr(args, 'disable_outlier_filtering', False),
                 )
                 examples = generate_training_examples(
                     geodesic_data, ring_nbrs_dict, ring1_nbrs,

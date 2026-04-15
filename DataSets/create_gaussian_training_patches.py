@@ -838,6 +838,7 @@ def process_single_source(
         'surface_name': surface_name,
         'texture': texture,
         'num_gaussian_outputs': len(gaussian_output_paths),
+        'disable_outlier_filtering': getattr(args, 'disable_outlier_filtering', False),
     }
     
     config_path = output_dir / 'config.yaml'

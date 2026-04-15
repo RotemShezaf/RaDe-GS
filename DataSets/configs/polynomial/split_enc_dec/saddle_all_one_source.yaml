@@ -35,7 +35,7 @@ adaptive_max_steps: 6
 normalize_per_patch: true
 
 # Outlier filtering
-disable_outlier_filtering: false
+disable_outlier_filtering: true
 outlier_median_multiplier: 3.0
 outlier_threshold_floor: 2.0
 outlier_hard_cap: 50.0

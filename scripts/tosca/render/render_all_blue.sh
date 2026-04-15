@@ -24,7 +24,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SHAPES=""
-ANIMALS=""
+#ANIMALS="victoria,wolf"
 ALL_SHAPES=""
 MAX_PARALLEL=""
 NUM_VIEWS=600
@@ -51,8 +51,8 @@ CMD="bash $SCRIPT_DIR/render_all_tosca.sh \
     --colmap_resolutions high_res \
     --image_mesh_resolution  high_res \
     --num_views $NUM_VIEWS \
-    --image_width 1024 \
-    --image_height 1024 \
+    --image_width 768 \
+    --image_height 768 \
     --auto_camera_radius \
     $ALL_SHAPES $MAX_PARALLEL $DRY_RUN"
 

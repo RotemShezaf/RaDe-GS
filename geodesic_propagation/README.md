@@ -133,7 +133,9 @@ from geodesic_propagation.utils import ModelHandler
 model_handler = ModelHandler(model_path="path/to/model.pt")
 
 # Build input builder — ring-1/ring-k neighbours and inference transforms
-# are computed internally when n_neighbors is provided.
+# are computed internally.  kNN parameters (n_neighbors, use_mahalanobis,
+# adaptive_*) are read automatically from the dataset config; pass them
+# explicitly only to override.
 input_builder = GaussianInputBuilder(
     positions=positions,
     dataset_config="DataSets/configs/polynomial/combined_polynomial_all.yaml",
@@ -142,8 +144,6 @@ input_builder = GaussianInputBuilder(
     rotations=rotations,
     opacities=opacities,
     device="cuda",
-    n_neighbors=10,                # triggers internal ring computation
-    use_mahalanobis=False,
     transforms_config=model_handler.get_transforms_config(),  # builds inference transforms
 )
 
@@ -160,10 +160,8 @@ source_indices = [0, 100, 200]
 distances = propagator.propagate(source_indices)
 ```
 
-Adaptive kNN is also supported — pass `adaptive_target_ring`,
-`adaptive_target_neighbors`, and `adaptive_k_boost` to
-`GaussianInputBuilder` to let each point choose its own ring-1 *k* via
-binary search:
+Adaptive kNN is also supported — these parameters are read from the
+dataset config by default, or can be overridden explicitly:
 
 ```python
 input_builder = GaussianInputBuilder(
@@ -172,6 +170,7 @@ input_builder = GaussianInputBuilder(
     ring=3,
     scales=scales, rotations=rotations, opacities=opacities,
     device="cuda",
+    # Override config values if needed:
     n_neighbors=10,
     use_mahalanobis=True,
     adaptive_target_ring=3,
@@ -290,9 +289,14 @@ builder = GaussianInputBuilder(
 )
 ```
 
-When ``n_neighbors`` is provided, ``ring1_neighbors`` and ``ring_neighbors``
-are populated automatically.  The computed ``mean_nn_dist`` and
-``per_point_nn_distances`` override the corresponding arguments.
+When ``n_neighbors`` is provided (explicitly or via config), ``ring1_neighbors``
+and ``ring_neighbors`` are populated automatically.  The computed ``mean_nn_dist``
+and ``per_point_nn_distances`` override the corresponding arguments.
+
+kNN parameters (``n_neighbors``, ``use_mahalanobis``, ``adaptive_target_ring``,
+``adaptive_target_neighbors``, ``adaptive_k_boost``, ``adaptive_max_mean_cut``,
+``adaptive_max_steps``) are read from ``dataset_config`` by default and only
+need to be passed explicitly to override the config values.
 
 When ``transforms_config`` is provided and ``inference_transforms`` is ``None``,
 inference-safe transforms are built from the config (stochastic augmentations

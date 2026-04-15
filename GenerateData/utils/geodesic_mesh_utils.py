@@ -1233,7 +1233,7 @@ def insert_gaussians_into_grid_mesh(
     # only the closest one wins; the other stays as a separate vertex.
     grid_kd_2d = KDTree(vertices[:n_grid, :2])
     snap_dist, snap_idx = grid_kd_2d.query(vertices[n_grid:, :2], k=1)
-    snap_tol = 5e-6
+    snap_tol = 5e-40
     snapped_to = np.where(snap_dist < snap_tol, snap_idx, -1)  # -1 = not snapped
 
     # Resolve conflicts: when multiple Gaussians snap to the same grid
@@ -1957,14 +1957,21 @@ def _lawson_flip_pass(
     sort_order = np.argsort(edge_keys)
     sorted_keys = edge_keys[sort_order]
 
-    # Consecutive equal pairs → interior edges
+    # Consecutive equal pairs → interior edges (exactly 2 occurrences)
     match = sorted_keys[:-1] == sorted_keys[1:]
-    # Exclude triplets (non-manifold): an interior edge has exactly 2
-    # so we want match[i] == True AND (i==0 or match[i-1]==False)
-    # AND (i+1 >= len or match[i+1]==False)
+    # first_of_pair[i] = True iff match[i] AND NOT match[i-1]
     first_of_pair = match.copy()
     if len(first_of_pair) > 1:
         first_of_pair[1:] &= ~match[:-1]
+    # Exclude non-manifold edges (3+ faces): require no third occurrence
+    # i.e. match[i+1] must be False (or i+1 out of range)
+    has_third = np.zeros(len(first_of_pair), dtype=bool)
+    fp_idx = np.where(first_of_pair)[0]
+    check = fp_idx + 1
+    valid = check < len(match)
+    has_third_sel = np.zeros(len(fp_idx), dtype=bool)
+    has_third_sel[valid] = match[check[valid]]
+    first_of_pair[fp_idx[has_third_sel]] = False
 
     pair_starts = np.where(first_of_pair)[0]
     if len(pair_starts) == 0:
@@ -2311,6 +2318,680 @@ def _patch_boundary_notches(
     return faces
 
 
+# ── Non-manifold / duplicate-face cleanup ────────────────────────────────────
+
+def _detect_non_manifold_edges(
+    faces: np.ndarray,
+) -> Tuple[int, list]:
+    """Detect non-manifold edges (shared by more than 2 faces).
+
+    Returns
+    -------
+    n_non_manifold : int
+        Number of non-manifold edges.
+    details : list of (edge_tuple, face_count)
+        Each entry is ``((vi, vj), count)`` for edges with count > 2.
+    """
+    from collections import Counter
+
+    all_edges = []
+    for i in range(3):
+        j = (i + 1) % 3
+        e = np.stack(
+            [np.minimum(faces[:, i], faces[:, j]),
+             np.maximum(faces[:, i], faces[:, j])],
+            axis=1,
+        )
+        all_edges.append(e)
+    all_edges = np.vstack(all_edges)
+    edge_tuples = list(map(tuple, all_edges.tolist()))
+    edge_counts = Counter(edge_tuples)
+    details = [(e, c) for e, c in edge_counts.items() if c > 2]
+    return len(details), details
+
+
+def _detect_duplicate_faces(
+    faces: np.ndarray,
+) -> Tuple[int, np.ndarray]:
+    """Detect duplicate faces (same 3 vertices, any winding).
+
+    Returns
+    -------
+    n_duplicates : int
+        Number of face pairs that are duplicates.
+    duplicate_indices : ndarray
+        Row indices of the duplicate (second occurrence) faces.
+    """
+    sorted_faces = np.sort(faces, axis=1)
+    dt = np.dtype([("a", np.int32), ("b", np.int32), ("c", np.int32)])
+    structured = np.empty(len(sorted_faces), dtype=dt)
+    structured["a"] = sorted_faces[:, 0]
+    structured["b"] = sorted_faces[:, 1]
+    structured["c"] = sorted_faces[:, 2]
+    _, first_idx, counts = np.unique(
+        structured, return_index=True, return_counts=True,
+    )
+    # For each duplicate group, mark all but the first occurrence
+    dup_mask = np.zeros(len(faces), dtype=bool)
+    if (counts > 1).any():
+        # Build inverse: find ALL indices for duplicated face-keys
+        _, inv = np.unique(structured, return_inverse=True)
+        dup_keys = set(np.where(counts > 1)[0].tolist())
+        for fi in range(len(faces)):
+            if inv[fi] in dup_keys and fi != first_idx[inv[fi]]:
+                dup_mask[fi] = True
+    return int(dup_mask.sum()), np.where(dup_mask)[0]
+
+
+def fix_non_manifold_mesh(
+    faces: np.ndarray,
+    gaussian_vertex_indices: np.ndarray | None = None,
+    verbose: bool = False,
+    vertices: np.ndarray | None = None,
+    surface_type: str | None = None,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """Remove duplicate faces and resolve non-manifold edges.
+
+    Steps:
+    1. Remove exact duplicate faces (same 3 vertices, any winding).
+    2. For any remaining non-manifold edges (shared by >2 faces),
+       keep the 2 faces with best quality (largest minimum angle)
+       and remove extras — preferring to keep faces that touch
+       Gaussian vertices.
+    3. Fill small holes left by face removal.  When a fill triangle
+       would duplicate an existing face or create a non-manifold edge,
+       insert a new center vertex (projected onto the polynomial
+       surface) and fan-triangulate from it instead.
+
+    Parameters
+    ----------
+    faces : ndarray (F, 3) int
+    gaussian_vertex_indices : ndarray (G,) int, optional
+        If provided, faces touching Gaussians are preferred during
+        non-manifold resolution.
+    verbose : bool
+    vertices : ndarray (V, 3) float, optional
+        Vertex coordinates.  Required for center-vertex hole filling.
+    surface_type : str, optional
+        Polynomial surface type (e.g. 'Paraboloid').  When provided
+        together with *vertices*, new center vertices are projected
+        onto the surface.
+
+    Returns
+    -------
+    faces : ndarray (F', 3) int
+        Cleaned face array.
+    vertices : ndarray (V', 3) float  — only returned when *vertices* was given
+        Vertex array, possibly with added center vertices.
+    """
+    n_before = len(faces)
+
+    # ── Step 1: Remove duplicate faces ────────────────────────────────
+    n_dup, dup_indices = _detect_duplicate_faces(faces)
+    if n_dup > 0:
+        keep_mask = np.ones(len(faces), dtype=bool)
+        keep_mask[dup_indices] = False
+        faces = faces[keep_mask]
+        if verbose:
+            print(f"        → removed {n_dup} duplicate face(s)")
+
+    # ── Step 2: Resolve non-manifold edges ────────────────────────────
+    n_nm, nm_details = _detect_non_manifold_edges(faces)
+    if n_nm > 0 and verbose:
+        print(f"        → {n_nm} non-manifold edge(s) remaining after dedup")
+
+    if n_nm > 0:
+        gauss_set = (
+            set(gaussian_vertex_indices.tolist())
+            if gaussian_vertex_indices is not None
+            else set()
+        )
+        faces_to_remove: set = set()
+
+        for (vi, vj), _count in nm_details:
+            # Find all faces sharing this edge
+            has_vi = (faces[:, 0] == vi) | (faces[:, 1] == vi) | (faces[:, 2] == vi)
+            has_vj = (faces[:, 0] == vj) | (faces[:, 1] == vj) | (faces[:, 2] == vj)
+            sharing = np.where(has_vi & has_vj)[0]
+
+            # Score each face: prefer Gaussian-touching, then by
+            # uniqueness (not already marked for removal)
+            scored = []
+            for fi in sharing:
+                if fi in faces_to_remove:
+                    continue
+                f = faces[fi]
+                touches_gauss = any(int(v) in gauss_set for v in f)
+                scored.append((fi, touches_gauss))
+
+            # Keep at most 2 faces: prefer Gaussian-touching
+            scored.sort(key=lambda x: (not x[1], x[0]))
+            for fi, _ in scored[2:]:
+                faces_to_remove.add(fi)
+
+        if faces_to_remove:
+            keep_mask = np.ones(len(faces), dtype=bool)
+            keep_mask[list(faces_to_remove)] = False
+            faces = faces[keep_mask]
+            if verbose:
+                print(f"        → removed {len(faces_to_remove)} face(s) "
+                      f"from non-manifold edges")
+
+    n_removed = n_before - len(faces)
+    if n_removed > 0 and verbose:
+        print(f"        → total topology fixes: {n_removed} face(s) removed")
+
+    # ── Step 3: Fill small holes created by face removal ──────────────
+    n_filled = 0
+    fill_faces = _fill_small_holes(faces, max_hole_size=20, verbose=verbose)
+    if len(fill_faces) > 0:
+        # Build existing-face set for duplicate check
+        existing_set = set()
+        for f in faces:
+            existing_set.add(tuple(sorted(f)))
+
+        # Build edge-count map to check for non-manifold creation
+        edge_count: dict[tuple, int] = {}
+        for f in faces:
+            s = sorted(f)
+            for e in ((s[0], s[1]), (s[0], s[2]), (s[1], s[2])):
+                edge_count[e] = edge_count.get(e, 0) + 1
+
+        novel = []
+        n_skipped_dup = 0
+        n_skipped_nm = 0
+        conflicting_holes: list[list] = []  # groups of fill faces that conflict
+        current_hole_group: list = []
+        current_hole_has_conflict = False
+
+        for f in fill_faces:
+            canonical = tuple(sorted(f))
+            edges = ((canonical[0], canonical[1]),
+                     (canonical[0], canonical[2]),
+                     (canonical[1], canonical[2]))
+            is_dup = canonical in existing_set
+            would_create_nm = any(edge_count.get(e, 0) >= 2 for e in edges)
+
+            if is_dup or would_create_nm:
+                if is_dup:
+                    n_skipped_dup += 1
+                else:
+                    n_skipped_nm += 1
+                current_hole_has_conflict = True
+                current_hole_group.append(f)
+            else:
+                if current_hole_has_conflict and current_hole_group:
+                    # Previous group had conflicts; save it for center-vertex fill
+                    conflicting_holes.append(current_hole_group)
+                    current_hole_group = []
+                    current_hole_has_conflict = False
+                elif current_hole_group:
+                    # Previous group was clean; add to novel
+                    for cf in current_hole_group:
+                        c = tuple(sorted(cf))
+                        novel.append(cf)
+                        existing_set.add(c)
+                        for ee in ((c[0], c[1]), (c[0], c[2]), (c[1], c[2])):
+                            edge_count[ee] = edge_count.get(ee, 0) + 1
+                    current_hole_group = []
+                    current_hole_has_conflict = False
+
+                # Add current clean face
+                novel.append(f)
+                existing_set.add(canonical)
+                for e in edges:
+                    edge_count[e] = edge_count.get(e, 0) + 1
+
+        # Handle last group
+        if current_hole_has_conflict and current_hole_group:
+            conflicting_holes.append(current_hole_group)
+        elif current_hole_group:
+            for cf in current_hole_group:
+                c = tuple(sorted(cf))
+                novel.append(cf)
+                existing_set.add(c)
+                for ee in ((c[0], c[1]), (c[0], c[2]), (c[1], c[2])):
+                    edge_count[ee] = edge_count.get(ee, 0) + 1
+
+        if verbose and (n_skipped_dup > 0 or n_skipped_nm > 0):
+            print(f"        → {n_skipped_dup} duplicate + "
+                  f"{n_skipped_nm} NM-creating fill face(s) in "
+                  f"{len(conflicting_holes)} hole(s)")
+
+        if novel:
+            faces = np.vstack([faces, np.array(novel)])
+            n_filled = len(novel)
+            if verbose:
+                print(f"        → filled hole(s) with "
+                      f"{n_filled} new face(s)")
+
+        # ── Step 3b: Center-vertex fill for conflicting holes ─────────
+        if conflicting_holes and vertices is not None:
+            center_faces, new_verts = _fill_holes_with_center_vertex(
+                conflicting_holes, faces, vertices, surface_type,
+                existing_set, edge_count, verbose,
+            )
+            if len(new_verts) > 0:
+                vertices = np.vstack([vertices, new_verts])
+            if len(center_faces) > 0:
+                faces = np.vstack([faces, center_faces])
+                n_filled += len(center_faces)
+                if verbose:
+                    print(f"        → center-vertex fill: {len(new_verts)} new "
+                          f"vertex(es), {len(center_faces)} new face(s)")
+        elif conflicting_holes and vertices is None:
+            if verbose:
+                print(f"        → WARNING: {len(conflicting_holes)} hole(s) "
+                      f"left unfilled (no vertices array provided)")
+
+    if vertices is not None:
+        return faces, vertices
+    return faces
+
+
+def _fill_holes_with_center_vertex(
+    conflicting_holes: list[list],
+    faces: np.ndarray,
+    vertices: np.ndarray,
+    surface_type: str | None,
+    existing_set: set,
+    edge_count: dict,
+    verbose: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Fill holes that have edge/face conflicts by inserting a center vertex.
+
+    For each conflicting hole, reconstructs the boundary loop from the
+    fill-face vertices, computes a centroid, projects it onto the
+    polynomial surface, and creates a fan from the new vertex.
+
+    Returns
+    -------
+    new_faces : ndarray (N, 3) int
+    new_vertices : ndarray (M, 3) float
+    """
+    new_faces_list: list = []
+    new_verts_list: list = []
+    next_vid = len(vertices)
+
+    for hole_group in conflicting_holes:
+        # Reconstruct boundary loop from the fill-face group.
+        # Each fill face is a fan triangle from the _fill_small_holes output.
+        # Extract the unique vertices that form the hole boundary.
+        all_verts_in_group = set()
+        for f in hole_group:
+            for v in f:
+                all_verts_in_group.add(int(v))
+        hole_verts = sorted(all_verts_in_group)
+
+        if len(hole_verts) < 3:
+            continue
+
+        # Compute centroid in XY, project Z onto surface
+        coords = vertices[hole_verts]  # (K, 3)
+        centroid = coords.mean(axis=0)  # (3,)
+
+        if surface_type is not None:
+            try:
+                from GenerateData.GenerateRawPolynomialMesh import (
+                    evaluate_polynomial,
+                )
+                z = evaluate_polynomial(centroid[0], centroid[1], surface_type)
+                centroid[2] = float(z)
+            except (ImportError, Exception):
+                pass  # fall back to averaging z
+
+        # Add the new vertex
+        center_vid = next_vid + len(new_verts_list)
+        new_verts_list.append(centroid.copy())
+
+        # Order hole boundary into a loop
+        # Build adjacency from boundary edges involving these vertices
+        from collections import defaultdict
+        bnd_adj: dict = defaultdict(set)
+        # Boundary edges are edges with count == 1 in the mesh
+        for vi in hole_verts:
+            for vj in hole_verts:
+                if vi >= vj:
+                    continue
+                e = (vi, vj)
+                cnt = edge_count.get(e, 0)
+                if cnt == 1:
+                    bnd_adj[vi].add(vj)
+                    bnd_adj[vj].add(vi)
+
+        # Walk adjacency to form ordered loop
+        loop = _order_boundary_loop(hole_verts, bnd_adj)
+        if loop is None:
+            # Fallback: try to reconstruct from fill faces
+            loop = _reconstruct_loop_from_fan(hole_group)
+        if loop is None or len(loop) < 3:
+            continue
+
+        # Determine winding: check an adjacent mesh face on the boundary
+        # to ensure consistent orientation.
+        a, b = loop[0], loop[1]
+        key = (min(a, b), max(a, b))
+        # Find the adjacent face that shares this edge
+        flip_winding = False
+        has_a = np.any(faces == a, axis=1)
+        has_b = np.any(faces == b, axis=1)
+        adj_faces_idx = np.where(has_a & has_b)[0]
+        if len(adj_faces_idx) > 0:
+            adj_face = faces[adj_faces_idx[0]]
+            # The adjacent face has directed edge orientation.
+            # Our fill should have opposite direction on shared edges.
+            for k in range(3):
+                if int(adj_face[k]) == a and int(adj_face[(k + 1) % 3]) == b:
+                    flip_winding = True  # face goes a→b, fill should go b→a
+                    break
+
+        if flip_winding:
+            loop = loop[::-1]
+
+        # Create fan triangles from center vertex
+        n = len(loop)
+        for i in range(n):
+            v0 = loop[i]
+            v1 = loop[(i + 1) % n]
+            new_faces_list.append([center_vid, v0, v1])
+
+    if not new_faces_list:
+        return np.empty((0, 3), dtype=faces.dtype), np.empty((0, 3), dtype=vertices.dtype)
+
+    return (
+        np.array(new_faces_list, dtype=faces.dtype),
+        np.array(new_verts_list, dtype=vertices.dtype),
+    )
+
+
+def _reconstruct_loop_from_fan(fan_faces: list) -> list | None:
+    """Reconstruct boundary loop from a set of fan triangles.
+
+    Assumes the fan shares a common pivot vertex.  Returns the boundary
+    loop (the non-pivot vertices in order), or None on failure.
+    """
+    from collections import Counter, defaultdict
+
+    # Find the pivot (vertex appearing in all faces)
+    vert_counts: Counter = Counter()
+    for f in fan_faces:
+        for v in f:
+            vert_counts[int(v)] += 1
+
+    n_faces = len(fan_faces)
+    pivots = [v for v, c in vert_counts.items() if c == n_faces]
+    if not pivots:
+        return None
+    pivot = pivots[0]
+
+    # Collect non-pivot edges
+    adj: dict = defaultdict(set)
+    for f in fan_faces:
+        others = [int(v) for v in f if int(v) != pivot]
+        if len(others) == 2:
+            adj[others[0]].add(others[1])
+            adj[others[1]].add(others[0])
+
+    # Walk adjacency to form loop
+    if not adj:
+        return None
+    start = next(iter(adj))
+    loop = [start]
+    visited = {start}
+    current = start
+    while True:
+        nxt = None
+        for nb in adj[current]:
+            if nb not in visited:
+                nxt = nb
+                break
+        if nxt is None:
+            break
+        loop.append(nxt)
+        visited.add(nxt)
+        current = nxt
+
+    if len(loop) < 3:
+        return None
+    return loop
+
+
+def _fill_small_holes(
+    faces: np.ndarray,
+    max_hole_size: int = 20,
+    verbose: bool = False,
+) -> np.ndarray:
+    """Find small interior boundary loops (holes) and fill them with fan triangulation.
+
+    Parameters
+    ----------
+    faces : ndarray (F, 3) int
+    max_hole_size : int
+        Only fill holes with at most this many boundary edges.
+    verbose : bool
+
+    Returns
+    -------
+    new_faces : ndarray (N, 3) int
+        Triangles that fill the holes.  Empty array if no holes found.
+    """
+    from collections import defaultdict, deque
+
+    if len(faces) == 0:
+        return np.empty((0, 3), dtype=faces.dtype)
+
+    # Find boundary edges (edges shared by exactly 1 face)
+    e0 = np.sort(faces[:, [0, 1]], axis=1)
+    e1 = np.sort(faces[:, [1, 2]], axis=1)
+    e2 = np.sort(faces[:, [2, 0]], axis=1)
+    all_edges = np.vstack([e0, e1, e2])
+
+    dt = np.dtype([("a", np.int64), ("b", np.int64)])
+    structured = np.empty(len(all_edges), dtype=dt)
+    structured["a"] = all_edges[:, 0]
+    structured["b"] = all_edges[:, 1]
+    _, inv, counts = np.unique(structured, return_inverse=True, return_counts=True)
+    occ = counts[inv]
+    boundary_edges = all_edges[occ == 1]
+
+    if len(boundary_edges) == 0:
+        return np.empty((0, 3), dtype=faces.dtype)
+
+    # Build boundary adjacency
+    adj: dict = defaultdict(list)
+    for a, b in boundary_edges:
+        adj[int(a)].append(int(b))
+        adj[int(b)].append(int(a))
+
+    # Find connected components via BFS
+    visited: set = set()
+    components: list = []
+    for node in adj:
+        if node not in visited:
+            comp: list = []
+            q = deque([node])
+            while q:
+                v = q.popleft()
+                if v in visited:
+                    continue
+                visited.add(v)
+                comp.append(v)
+                for nb in adj[v]:
+                    if nb not in visited:
+                        q.append(nb)
+            components.append(comp)
+
+    if len(components) <= 1:
+        return np.empty((0, 3), dtype=faces.dtype)
+
+    # The largest component is the outer boundary; smaller ones are holes
+    components.sort(key=len, reverse=True)
+    holes = [c for c in components[1:] if len(c) <= max_hole_size]
+
+    if not holes:
+        return np.empty((0, 3), dtype=faces.dtype)
+
+    # Build set of ALL existing edges (not just boundary) for conflict detection
+    existing_edges: set = set()
+    for fi, f in enumerate(faces):
+        for i in range(3):
+            a, b = int(f[i]), int(f[(i + 1) % 3])
+            existing_edges.add((min(a, b), max(a, b)))
+
+    # Build a face->edge lookup to determine consistent winding
+    # For each boundary edge, find the adjacent face and its winding
+    edge_to_face_winding: dict = {}
+    for fi, f in enumerate(faces):
+        for i in range(3):
+            a, b = int(f[i]), int(f[(i + 1) % 3])
+            key = (min(a, b), max(a, b))
+            # Store the directed edge as seen from the face
+            edge_to_face_winding[key] = (a, b)
+
+    new_faces_list: list = []
+    for hole_verts in holes:
+        # Order vertices into a boundary loop
+        loop = _order_boundary_loop(hole_verts, adj)
+        if loop is None:
+            continue
+
+        # Determine winding: the fill triangles should have opposite
+        # winding to adjacent mesh faces on the boundary.
+        # Check the first boundary edge to determine correct winding.
+        a, b = loop[0], loop[1]
+        key = (min(a, b), max(a, b))
+        if key in edge_to_face_winding:
+            fa, fb = edge_to_face_winding[key]
+            # The existing face has directed edge (fa, fb).
+            # The fill triangle sharing this edge should go (fb, fa, ...)
+            # i.e., reversed direction. If our loop goes a->b same as fa->fb,
+            # we need to reverse the loop.
+            if (fa, fb) == (a, b):
+                loop = loop[::-1]
+
+        # Triangulate hole avoiding existing interior edges
+        fill = _triangulate_hole_no_conflict(loop, existing_edges)
+        new_faces_list.extend(fill)
+        # Register new edges to avoid conflicts between multiple holes
+        for tri in fill:
+            for i in range(3):
+                ea, eb = tri[i], tri[(i + 1) % 3]
+                existing_edges.add((min(ea, eb), max(ea, eb)))
+
+    if not new_faces_list:
+        return np.empty((0, 3), dtype=faces.dtype)
+
+    return np.array(new_faces_list, dtype=faces.dtype)
+
+
+def _triangulate_hole_no_conflict(
+    loop: list, existing_edges: set,
+) -> list:
+    """Triangulate a hole (ordered vertex loop) avoiding existing interior edges.
+
+    For small holes (3-4 vertices), tries alternative triangulations.
+    For larger holes, uses ear-clipping with conflict avoidance.
+
+    Returns list of [v0, v1, v2] triangles.
+    """
+    n = len(loop)
+    if n < 3:
+        return []
+    if n == 3:
+        return [[loop[0], loop[1], loop[2]]]
+
+    if n == 4:
+        # Two possible diagonals: (loop[0], loop[2]) or (loop[1], loop[3])
+        diag_a = (min(loop[0], loop[2]), max(loop[0], loop[2]))
+        diag_b = (min(loop[1], loop[3]), max(loop[1], loop[3]))
+        a_conflict = diag_a in existing_edges
+        b_conflict = diag_b in existing_edges
+
+        if not a_conflict:
+            return [
+                [loop[0], loop[1], loop[2]],
+                [loop[0], loop[2], loop[3]],
+            ]
+        elif not b_conflict:
+            return [
+                [loop[0], loop[1], loop[3]],
+                [loop[1], loop[2], loop[3]],
+            ]
+        else:
+            # Both diagonals exist — use the first and accept the conflict
+            # (this is very rare; the mesh rebuild will fix it)
+            return [
+                [loop[0], loop[1], loop[2]],
+                [loop[0], loop[2], loop[3]],
+            ]
+
+    # General case: fan from the pivot with least edge conflicts
+    best_pivot = 0
+    best_conflicts = n
+    for p in range(n):
+        conflicts = 0
+        for i in range(1, n - 1):
+            vi = loop[(p + i) % n]
+            vj = loop[(p + i + 1) % n]
+            # The diagonal is (loop[p], vi) for i >= 2
+            if i >= 2:
+                vp = loop[p]
+                diag = (min(vp, vi), max(vp, vi))
+                if diag in existing_edges:
+                    conflicts += 1
+        if conflicts == 0:
+            best_pivot = p
+            break
+        if conflicts < best_conflicts:
+            best_conflicts = conflicts
+            best_pivot = p
+
+    pivot = loop[best_pivot]
+    reordered = [loop[(best_pivot + i) % n] for i in range(n)]
+    result = []
+    for i in range(1, n - 1):
+        result.append([reordered[0], reordered[i], reordered[i + 1]])
+    return result
+
+
+def _order_boundary_loop(vertices_list: list, adj: dict) -> list | None:
+    """Order boundary vertices into a loop by walking the adjacency.
+
+    Returns None if the vertices don't form a simple loop.
+    """
+    if len(vertices_list) < 3:
+        return None
+
+    vset = set(vertices_list)
+    # Start from first vertex, walk the loop
+    loop = [vertices_list[0]]
+    prev = None
+    current = vertices_list[0]
+
+    for _ in range(len(vertices_list)):
+        neighbors_in_hole = [n for n in adj[current] if n in vset and n != prev]
+        if len(neighbors_in_hole) != 1:
+            # Ambiguous or dead-end — not a simple loop
+            if len(neighbors_in_hole) == 0:
+                break
+            # Pick the one not yet visited
+            unvisited = [n for n in neighbors_in_hole if n not in loop]
+            if not unvisited:
+                break
+            neighbors_in_hole = unvisited[:1]
+        nxt = neighbors_in_hole[0]
+        if nxt == loop[0] and len(loop) == len(vertices_list):
+            return loop  # closed the loop
+        loop.append(nxt)
+        prev = current
+        current = nxt
+
+    # Check if we got all vertices
+    if len(loop) == len(vertices_list):
+        return loop
+    return None
+
+
 def _count_mesh_holes(faces: np.ndarray) -> int:
     """Count holes in a triangle mesh.
 
@@ -2552,6 +3233,75 @@ def fix_orphaned_gaussians(
               f"after {max_attempts} fix attempts (will be dropped)")
 
     return vertices, faces
+
+
+def repair_orphan_gaussians(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    gaussian_vertex_indices: np.ndarray,
+    *,
+    verbose: bool = False,
+) -> np.ndarray:
+    """Re-insert orphaned Gaussian vertices by splitting the enclosing face.
+
+    After refinement, some Gaussian vertices may lose all incident faces
+    (valence 0).  For each such orphan, this function locates the face
+    whose 2-D ``(x, y)`` projection is nearest and splits it into three
+    sub-triangles that all share the orphan vertex.
+
+    Parameters
+    ----------
+    vertices : ndarray ``(V, 3)``
+    faces : ndarray ``(F, 3)``
+    gaussian_vertex_indices : ndarray ``(G,)``
+    verbose : bool
+
+    Returns
+    -------
+    faces : ndarray ``(F', 3)``
+        Updated face array.  The vertex array is unchanged.
+    """
+    valence = np.zeros(len(vertices), dtype=np.int32)
+    for c in range(3):
+        np.add.at(valence, faces[:, c], 1)
+
+    orphans = gaussian_vertex_indices[valence[gaussian_vertex_indices] == 0]
+    if len(orphans) == 0:
+        return faces
+
+    if verbose:
+        print(f"        → {len(orphans)} orphaned Gaussian(s) after refinement — "
+              f"repairing via face-split")
+
+    # Process orphans one at a time so that when two orphans map to the
+    # same face, the second one lands in a sub-face created by the first.
+    for og in orphans:
+        centroids_xy = (
+            vertices[faces[:, 0], :2]
+            + vertices[faces[:, 1], :2]
+            + vertices[faces[:, 2], :2]
+        ) / 3.0
+        og_xy = vertices[og, :2]
+        dists = np.linalg.norm(centroids_xy - og_xy, axis=1)
+        nearest_fi = int(np.argmin(dists))
+        f_tri = faces[nearest_fi]
+        # Split face [a, b, c] into [og, a, b], [og, b, c], [og, c, a]
+        new_faces = np.array([
+            [og, int(f_tri[0]), int(f_tri[1])],
+            [og, int(f_tri[1]), int(f_tri[2])],
+            [og, int(f_tri[2]), int(f_tri[0])],
+        ], dtype=faces.dtype)
+        # Remove the split face and append the 3 new sub-faces
+        faces = np.vstack([
+            faces[:nearest_fi],
+            faces[nearest_fi + 1:],
+            new_faces,
+        ])
+        if verbose:
+            print(f"          inserted v[{og}] into face {f_tri.tolist()} "
+                  f"(centroid dist {dists[nearest_fi]:.2e})")
+
+    return faces
 
 
 # ── Steiner-point insertion ─────────────────────────────────────────────────
@@ -3904,6 +4654,467 @@ def _circumcenter_steiner_pass(
     return vertices, faces, is_gaussian
 
 
+def _retri_extreme_vertices(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    is_gaussian: np.ndarray,
+    extreme_ar_threshold: float,
+    extreme_min_angle_deg: float,
+    surface_type: str,
+    max_edge_length: float,
+    max_targets: int = 5000,
+    verbose: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Ring-based local re-triangulation around extreme-sliver vertices.
+
+    For each triangle with AR > *extreme_ar_threshold*, picks a
+    non-Gaussian vertex to retri around (preferring the max-angle
+    vertex, which sits at the short edge of the sliver).  Deletes
+    the 1-ring of faces around that vertex, places ring support
+    points, and locally re-triangulates via fan + face-split.
+
+    All-Gaussian extreme faces are skipped (handled by
+    ``_fix_invalid_gaussians_with_rings`` in the caller).
+
+    Returns updated (vertices, faces, is_gaussian).
+    """
+    ar, min_ang, _ = _triangle_quality(vertices, faces)
+    # Only target extreme-AR slivers; low-angle-only cases are handled
+    # by _fix_invalid_gaussians_with_rings in the extreme cleanup pass.
+    extreme_mask = ar > extreme_ar_threshold
+    extreme_idx = np.where(extreme_mask)[0]
+    if len(extreme_idx) == 0:
+        return vertices, faces, is_gaussian
+
+    # ── For each extreme face, pick a non-Gaussian target vertex ──
+    # Prefer the max-angle vertex (smallest cosine = widest angle),
+    # which sits at the short edge that causes the sliver.
+    v0 = vertices[faces[:, 0]]
+    v1 = vertices[faces[:, 1]]
+    v2 = vertices[faces[:, 2]]
+    e0_sq = ((v1 - v0) ** 2).sum(1)
+    e1_sq = ((v2 - v1) ** 2).sum(1)
+    e2_sq = ((v0 - v2) ** 2).sum(1)
+    e0 = np.sqrt(e0_sq); e1 = np.sqrt(e1_sq); e2 = np.sqrt(e2_sq)
+    cos_A0 = np.clip((e0_sq + e2_sq - e1_sq) / (2*e0*e2 + 1e-30), -1, 1)
+    cos_A1 = np.clip((e0_sq + e1_sq - e2_sq) / (2*e0*e1 + 1e-30), -1, 1)
+    cos_A2 = np.clip((e1_sq + e2_sq - e0_sq) / (2*e1*e2 + 1e-30), -1, 1)
+    cos_stack = np.column_stack([cos_A0, cos_A1, cos_A2])
+
+    # max-angle vertex = argmin(cosine)
+    max_angle_local = np.argmin(cos_stack, axis=1)
+
+    target_verts_list = []
+    target_ar_list = []
+    for ei in extreme_idx:
+        f = faces[ei]
+        gauss_flags = is_gaussian[f]
+        if gauss_flags.all():
+            continue   # all-Gaussian → skip, handled by ring-fix step
+
+        # Prefer max-angle non-Gaussian vertex
+        preferred = int(max_angle_local[ei])
+        candidates = [preferred] + [c for c in range(3) if c != preferred]
+        chosen = None
+        for c in candidates:
+            if not is_gaussian[f[c]]:
+                chosen = int(f[c])
+                break
+        if chosen is not None:
+            target_verts_list.append(chosen)
+            target_ar_list.append(ar[ei])
+
+    if not target_verts_list:
+        return vertices, faces, is_gaussian
+
+    # Deduplicate: keep worst AR per vertex
+    target_arr = np.array(target_verts_list, dtype=np.int64)
+    target_ar_arr = np.array(target_ar_list)
+    unique_verts, inv = np.unique(target_arr, return_inverse=True)
+    best_ar = np.zeros(len(unique_verts))
+    np.maximum.at(best_ar, inv, target_ar_arr)
+    order = np.argsort(-best_ar)
+    target_verts = unique_verts[order]
+    if len(target_verts) > max_targets:
+        target_verts = target_verts[:max_targets]
+
+    # ── build vertex→face adjacency ──
+    from collections import defaultdict
+    vert_to_faces: Dict[int, List[int]] = defaultdict(list)
+    for fi in range(len(faces)):
+        for col in range(3):
+            vert_to_faces[int(faces[fi, col])].append(fi)
+
+    xy = vertices[:, :2]
+    all_elens = np.concatenate([e0, e1, e2])
+    median_el = float(np.median(all_elens))
+
+    faces_to_remove: set = set()
+    processed_verts: set = set()   # prevent overlapping 1-rings
+    retri_specs: list = []         # (center_vi, ordered_boundary)
+
+    for cvi_np in target_verts:
+        cvi = int(cvi_np)
+        if cvi in processed_verts:
+            continue
+        adj_fi = vert_to_faces.get(cvi, [])
+        if not adj_fi:
+            continue
+
+        # skip if any adjacent face already removed (overlapping 1-ring)
+        if any(fi in faces_to_remove for fi in adj_fi):
+            continue
+
+        # ── order boundary vertices by angle around center ──
+        # boundary = union of vertices in adj_faces minus center
+        boundary_set: set = set()
+        for fi in adj_fi:
+            for col in range(3):
+                v = int(faces[fi, col])
+                if v != cvi:
+                    boundary_set.add(v)
+        if len(boundary_set) < 3:
+            continue
+
+        # Order by angle from center
+        bnd_list = list(boundary_set)
+        cx, cy = float(xy[cvi, 0]), float(xy[cvi, 1])
+        bnd_angles = np.array([
+            np.arctan2(float(xy[v, 1]) - cy, float(xy[v, 0]) - cx)
+            for v in bnd_list
+        ])
+        angle_order = np.argsort(bnd_angles)
+        ordered_bnd = [bnd_list[i] for i in angle_order]
+
+        # Mark faces and verts
+        for fi in adj_fi:
+            faces_to_remove.add(fi)
+        processed_verts.add(cvi)
+        for v in ordered_bnd:
+            processed_verts.add(v)
+
+        retri_specs.append((cvi, ordered_bnd))
+
+    if not retri_specs:
+        return vertices, faces, is_gaussian
+
+    # ── remove old faces ──
+    keep_mask = np.ones(len(faces), dtype=bool)
+    for fi in faces_to_remove:
+        keep_mask[fi] = False
+    new_faces_list: list = [faces[keep_mask]]
+
+    n_processed = 0
+    for cvi, ordered_bnd in retri_specs:
+        nb = len(ordered_bnd)
+
+        # ── generate ring points around center ──
+        center_xy = xy[cvi]
+        bnd_xy = np.array([[float(xy[v, 0]), float(xy[v, 1])] for v in ordered_bnd])
+        dists = np.linalg.norm(bnd_xy - center_xy[None, :], axis=1)
+        ring_r = float(np.median(dists)) * 0.5
+        ring_r = max(ring_r, median_el * 0.3)
+        ring_r = min(ring_r, median_el * 2.0)
+
+        n_ring = 6
+        angles = np.linspace(0, 2*np.pi, n_ring + 1)[:-1]
+        ring_xy = np.column_stack([
+            center_xy[0] + ring_r * np.cos(angles),
+            center_xy[1] + ring_r * np.sin(angles),
+        ])
+
+        # Dedup ring points against existing vertices
+        existing_xy = np.vstack([center_xy[None, :], bnd_xy])
+        min_spacing = ring_r * 0.3
+        keep = np.ones(len(ring_xy), dtype=bool)
+        for i in range(len(ring_xy)):
+            dd = np.linalg.norm(existing_xy - ring_xy[i], axis=1)
+            if dd.min() < min_spacing:
+                keep[i] = False
+        ring_xy = ring_xy[keep]
+
+        # ── add ring vertices ──
+        if len(ring_xy) > 0:
+            ring_z = evaluate_polynomial(ring_xy[:, 0], ring_xy[:, 1], surface_type)
+            ring_pts_3d = np.column_stack([ring_xy, ring_z])
+            base_idx = len(vertices)
+            vertices = np.vstack([vertices, ring_pts_3d])
+            is_gaussian = np.concatenate([is_gaussian, np.zeros(len(ring_pts_3d), dtype=bool)])
+            ring_global = list(range(base_idx, base_idx + len(ring_pts_3d)))
+        else:
+            ring_global = []
+
+        # ── build fan: center → boundary[i] → boundary[i+1] ──
+        fan_faces: list = []
+        for i in range(nb):
+            j = (i + 1) % nb
+            fan_faces.append([cvi, ordered_bnd[i], ordered_bnd[j]])
+        fan_faces = np.array(fan_faces, dtype=np.int32)
+
+        # ── insert ring points into fan via face-subdivision ──
+        # For each ring point, find which fan face contains it, then split
+        local_faces = fan_faces
+        for rvi in ring_global:
+            rxy = vertices[rvi, :2]
+            # Find containing face by barycentric test
+            best_fi = -1
+            for fi_local in range(len(local_faces)):
+                tri_vi = local_faces[fi_local]
+                ax, ay = float(xy[tri_vi[0], 0]), float(xy[tri_vi[0], 1])
+                bx, by = float(xy[tri_vi[1], 0]), float(xy[tri_vi[1], 1])
+                ccx, ccy = float(xy[tri_vi[2], 0]), float(xy[tri_vi[2], 1])
+                # Barycentric coords
+                denom = (by - ccy) * (ax - ccx) + (ccx - bx) * (ay - ccy)
+                if abs(denom) < 1e-30:
+                    continue
+                la = ((by - ccy) * (rxy[0] - ccx) + (ccx - bx) * (rxy[1] - ccy)) / denom
+                lb = ((ccy - ay) * (rxy[0] - ccx) + (ax - ccx) * (rxy[1] - ccy)) / denom
+                lc = 1 - la - lb
+                if la >= -1e-8 and lb >= -1e-8 and lc >= -1e-8:
+                    best_fi = fi_local
+                    break
+
+            if best_fi < 0:
+                # fallback: nearest centroid
+                centroids = np.mean(
+                    vertices[local_faces, :2].reshape(-1, 3, 2), axis=1
+                ) if len(local_faces) > 0 else np.empty((0, 2))
+                if len(centroids) > 0:
+                    d = np.linalg.norm(centroids - rxy[None, :], axis=1)
+                    best_fi = int(np.argmin(d))
+                else:
+                    continue
+
+            # Split face into 3
+            old_tri = local_faces[best_fi]
+            new_tris = np.array([
+                [old_tri[0], old_tri[1], rvi],
+                [old_tri[1], old_tri[2], rvi],
+                [old_tri[2], old_tri[0], rvi],
+            ], dtype=np.int32)
+            local_faces = np.vstack([
+                local_faces[:best_fi],
+                local_faces[best_fi+1:],
+                new_tris,
+            ])
+
+            # update xy reference since we may have added vertices
+            xy = vertices[:, :2]
+
+        new_faces_list.append(local_faces)
+        n_processed += 1
+
+    faces = np.vstack(new_faces_list).astype(np.int32)
+
+    # Reproject z
+    vertices[:, 2] = evaluate_polynomial(vertices[:, 0], vertices[:, 1], surface_type)
+
+    # Lawson flips to clean up
+    xy = vertices[:, :2].copy()
+    faces_i64 = faces.astype(np.int64)
+    total_flips = 0
+    for _ in range(10):
+        nf = _lawson_flip_pass(xy, faces_i64)
+        total_flips += nf
+        if nf == 0:
+            break
+    faces = faces_i64.astype(np.int32)
+
+    if verbose:
+        ar2, ma2, _ = _triangle_quality(vertices, faces)
+        extreme2 = (ar2 > extreme_ar_threshold) | (ma2 < extreme_min_angle_deg)
+        print(
+            f"          [extreme retri] processed {n_processed} vertices, "
+            f"removed {len(faces_to_remove)} faces, "
+            f"{int(extreme2.sum())} extreme remain "
+            f"(worst AR={ar2.max():.1f}, min angle={ma2.min():.2f}°, "
+            f"{total_flips} flips)"
+        )
+
+    return vertices, faces, is_gaussian
+
+
+def _extreme_triangle_cleanup(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    is_gaussian: np.ndarray,
+    *,
+    surface_type: str,
+    max_edge_length: Optional[float],
+    min_spacing: float,
+    extreme_cleanup_passes: int,
+    extreme_ar_threshold: float,
+    extreme_min_angle_deg: float,
+    extreme_max_splits_per_pass: int,
+    extreme_smoothing_passes: int = 0,
+    surface_aware: bool = False,
+    verbose: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Clean up extreme-quality triangles after the main refinement loop.
+
+    Each pass performs:
+      1. Ring-fix Gaussian-touching extreme triangles.
+      2. Split remaining extreme triangles at the longest-edge midpoint.
+      3. Lawson edge flips to restore quality.
+      4. (Optional) Laplacian smoothing of non-Gaussian vertices of
+         still-extreme triangles.
+
+    Parameters
+    ----------
+    extreme_smoothing_passes : int
+        Number of Laplacian smoothing passes applied to non-Gaussian
+        vertices of extreme triangles at the end of each cleanup pass.
+        0 = disabled (default).
+    """
+    for _ec in range(extreme_cleanup_passes):
+        ar_ec, ma_ec, le_ec = _triangle_quality(vertices, faces)
+        extreme_mask = (ar_ec > extreme_ar_threshold) | (ma_ec < extreme_min_angle_deg)
+        n_extreme = int(extreme_mask.sum())
+        if n_extreme == 0:
+            if verbose:
+                print(f"        [extreme pass {_ec}] 0 extreme triangles — done")
+            break
+
+        if verbose:
+            print(
+                f"        [extreme pass {_ec}] {n_extreme} extreme "
+                f"(worst AR={ar_ec.max():.1f}, min angle={ma_ec.min():.2f}°)"
+            )
+
+        # Step 1: Ring fix for Gaussian-touching extreme triangles
+        vertices, faces, is_gaussian = _fix_invalid_gaussians_with_rings(
+            vertices, faces, is_gaussian, max_edge_length, surface_type,
+            gauss_ar_threshold=extreme_ar_threshold,
+            gauss_angle_threshold=extreme_min_angle_deg,
+            gauss_edge_threshold=None,
+            max_ring_steps=1,
+            verbose=verbose,
+        )
+
+        # Step 2: Split remaining extreme triangles (longest edge)
+        ar_ec2, ma_ec2, le_ec2 = _triangle_quality(vertices, faces)
+        still_extreme = (ar_ec2 > extreme_ar_threshold) | (ma_ec2 < extreme_min_angle_deg)
+        n_still = int(still_extreme.sum())
+        if n_still > 0:
+            bad_idx_ec = np.where(still_extreme)[0]
+            ef = faces[bad_idx_ec]
+            ev0 = vertices[ef[:, 0]]
+            ev1 = vertices[ef[:, 1]]
+            ev2 = vertices[ef[:, 2]]
+            ec_elens = np.column_stack([
+                np.linalg.norm(ev1 - ev0, axis=1),
+                np.linalg.norm(ev2 - ev1, axis=1),
+                np.linalg.norm(ev0 - ev2, axis=1),
+            ])
+            long_idx_ec = np.argmax(ec_elens, axis=1)
+            edge_v_ec = np.array([[0, 1], [1, 2], [2, 0]])
+            n_ec = len(ef)
+            va_ec = ef[np.arange(n_ec), edge_v_ec[long_idx_ec, 0]]
+            vb_ec = ef[np.arange(n_ec), edge_v_ec[long_idx_ec, 1]]
+            mid_xy_ec = (vertices[va_ec, :2] + vertices[vb_ec, :2]) / 2.0
+
+            # Deduplicate by edge key
+            emin = np.minimum(va_ec, vb_ec)
+            emax = np.maximum(va_ec, vb_ec)
+            ekeys = emin.astype(np.int64) * (len(vertices) + n_ec) + emax.astype(np.int64)
+            _, uniq = np.unique(ekeys, return_index=True)
+            uniq = np.sort(uniq)
+            va_ec, vb_ec = va_ec[uniq], vb_ec[uniq]
+            mid_xy_ec = mid_xy_ec[uniq]
+
+            # Deduplicate against existing vertices
+            if len(mid_xy_ec) > 0:
+                kd_ec = KDTree(vertices[:, :2])
+                dd_ec, _ = kd_ec.query(mid_xy_ec)
+                far_ec = dd_ec > min_spacing
+                va_ec, vb_ec = va_ec[far_ec], vb_ec[far_ec]
+                mid_xy_ec = mid_xy_ec[far_ec]
+
+            # Limit insertions per extreme-cleanup pass
+            if extreme_max_splits_per_pass > 0 and len(mid_xy_ec) > extreme_max_splits_per_pass:
+                priority = ec_elens[uniq][far_ec]
+                top = np.argsort(priority.max(axis=1) if priority.ndim == 2 else priority)[::-1][:extreme_max_splits_per_pass]
+                va_ec = va_ec[top]
+                vb_ec = vb_ec[top]
+                mid_xy_ec = mid_xy_ec[top]
+                if verbose:
+                    print(
+                        f"          [extreme split] capped to {extreme_max_splits_per_pass} "
+                        f"splits (extreme_max_splits_per_pass)"
+                    )
+
+            if len(mid_xy_ec) > 0:
+                mid_z_ec = evaluate_polynomial(
+                    mid_xy_ec[:, 0], mid_xy_ec[:, 1], surface_type
+                )
+                new_pts_ec = np.column_stack([mid_xy_ec, mid_z_ec])
+                base_ec = len(vertices)
+                mid_idx_ec = np.arange(base_ec, base_ec + len(new_pts_ec), dtype=np.int64)
+                vertices = np.vstack([vertices, new_pts_ec])
+                xy_ec = vertices[:, :2]
+                faces = _split_faces_with_midpoints(
+                    xy_ec, faces, va_ec, vb_ec, mid_idx_ec,
+                )
+                is_gaussian = np.concatenate([
+                    is_gaussian, np.zeros(len(new_pts_ec), dtype=bool)
+                ])
+                if verbose:
+                    print(
+                        f"          [extreme split] inserted {len(new_pts_ec)} midpoints"
+                    )
+
+        # Step 3: Lawson flips
+        xy_flip = vertices[:, :2].copy()
+        faces_i64_ec = faces.astype(np.int64)
+        for _ in range(10):
+            nf_ec = _lawson_flip_pass(xy_flip, faces_i64_ec)
+            if nf_ec == 0:
+                break
+        faces = faces_i64_ec.astype(np.int32)
+
+        # Step 4: Smoothing of non-Gaussian vertices of extreme triangles
+        if extreme_smoothing_passes > 0:
+            ar_sm, ma_sm, _ = _triangle_quality(vertices, faces)
+            ext_sm = (ar_sm > extreme_ar_threshold) | (ma_sm < extreme_min_angle_deg)
+            n_ext_sm = int(ext_sm.sum())
+            if n_ext_sm > 0:
+                bad_verts_sm = np.unique(faces[np.where(ext_sm)[0]].ravel())
+                movable = np.zeros(len(vertices), dtype=bool)
+                movable[bad_verts_sm] = True
+                movable &= ~is_gaussian
+                n_movable = int(movable.sum())
+                if n_movable > 0:
+                    _w_cache = None
+                    for _sp in range(extreme_smoothing_passes):
+                        if surface_aware:
+                            _, _w_cache = _metric_weighted_laplacian_smooth(
+                                vertices, faces, movable, surface_type,
+                                damping=0.3, _W_cache=_w_cache,
+                            )
+                        else:
+                            _, _w_cache = _uniform_laplacian_smooth(
+                                vertices, faces, movable, surface_type,
+                                damping=0.3, _adj_cache=_w_cache,
+                            )
+                    ar_after, ma_after, _ = _triangle_quality(vertices, faces)
+                    ext_after = (ar_after > extreme_ar_threshold) | (ma_after < extreme_min_angle_deg)
+                    if verbose:
+                        print(
+                            f"          [extreme smooth] {n_ext_sm} → "
+                            f"{int(ext_after.sum())} extreme after "
+                            f"{extreme_smoothing_passes} passes "
+                            f"({n_movable} movable verts)"
+                        )
+
+    # gaussian_vertex_indices: vertices are only appended (never removed
+    # or compacted) inside refine_bad_triangles, so the original indices
+    # remain valid.  Do NOT reconstruct via np.where(is_gaussian) — that
+    # returns sorted order and destroys the caller's Gaussian-to-vertex
+    # mapping.
+
+    return vertices, faces, is_gaussian
+
+
 def refine_bad_triangles(
     vertices: np.ndarray,
     faces: np.ndarray,
@@ -3931,6 +5142,11 @@ def refine_bad_triangles(
     max_flip_passes: int = 20,
     steiner_fix_gaussians: bool = False,
     steiner_max_iterations: int = 3,
+    extreme_cleanup_passes: int = 3,
+    extreme_ar_threshold: float = 20.0,
+    extreme_min_angle_deg: float = 5.0,
+    extreme_max_splits_per_pass: int = 0,
+    extreme_smoothing_passes: int = 0,
     verbose: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Iteratively improve mesh quality by **smoothing** and **splitting**.
@@ -4411,6 +5627,22 @@ def refine_bad_triangles(
                 f"{_fp + 1} passes"
             )
 
+    # ── Extreme triangle cleanup ──────────────────────────────────────
+    if extreme_cleanup_passes > 0 and max_iterations > 0:
+        vertices, faces, is_gaussian = _extreme_triangle_cleanup(
+            vertices, faces, is_gaussian,
+            surface_type=surface_type,
+            max_edge_length=max_edge_length,
+            min_spacing=min_spacing,
+            extreme_cleanup_passes=extreme_cleanup_passes,
+            extreme_ar_threshold=extreme_ar_threshold,
+            extreme_min_angle_deg=extreme_min_angle_deg,
+            extreme_max_splits_per_pass=extreme_max_splits_per_pass,
+            extreme_smoothing_passes=extreme_smoothing_passes,
+            surface_aware=surface_aware,
+            verbose=verbose,
+        )
+
     if verbose:
         ar_final, ma_final, _ = _triangle_quality(vertices, faces)
         print(
@@ -4504,3 +5736,284 @@ def load_geodesic_mesh(
 
     data = np.load(str(npz_path))
     return data["vertices"], data["faces"], data["gaussian_vertex_indices"]
+
+
+def fix_face_winding(
+    faces: np.ndarray,
+    nv: int,
+    *,
+    verbose: bool = False,
+) -> np.ndarray:
+    """Fix face winding consistency using BFS propagation.
+
+    Adjacent faces should traverse their shared edge in opposite directions.
+    When they don't ("inconsistent winding"), algorithms like VTP geodesic
+    distance fail with a linked-list error.
+
+    This function builds a face-adjacency graph, BFS-propagates a parity
+    label, and flips faces whose parity is 1.
+
+    Parameters
+    ----------
+    faces : ndarray ``(F, 3)``
+        Triangle face array.
+    nv : int
+        Number of vertices (needed to build unique edge keys).
+    verbose : bool
+        Print diagnostics.
+
+    Returns
+    -------
+    faces : ndarray ``(F, 3)``
+        Face array with consistent winding.
+    """
+    from collections import deque
+
+    faces_i = faces.astype(np.int64)
+    nf = faces_i.shape[0]
+
+    # ── vectorised half-edge analysis ──
+    he_a = np.empty(3 * nf, dtype=np.int64)
+    he_b = np.empty(3 * nf, dtype=np.int64)
+    he_a[0::3] = faces_i[:, 0]; he_b[0::3] = faces_i[:, 1]
+    he_a[1::3] = faces_i[:, 1]; he_b[1::3] = faces_i[:, 2]
+    he_a[2::3] = faces_i[:, 2]; he_b[2::3] = faces_i[:, 0]
+
+    face_of_he = np.arange(3 * nf, dtype=np.int64) // 3
+    emin = np.minimum(he_a, he_b)
+    emax = np.maximum(he_a, he_b)
+    direction = (he_a < he_b).astype(np.int8)
+    edge_key = emin * (nv + 1) + emax
+
+    sort_idx = np.argsort(edge_key)
+    sorted_keys = edge_key[sort_idx]
+    sorted_face = face_of_he[sort_idx]
+    sorted_dirs = direction[sort_idx]
+
+    unique_keys, starts, counts = np.unique(
+        sorted_keys, return_index=True, return_counts=True,
+    )
+    interior = counts == 2
+    interior_starts = starts[interior]
+
+    fi = sorted_face[interior_starts]
+    fj = sorted_face[interior_starts + 1]
+    di = sorted_dirs[interior_starts]
+    dj = sorted_dirs[interior_starts + 1]
+
+    is_inconsistent = (di == dj).astype(np.int8)
+    n_inconsistent = int(np.sum(is_inconsistent))
+
+    if n_inconsistent == 0:
+        if verbose:
+            print("    Face winding already consistent — nothing to fix.")
+        return faces
+
+    # ── build adjacency & BFS ──
+    adj = [[] for _ in range(nf)]
+    for idx in range(len(fi)):
+        f1, f2, inc = int(fi[idx]), int(fj[idx]), int(is_inconsistent[idx])
+        adj[f1].append((f2, inc))
+        adj[f2].append((f1, inc))
+
+    parity = np.full(nf, -1, dtype=np.int8)
+    for seed in range(nf):
+        if parity[seed] >= 0:
+            continue
+        parity[seed] = 0
+        queue = deque([seed])
+        while queue:
+            ci = queue.popleft()
+            cp = parity[ci]
+            for ni, inc in adj[ci]:
+                if parity[ni] >= 0:
+                    continue
+                parity[ni] = cp ^ inc
+                queue.append(ni)
+
+    faces_fixed = faces.copy()
+    flip_mask = parity == 1
+    faces_fixed[flip_mask] = faces_fixed[flip_mask][:, [0, 2, 1]]
+    n_flipped = int(np.sum(flip_mask))
+
+    if verbose:
+        print(f"    Winding fix: {n_inconsistent} inconsistent edges → "
+              f"flipped {n_flipped}/{nf} faces → 0 inconsistent.")
+
+    return faces_fixed
+
+
+def prepare_mesh_for_vtp(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    gaussian_vertex_indices: np.ndarray,
+    *,
+    verbose: bool = False,
+) -> np.ndarray:
+    """Prepare a mesh for VTP geodesic distance computation.
+
+    VTP requires a single connected component with consistent face winding.
+    This function:
+
+    1. Finds connected components; keeps only the largest.
+    2. Re-inserts Gaussian vertices from removed islands via face-split.
+    3. Fixes face winding via BFS propagation.
+    4. Removes faces touching any residual inconsistent edges
+       (non-orientable artefacts) and re-inserts affected Gaussians.
+
+    Parameters
+    ----------
+    vertices : ndarray ``(V, 3)``
+    faces : ndarray ``(F, 3)``
+    gaussian_vertex_indices : ndarray ``(G,)``
+    verbose : bool
+
+    Returns
+    -------
+    faces : ndarray ``(F', 3)``
+        Cleaned face array ready for VTP.
+    """
+    from collections import deque
+
+    nv = vertices.shape[0]
+    gauss_set = set(gaussian_vertex_indices.tolist())
+
+    # ── 1. Connected components ──────────────────────────────────────
+    def _connected_components(faces_arr):
+        nf = faces_arr.shape[0]
+        he_a = np.empty(3 * nf, dtype=np.int64)
+        he_b = np.empty(3 * nf, dtype=np.int64)
+        he_a[0::3] = faces_arr[:, 0]; he_b[0::3] = faces_arr[:, 1]
+        he_a[1::3] = faces_arr[:, 1]; he_b[1::3] = faces_arr[:, 2]
+        he_a[2::3] = faces_arr[:, 2]; he_b[2::3] = faces_arr[:, 0]
+        face_of = np.arange(3 * nf, dtype=np.int64) // 3
+        emn = np.minimum(he_a, he_b)
+        emx = np.maximum(he_a, he_b)
+        ek = emn * (nv + 1) + emx
+        si = np.argsort(ek)
+        uk, st, ct = np.unique(ek[si], return_index=True, return_counts=True)
+        imask = ct == 2
+        ist = st[imask]
+        fi_arr = face_of[si[ist]]
+        fj_arr = face_of[si[ist + 1]]
+
+        adj = [[] for _ in range(nf)]
+        for idx in range(len(fi_arr)):
+            f1, f2 = int(fi_arr[idx]), int(fj_arr[idx])
+            adj[f1].append(f2)
+            adj[f2].append(f1)
+
+        visited = np.full(nf, -1, dtype=np.int32)
+        comp_id = 0
+        for seed in range(nf):
+            if visited[seed] >= 0:
+                continue
+            queue = deque([seed])
+            visited[seed] = comp_id
+            while queue:
+                ci = queue.popleft()
+                for ni in adj[ci]:
+                    if visited[ni] < 0:
+                        visited[ni] = comp_id
+                        queue.append(ni)
+            comp_id += 1
+        return visited, comp_id
+
+    comp_labels, n_comps = _connected_components(faces)
+
+    if n_comps > 1:
+        # Keep only the largest component
+        comp_sizes = np.bincount(comp_labels)
+        main_comp = int(np.argmax(comp_sizes))
+        island_mask = comp_labels != main_comp
+        n_island_faces = int(np.sum(island_mask))
+
+        # Collect Gaussian vertices in islands
+        island_face_indices = np.where(island_mask)[0]
+        island_verts = set()
+        for fi in island_face_indices:
+            island_verts.update(faces[fi].tolist())
+        orphaned_gaussians = sorted(island_verts & gauss_set)
+
+        faces = faces[~island_mask]
+
+        if verbose:
+            print(f"    Removed {n_island_faces} faces from "
+                  f"{n_comps - 1} disconnected island(s); "
+                  f"{len(orphaned_gaussians)} Gaussian(s) orphaned.")
+
+        # Re-insert orphaned Gaussians via face-split
+        if orphaned_gaussians:
+            faces = repair_orphan_gaussians(
+                vertices, faces, np.array(orphaned_gaussians, dtype=np.int64),
+                verbose=verbose,
+            )
+    elif verbose:
+        print(f"    Mesh is fully connected (1 component).")
+
+    # ── 2. Fix face winding ──────────────────────────────────────────
+    faces = fix_face_winding(faces, nv, verbose=verbose)
+
+    # ── 3. Remove faces on residual inconsistent edges ───────────────
+    faces_i = faces.astype(np.int64)
+    nf = faces_i.shape[0]
+    he_a = np.empty(3 * nf, dtype=np.int64)
+    he_b = np.empty(3 * nf, dtype=np.int64)
+    he_a[0::3] = faces_i[:, 0]; he_b[0::3] = faces_i[:, 1]
+    he_a[1::3] = faces_i[:, 1]; he_b[1::3] = faces_i[:, 2]
+    he_a[2::3] = faces_i[:, 2]; he_b[2::3] = faces_i[:, 0]
+    face_of = np.arange(3 * nf, dtype=np.int64) // 3
+    emin = np.minimum(he_a, he_b)
+    emax = np.maximum(he_a, he_b)
+    direction = (he_a < he_b).astype(np.int8)
+    ek = emin * (nv + 1) + emax
+    si = np.argsort(ek)
+    sk = ek[si]
+    sd = direction[si]
+    sf = face_of[si]
+    uk, st, ct = np.unique(sk, return_index=True, return_counts=True)
+    imask = ct == 2
+    ist = st[imask]
+    incon = sd[ist] == sd[ist + 1]
+
+    if np.any(incon):
+        bad_faces = set()
+        incon_idx = np.where(incon)[0]
+        for idx in incon_idx:
+            i = ist[idx]
+            bad_faces.add(int(sf[i]))
+            bad_faces.add(int(sf[i + 1]))
+
+        # Collect Gaussians in bad faces
+        bad_verts = set()
+        for fi in bad_faces:
+            bad_verts.update(faces[fi].tolist())
+        orphaned_gaussians2 = sorted(bad_verts & gauss_set)
+
+        keep = np.ones(nf, dtype=bool)
+        for fi in bad_faces:
+            keep[fi] = False
+        faces = faces[keep]
+
+        if verbose:
+            print(f"    Removed {len(bad_faces)} faces on "
+                  f"{len(incon_idx)} non-orientable edges; "
+                  f"{len(orphaned_gaussians2)} Gaussian(s) affected.")
+
+        # Re-insert affected Gaussians
+        if orphaned_gaussians2:
+            # Check which ones actually lost all faces
+            valence = np.zeros(nv, dtype=np.int32)
+            for c in range(3):
+                np.add.at(valence, faces[:, c], 1)
+            truly_orphaned = [g for g in orphaned_gaussians2
+                              if valence[g] == 0]
+            if truly_orphaned:
+                faces = repair_orphan_gaussians(
+                    vertices, faces, np.array(truly_orphaned, dtype=np.int64),
+                    verbose=verbose,
+                )
+    elif verbose:
+        print(f"    No residual non-orientable edges.")
+
+    return faces

@@ -62,7 +62,6 @@ class GaussianInputBuilder:
             positions=positions,
             dataset_config="DataSets/configs/polynomial/combined_polynomial_ring2.yaml",
             ring=2,
-            normalization_factor=mean_nn_dist,
             scales=scales,
             rotations=rotations,
             opacities=opacities,
@@ -95,15 +94,6 @@ class GaussianInputBuilder:
         per_point_nn_distances: Optional[np.ndarray] = None,
         inference_transforms=None,
         device: Optional[str] = None,
-        # --- Ring computation (when provided, compute rings internally) ---
-        n_neighbors: Optional[int] = None,
-        use_mahalanobis: Optional[bool] = None,
-        # --- Adaptive kNN parameters ---
-        adaptive_target_ring: Optional[int] = None,
-        adaptive_target_neighbors: Optional[int] = None,
-        adaptive_k_boost: int = 20,
-        adaptive_max_mean_cut: float = 2.0,
-        adaptive_max_steps: int = 5,
         # --- Inference transforms from config (alternative to callable) ---
         transforms_config: Optional[List] = None,
     ):
@@ -115,8 +105,8 @@ class GaussianInputBuilder:
         ``max_neighbors``, and ``nn_mean`` are read from the dataset, so they
         do not need to be passed separately.
 
-        When ``n_neighbors`` is provided, ring-1 and ring-k neighbours are
-        computed internally (with optional adaptive kNN).  The computed
+        When the config contains ``n_neighbors``, ring-1 and ring-k neighbours
+        are computed internally (with optional adaptive kNN).  The computed
         ``mean_nn_dist`` and ``per_point_nn_distances`` override the
         ``normalization_factor`` and ``per_point_nn_distances`` arguments.
         The resulting neighbourhoods are stored as :attr:`ring1_neighbors`
@@ -152,16 +142,6 @@ class GaussianInputBuilder:
                 (e.g. ``GaussianPatchCanonicalRotate``).
             device: Torch device string (e.g. ``'cuda'``, ``'cpu'``).
                 Defaults to CUDA when available, otherwise CPU.
-            n_neighbors: Ring-1 kNN *k*.  When provided, ring-1 and ring-k
-                neighbours are computed internally and stored on
-                :attr:`ring1_neighbors` / :attr:`ring_neighbors`.
-            use_mahalanobis: Use Mahalanobis distance for kNN.  Defaults to
-                the ``use_mahalanobis`` flag in the dataset config.
-            adaptive_target_ring: Ring level for adaptive kNN binary search.
-            adaptive_target_neighbors: Desired ring-k cap for adaptive kNN.
-            adaptive_k_boost: Max boosted *k* for adaptive mode.
-            adaptive_max_mean_cut: Stop when average cut ≤ this.
-            adaptive_max_steps: Max binary-search iterations.
             transforms_config: Training transform config list (from YAML).
                 Used to build inference transforms when ``inference_transforms``
                 is ``None``.
@@ -219,6 +199,16 @@ class GaussianInputBuilder:
             if per_point_nn_distances is not None else None
         )
 
+        # ── Resolve kNN / adaptive params from config ──
+        _cfg = self.dataset.config
+        n_neighbors = _cfg.get('n_neighbors', None)
+        use_mahalanobis = _cfg.get('use_mahalanobis', False)
+        adaptive_target_ring = _cfg.get('adaptive_target_ring', None)
+        adaptive_target_neighbors = _cfg.get('adaptive_target_neighbors', None)
+        adaptive_k_boost = _cfg.get('adaptive_k_boost', 20)
+        adaptive_max_mean_cut = _cfg.get('adaptive_max_mean_cut', 2.0)
+        adaptive_max_steps = _cfg.get('adaptive_max_steps', 5)
+
         # ── Compute ring neighbours if n_neighbors was provided ───────
         self.ring1_neighbors: Optional[Dict[int, np.ndarray]] = None
         self.ring_neighbors: Optional[Dict[int, np.ndarray]] = None
@@ -262,6 +252,7 @@ class GaussianInputBuilder:
             mask_constant=self.mask_constant,
             ring_size_mapping=self.dataset.config.get('ring_size_mapping', None),
             normalize_per_patch=self.per_point_nn_distances is not None,
+            disable_outlier_filtering=self.dataset.config.get('disable_outlier_filtering', False),
         )
 
         self.inference_transforms = inference_transforms

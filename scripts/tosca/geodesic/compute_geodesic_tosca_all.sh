@@ -3,11 +3,14 @@
 # Compute geodesic distances for all TOSCA shapes and Gaussian outputs
 #
 # This script iterates over:
-#   - Multiple batch splits (source range batches)
 #   - Multiple textures
 #   - Multiple colmap resolutions (high_res, low_res)
 #   - Multiple output names (e.g., different training runs)
 #   - Multiple TOSCA shapes (auto-detected or explicitly specified)
+#
+# Outputs are processed concurrently (up to NUM_PARALLEL_OUTPUTS at a time).
+# Each output runs a single Python process that handles internal batch
+# parallelism via the compute_and_save_geodesic_pipeline.
 #
 # It assumes the directory structure created by create_synthetic_colmap_dataset_from_mesh_tosca.py
 # and that training has been performed with outputs stored in the specified output folder.
@@ -28,7 +31,8 @@
 #   --colmap_resolutions LIST  Comma-separated COLMAP resolution levels (default: high_res)
 #   --outputs LIST             Comma-separated output names (default: output)
 #   --light_ids LIST           Comma-separated light IDs (default: 0,1,2,3,4)
-#   --n_batches N              Number of batches per shape/output (default: 8)
+#   --n_batches N              (deprecated alias for --num_parallel_outputs)
+#   --num_parallel_outputs N   Number of outputs to run concurrently (default: 4)
 #   --resolution N             Source mesh resolution (NxN) (default: 8)
 #   --use_mahalanobis          Use Mahalanobis distance
 #   --dry_run                  Print commands without executing
@@ -57,7 +61,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../tosca_animal_map.sh"
 DATA_ROOT="TrainData/TOSCA/processed"
 SYNTH_DATA_BASE="TrainData/TOSCA/SyntheticColmapData"
 
-N_BATCHES=8
+NUM_PARALLEL_OUTPUTS=4   # Number of outputs to process concurrently
 MAX_PARALLEL=$(($(nproc) - 1))
 if [ $MAX_PARALLEL -lt 1 ]; then
     MAX_PARALLEL=1
@@ -121,8 +125,8 @@ while [[ $# -gt 0 ]]; do
             N_JOBS_OVERRIDE="$2"
             shift 2
             ;;
-        --n_batches)
-            N_BATCHES="$2"
+        --n_batches|--num_parallel_outputs)
+            NUM_PARALLEL_OUTPUTS="$2"
             shift 2
             ;;
         --num_sources)
@@ -156,9 +160,9 @@ while [[ $# -gt 0 ]]; do
             echo "  --colmap_resolutions LIST   Comma-separated COLMAP resolutions (default: high_res)"
             echo "  --outputs LIST              Comma-separated output folder names (default: output)"
             echo "  --light_ids LIST            Comma-separated light IDs (default: 0,1,2,3,4)"
-            echo "  --n_jobs N                  Parallel jobs per batch"
-            echo "  --n_batches N               Number of batches per shape (default: 8)"
-            echo "  --num_sources N             Number of source vertices (default: 200)"
+            echo "  --n_jobs N                  Parallel jobs per output"
+            echo "  --num_parallel_outputs N    Number of outputs to run concurrently (default: 4)"
+            echo "  --num_sources N             Number of source vertices (default: 64)"
             echo "  --dry_run                   Print commands without executing"
             echo "  --sequential                Run batches sequentially"
             echo "  --use_mahalanobis           Use Mahalanobis distance"
@@ -244,17 +248,15 @@ else
 fi
 
 # ============================================================================
-# Compute batch parameters
+# Compute job parameters
 # ============================================================================
 TOTAL_SOURCES=$NUM_SOURCES
-SOURCES_PER_BATCH=$(( (TOTAL_SOURCES + N_BATCHES - 1) / N_BATCHES ))
-
-# N_JOBS: each batch spawns a parent Python process + N_JOBS pool workers,
-# so total = N_BATCHES * (1 + N_JOBS). Reserve one core per batch for the parent.
+# Calculate N_JOBS (per-output internal parallelism) only if not explicitly set.
+# Divide available CPUs evenly among concurrent outputs.
 if [ -n "$N_JOBS_OVERRIDE" ]; then
     N_JOBS=$N_JOBS_OVERRIDE
 else
-    N_JOBS=$(( (MAX_PARALLEL - N_BATCHES) / N_BATCHES ))
+    N_JOBS=$(( MAX_PARALLEL / NUM_PARALLEL_OUTPUTS ))
     if [ $N_JOBS -lt 1 ]; then
         N_JOBS=1
     fi
@@ -282,9 +284,8 @@ else
     echo "  Lighting mode:     default_light"
 fi
 echo "  Num sources:       $NUM_SOURCES"
-echo "  Number of batches: $N_BATCHES"
-echo "  Sources per batch: ~$SOURCES_PER_BATCH"
-echo "  Jobs per batch:    $N_JOBS"
+echo "  Parallel outputs:  $NUM_PARALLEL_OUTPUTS"
+echo "  Jobs per output:   $N_JOBS"
 echo "  Sequential:        $SEQUENTIAL"
 echo "  Dry run:           $DRY_RUN"
 echo ""
@@ -296,178 +297,191 @@ echo ""
 # ============================================================================
 # Count total work
 # ============================================================================
-TOTAL_OUTPUTS=0
-for shape in "${SHAPE_ARRAY[@]}"; do
-    for texture in "${TEXTURE_ARRAY[@]}"; do
-        for resolution in "${RESOLUTION_ARRAY[@]}"; do
-            for light_id in "${LIGHT_ID_ARRAY[@]}"; do
-                for output_name in "${OUTPUT_ARRAY[@]}"; do
-                    TOTAL_OUTPUTS=$((TOTAL_OUTPUTS + 1))
-                done
-            done
-        done
-    done
-done
-
-echo "Total outputs to process: $TOTAL_OUTPUTS"
-echo ""
-
 # ============================================================================
-# Main processing loop
+# Pre-scan: build work list
 # ============================================================================
-START_TIME=$(date +%s)
-CURRENT_OUTPUT=0
-FAILED_OUTPUTS=()
+declare -a JOB_LABELS=()
+declare -a JOB_CMDS=()
+declare -a JOB_MERGE_CMDS=()
+SKIPPED=0
 
 for shape in "${SHAPE_ARRAY[@]}"; do
     for texture in "${TEXTURE_ARRAY[@]}"; do
         for resolution in "${RESOLUTION_ARRAY[@]}"; do
             for light_id in "${LIGHT_ID_ARRAY[@]}"; do
                 for output_name in "${OUTPUT_ARRAY[@]}"; do
-                    CURRENT_OUTPUT=$((CURRENT_OUTPUT + 1))
-
                     # Construct paths
-                    # Gaussian output: {synth_data_base}/{texture}_texture/{shape}/{resolution}/light_{light_id}/{output_name}
                     if [ "$USE_DECOUPLED_APPEARANCE" = true ]; then
                         GAUSSIAN_OUTPUT="$SYNTH_DATA_BASE/${texture}_texture/$shape/$resolution/decoupled_appearance/$output_name"
-                    elif [ -n "$light_id" ]; then
+                    elif [ -n "$light_id" ] && [ "$light_id" != "__decoupled__" ]; then
                         GAUSSIAN_OUTPUT="$SYNTH_DATA_BASE/${texture}_texture/$shape/$resolution/light_${light_id}/$output_name"
                     else
                         GAUSSIAN_OUTPUT="$SYNTH_DATA_BASE/${texture}_texture/$shape/$resolution/default_light/$output_name"
                     fi
 
-                    echo "============================================================"
-                    echo "[$CURRENT_OUTPUT/$TOTAL_OUTPUTS] Processing:"
-                    echo "  Shape:   $shape"
-                    echo "  Texture: $texture"
-                    echo "  Resolution: $resolution"
-                    if [ "$USE_DECOUPLED_APPEARANCE" = true ]; then
-                        echo "  Lighting: decoupled_appearance"
-                    elif [ -n "$light_id" ]; then
-                        echo "  Light ID: $light_id"
-                    fi
-                    echo "  Output:  $output_name"
-                    echo "  Gaussian output: $GAUSSIAN_OUTPUT"
-                    echo "  Ground truth mesh: $DATA_ROOT/$shape/mesh_high_res_*.ply"
-                    echo "============================================================"
+                    LABEL="$texture/$shape/$resolution/light_${light_id:-default}/$output_name"
 
-                    # Check if Gaussian output exists
-                    if [ ! -d "$GAUSSIAN_OUTPUT" ]; then
-                        echo "  Warning: Gaussian output not found, skipping..."
-                        echo "           Expected: $GAUSSIAN_OUTPUT"
-                        FAILED_OUTPUTS+=("$texture/$shape/$resolution/$output_name (missing output)")
-                        echo ""
+                    # Validate prerequisites
+                    if [ ! -d "$GAUSSIAN_OUTPUT" ] || [ ! -d "$GAUSSIAN_OUTPUT/point_cloud" ]; then
+                        SKIPPED=$((SKIPPED + 1))
                         continue
                     fi
-
-                    # Check if point cloud exists
-                    if [ ! -d "$GAUSSIAN_OUTPUT/point_cloud" ]; then
-                        echo "  Warning: No point_cloud directory found, skipping..."
-                        FAILED_OUTPUTS+=("$texture/$shape/$resolution/$output_name (no point cloud)")
-                        echo ""
-                        continue
-                    fi
-
-                    # Check if TOSCA ground truth mesh exists
                     if ! ls "$DATA_ROOT/$shape"/mesh_high_res_*.ply 2>/dev/null | grep -q .; then
-                        echo "  Warning: No ground truth mesh found at $DATA_ROOT/$shape/mesh_high_res_*.ply"
-                        echo "           Please run preprocess_tosca.py first."
-                        FAILED_OUTPUTS+=("$texture/$shape/$resolution/$output_name (missing GT mesh)")
-                        echo ""
+                        SKIPPED=$((SKIPPED + 1))
                         continue
                     fi
 
-                    # ================================================================
-                    # Run batched computation
-                    # ================================================================
-                    PIDS=()
+                    CMD="python $COMPUTE_SCRIPT \
+                        --gaussian_output $GAUSSIAN_OUTPUT \
+                        --data_root $DATA_ROOT \
+                        --shape $shape \
+                        --mesh_type $MESH_TYPE \
+                        --num_sources $NUM_SOURCES \
+                        --geodesic_method mmp \
+                        --embed_gaussians \
+                        --n_jobs $N_JOBS \
+                        $USE_MAHALANOBIS \
+                        $VERBOSE"
 
-                    for ((batch=0; batch<N_BATCHES; batch++)); do
-                        SOURCE_START=$((batch * SOURCES_PER_BATCH))
-                        SOURCE_END=$(( (batch + 1) * SOURCES_PER_BATCH ))
+                    MERGE_CMD="python $COMPUTE_SCRIPT \
+                        --gaussian_output $GAUSSIAN_OUTPUT \
+                        --merge_only \
+                        $VERBOSE"
 
-                        # Clamp to total sources
-                        if [ $SOURCE_END -gt $TOTAL_SOURCES ]; then
-                            SOURCE_END=$TOTAL_SOURCES
-                        fi
-
-                        # Skip empty batches
-                        if [ $SOURCE_START -ge $TOTAL_SOURCES ]; then
-                            continue
-                        fi
-
-                        echo "  Batch $((batch+1))/$N_BATCHES: sources $SOURCE_START-$SOURCE_END"
-
-                        # NOTE: compute_gaussian_geodesic_distances.py currently uses
-                        # --surface for polynomial types. For TOSCA, the script needs to
-                        # be extended with --shape and --tosca_data_root parameters.
-                        # Replace --surface with --shape once TOSCA support is added.
-                        CMD="python $COMPUTE_SCRIPT \
-                            --gaussian_output $GAUSSIAN_OUTPUT \
-                            --data_root $DATA_ROOT \
-                            --shape $shape \
-                            --mesh_type $MESH_TYPE \
-                            --num_sources $NUM_SOURCES \
-                            --geodesic_method mmp \
-                            --embed_gaussians \
-                            --source_start $SOURCE_START \
-                            --source_end $SOURCE_END \
-                            --n_jobs $N_JOBS \
-                            $USE_MAHALANOBIS \
-                            $VERBOSE"
-
-                        if [ "$DRY_RUN" = true ]; then
-                            echo "    [DRY RUN] $CMD"
-                        elif [ "$SEQUENTIAL" = true ]; then
-                            if ! $CMD; then
-                                echo "    Warning: Batch $((batch+1)) failed"
-                            fi
-                        else
-                            $CMD &
-                            PIDS+=($!)
-                        fi
-                    done
-
-                    # Wait for all batches of this output to complete
-                    if [ "$DRY_RUN" = false ] && [ "$SEQUENTIAL" = false ]; then
-                        echo ""
-                        echo "  Waiting for batches to complete..."
-                        BATCH_FAILED=0
-                        for pid in "${PIDS[@]}"; do
-                            if ! wait $pid; then
-                                BATCH_FAILED=$((BATCH_FAILED + 1))
-                            fi
-                        done
-                        if [ $BATCH_FAILED -gt 0 ]; then
-                            echo "  Warning: $BATCH_FAILED batches failed"
-                            FAILED_OUTPUTS+=("$texture/$shape/$resolution/$output_name ($BATCH_FAILED batches failed)")
-                        fi
-                    fi
-
-                    # ================================================================
-                    # Merge partial results for this output
-                    # ================================================================
-                    if [ "$DRY_RUN" = false ]; then
-                        echo ""
-                        echo "  Merging partial results..."
-                        MERGE_CMD="python $COMPUTE_SCRIPT \
-                            --gaussian_output $GAUSSIAN_OUTPUT \
-                            --merge_only \
-                            $VERBOSE"
-                        if ! $MERGE_CMD; then
-                            echo "  Warning: Merge failed for $texture/$shape/$resolution/$output_name"
-                            FAILED_OUTPUTS+=("$texture/$shape/$resolution/$output_name (merge failed)")
-                        else
-                            echo "  Done! Results saved to: $GAUSSIAN_OUTPUT/geodesic_distance/gt_geodesic.npz"
-                        fi
-                    fi
-
-                    echo ""
+                    JOB_LABELS+=("$LABEL")
+                    JOB_CMDS+=("$CMD")
+                    JOB_MERGE_CMDS+=("$MERGE_CMD")
                 done
             done
         done
     done
 done
+
+TOTAL=${#JOB_LABELS[@]}
+
+if [ "$TOTAL" -eq 0 ]; then
+    echo "Nothing to do — all outputs skipped or not found."
+    exit 0
+fi
+
+echo "  Total outputs:   $TOTAL  (skipped: $SKIPPED)"
+echo ""
+
+if [ "$DRY_RUN" = true ]; then
+    echo "============================================================"
+    echo "DRY RUN — commands that would be executed:"
+    echo "============================================================"
+    for i in "${!JOB_LABELS[@]}"; do
+        echo ""
+        echo "  [$(( i + 1 ))/$TOTAL] ${JOB_LABELS[$i]}"
+        echo "  ${JOB_CMDS[$i]}"
+        echo "  merge: ${JOB_MERGE_CMDS[$i]}"
+    done
+    exit 0
+fi
+
+# ============================================================================
+# Main processing — parallelize across outputs
+# ============================================================================
+START_TIME=$(date +%s)
+CURRENT_OUTPUT=0
+FAILED_OUTPUTS=()
+
+# Pool state
+declare -a _PIDS=()
+declare -a _LABELS=()
+declare -a _MERGE_CMDS=()
+
+_reap_one() {
+    # Wait for any one background job to finish
+    wait -n 2>/dev/null || true
+    local new_pids=() new_labels=() new_merges=()
+    local reaped=0
+    for i in "${!_PIDS[@]}"; do
+        local pid="${_PIDS[$i]}"
+        if [ "$reaped" -eq 0 ] && ! kill -0 "$pid" 2>/dev/null; then
+            local rc=0
+            wait "$pid" 2>/dev/null || rc=$?
+            local label="${_LABELS[$i]}"
+            local merge_cmd="${_MERGE_CMDS[$i]}"
+            if [ "$rc" -eq 0 ]; then
+                echo "  ✓ $label — compute done, merging ..."
+                if ! eval "$merge_cmd"; then
+                    echo "  ✗ $label — merge FAILED"
+                    FAILED_OUTPUTS+=("$label (merge failed)")
+                fi
+            else
+                echo "  ✗ $label — compute FAILED (exit $rc)"
+                FAILED_OUTPUTS+=("$label (compute failed)")
+            fi
+            reaped=1
+        else
+            new_pids+=("$pid")
+            new_labels+=("${_LABELS[$i]}")
+            new_merges+=("${_MERGE_CMDS[$i]}")
+        fi
+    done
+    _PIDS=("${new_pids[@]+"${new_pids[@]}"}")
+    _LABELS=("${new_labels[@]+"${new_labels[@]}"}")
+    _MERGE_CMDS=("${new_merges[@]+"${new_merges[@]}"}")
+}
+
+_throttle() {
+    while [ "${#_PIDS[@]}" -ge "$NUM_PARALLEL_OUTPUTS" ]; do
+        _reap_one
+    done
+}
+
+_drain() {
+    while [ "${#_PIDS[@]}" -gt 0 ]; do
+        _reap_one
+    done
+}
+
+_cleanup() {
+    for pid in "${_PIDS[@]+"${_PIDS[@]}"}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+}
+trap _cleanup EXIT INT TERM
+
+echo "============================================================"
+echo "Dispatching $TOTAL outputs ($NUM_PARALLEL_OUTPUTS concurrent)"
+echo "============================================================"
+echo ""
+
+for i in "${!JOB_LABELS[@]}"; do
+    _throttle
+    label="${JOB_LABELS[$i]}"
+    cmd="${JOB_CMDS[$i]}"
+
+    CURRENT_OUTPUT=$(( i + 1 ))
+    if [ "$SEQUENTIAL" = true ]; then
+        echo "  → [$CURRENT_OUTPUT/$TOTAL] $label"
+        if eval "$cmd"; then
+            echo "  ✓ $label — compute done, merging ..."
+            if ! eval "${JOB_MERGE_CMDS[$i]}"; then
+                echo "  ✗ $label — merge FAILED"
+                FAILED_OUTPUTS+=("$label (merge failed)")
+            fi
+        else
+            echo "  ✗ $label — compute FAILED"
+            FAILED_OUTPUTS+=("$label (compute failed)")
+        fi
+    else
+        echo "  → queued [$CURRENT_OUTPUT/$TOTAL] $label"
+        eval "$cmd" &
+        _PIDS+=("$!")
+        _LABELS+=("$label")
+        _MERGE_CMDS+=("${JOB_MERGE_CMDS[$i]}")
+    fi
+done
+
+if [ "$SEQUENTIAL" = false ]; then
+    echo ""
+    echo "All jobs queued — waiting for completion ..."
+    _drain
+fi
 
 # ============================================================================
 # Summary
@@ -479,7 +493,8 @@ echo "============================================================"
 echo "All Processing Complete"
 echo "============================================================"
 echo "  Total time:              ${ELAPSED}s ($(( ELAPSED / 60 ))m $(( ELAPSED % 60 ))s)"
-echo "  Total outputs processed: $CURRENT_OUTPUT"
+echo "  Total outputs processed: $TOTAL"
+echo "  Skipped:                 $SKIPPED"
 echo "  Failed outputs:          ${#FAILED_OUTPUTS[@]}"
 
 if [ ${#FAILED_OUTPUTS[@]} -gt 0 ]; then

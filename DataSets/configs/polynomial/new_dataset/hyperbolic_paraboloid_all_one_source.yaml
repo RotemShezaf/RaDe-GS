@@ -63,7 +63,7 @@ attributes:
   - xyz
 
 # Outlier filtering
-disable_outlier_filtering: false
+disable_outlier_filtering: true
 
 # Normalization and padding
 nn_mean: 1

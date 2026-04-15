@@ -22,12 +22,12 @@ set -e
 # ============================================================================
 # Defaults
 # ============================================================================
-NODE="gipdeep7"
+NODE="gipdeep10"
 GPUS=1
 TIME="4:00:00"
-CONFIG="/home/rotem.shezaf/RaDe-GS/models/configs/testing.yaml"
+CONFIG="/home/rotem.shezaf/RaDe-GS/models/configs/combined_polynomial_ring3.yaml"
 MODEL_PATH=""
-TRAIN_CONFIG="/home/rotem.shezaf/RaDe-GS/models/configs/one_source/combined_polynomial_ring3.yaml"
+TRAIN_CONFIG="/home/rotem.shezaf/RaDe-GS/models/configs/combined_polynomial_ring3.yaml"
 DATASET_CONFIG=""
 EXTRA=""
 DRY_RUN=false

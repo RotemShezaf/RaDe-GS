@@ -68,7 +68,7 @@ After training Gaussian splats on the synthetic datasets, these scripts compute 
 
 | Script | Domain | Method |
 |--------|--------|--------|
-| `compute_gaussian_geodesic_distances.py` | Polynomial surfaces | Projects Gaussians onto the nearest face of the GT mesh, then uses **barycentric interpolation** of face-vertex geodesic distances (MMP/VTP algorithm) for O(h²) accuracy. Supports batch processing with partial computation and merging. |
+| `compute_gaussian_geodesic_distances.py` | Polynomial surfaces | Projects Gaussians onto the nearest face of the GT mesh, then uses **barycentric interpolation** of face-vertex geodesic distances (MMP/VTP algorithm) for O(h²) accuracy. Uses a high-level pipeline (`compute_and_save_geodesic_pipeline`) that splits sources into batches, computes geodesics, transfers to Gaussians, and saves partial results — all in one worker per batch. |
 | `compute_gaussian_geodesic_distances_tosca.py` | TOSCA shapes | Same approach but for TOSCA meshes. Supports **Gaussian embedding** (`--embed_gaussians`): each Gaussian is projected onto the mesh surface and inserted as a new vertex, eliminating barycentric interpolation error. Uses **normal-guided projection** by default: instead of orthogonal closest-point projection, each Gaussian is ray-cast along the interpolated vertex normal at the initial projection point, giving more geometrically faithful placement on curved surfaces (falls back to orthogonal projection when the ray misses the triangle). Source vertices are selected via **farthest-point sampling** on embedded Gaussian mesh vertices (when embedding is enabled) or proximity-filtered mesh vertices (legacy mode). Supports both GT and reconstructed meshes. Partial results are merged with automatic deduplication of overlapping source ranges. |
 | `compute_geodesic_mesh_for_gaussians.py` | Polynomial surfaces | Alternative approach: inserts Gaussian positions **directly as mesh vertices** (zero transfer error) by projecting (x,y) onto the analytical surface. Supports two insertion modes: global Delaunay (default) and **local per-triangle refinement** (`--local_refinement`), which preserves the grid topology and sub-triangulates only within each grid face containing Gaussians. |
 
@@ -77,7 +77,7 @@ After training Gaussian splats on the synthetic datasets, these scripts compute 
 <gaussian_output>/
 └── geodesic_distance/
     ├── gt_partial/
-    │   └── sources_range_{start}_{end}.npz   # Partial results (for parallelization)
+    │   └── sources_batch_{index}_{start}_{end}.npz  # Partial results (per-batch)
     └── gt_geodesic.npz                        # Complete merged ground truth
 ```
 

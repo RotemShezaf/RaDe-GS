@@ -121,6 +121,10 @@ scripts/
     │   ├── evaluate_geodesic_all.sh        # Evaluate all test shapes (GPU)
     │   ├── evaluate_geodesic_single_tmux.sh  # tmux launcher for single-shape eval
     │   └── evaluate_geodesic_all_tmux.sh   # tmux launcher for all-shapes eval
+    ├── benchmark/             # Parameter benchmarking
+    │   ├── benchmark_params.sh             # Sweep training params, evaluate mesh quality
+    │   ├── benchmark_tmux.sh               # tmux+SLURM launcher for benchmark
+    │   └── evaluate_benchmark.py           # Per-run evaluation (mesh quality, Gaussian dist, CC)
     └── pipeline/              # Full pipeline orchestration
         └── full_pipeline_tmux.sh           # Render→train→geodesic→patches
 ```
@@ -180,6 +184,55 @@ bash scripts/tosca/pipeline/full_pipeline_tmux.sh --shapes "cat0,cat1,dog0"
 tmux attach -t tosca_pipeline
 ```
 
+### TOSCA Parameter Benchmark
+
+Sweep training hyperparameters (`min_opacity_prune`, `lambda_multi_view_geo`,
+`lambda_distortion`, `densify_grad_threshold`, `big_point_scale_factor`) on a
+single shape. Each combination is trained, mesh-extracted, and evaluated against
+the ground-truth mesh. Results are saved as per-run JSON reports and a summary CSV.
+Optionally logs to Weights & Biases.
+
+```bash
+# Benchmark cat0 with default parameter grid
+bash scripts/tosca/benchmark/benchmark_params.sh --shape cat0
+
+# Dry run – see all parameter combinations without running
+bash scripts/tosca/benchmark/benchmark_params.sh --dry_run
+
+# Run via tmux on a GPU node
+bash scripts/tosca/benchmark/benchmark_tmux.sh --node gipdeep7 --shape cat0
+
+# Skip wandb, resume partial benchmark
+bash scripts/tosca/benchmark/benchmark_tmux.sh --no_wandb --skip_existing
+
+# Attach to monitor
+tmux attach -t tosca_benchmark
+```
+
+**Metrics collected per run:**
+- Chamfer distance (reconstructed mesh ↔ GT mesh)
+- Gaussian → GT mesh surface distance (mean, median, p95, p99)
+- Gaussian → closest reconstructed mesh vertex distance
+- Number of Gaussians
+- Number of connected components in reconstructed mesh
+- Accuracy (recon→GT) and completeness (GT→recon)
+
+**Output structure:**
+```
+output/benchmarks/tosca_params/{shape}_{texture}_{resolution}/
+├── benchmark_summary.csv           # Summary table of all runs
+├── mop_0.005/                      # min_opacity_prune=0.005
+│   ├── benchmark_report.json       # Full evaluation report
+│   ├── benchmark_args.txt          # Training args used
+│   ├── train.log                   # Training log
+│   ├── mesh_extract.log            # Mesh extraction log
+│   ├── recon.ply                   # Reconstructed mesh
+│   └── point_cloud/                # Gaussian point clouds
+├── lmvg_0.1/                       # lambda_multi_view_geo=0.1
+│   └── ...
+└── ...
+```
+
 ---
 
 ## TOSCA Scripts Detail
@@ -212,6 +265,8 @@ bash scripts/tosca/render/render_tmux.sh --node gipdeep9 --cpus 20
 | `train_tosca_smart.sh` | Smart batch trainer (animals, decoupled_appearance, GPU node) |
 | `train_tosca_gaussian_all.sh` | Batch-train Gaussian splatting (shapes/textures/resolutions + optional mesh) |
 | `mesh_extract_tosca_all.sh` | Extract mesh for all trained TOSCA Gaussian outputs |
+| `evaluate_gaussian_mesh_quality_single.sh` | Evaluate Gaussian-to-mesh alignment for a single shape (JSON report) |
+| `evaluate_gaussian_mesh_quality_all.sh` | Evaluate all TOSCA shapes and print aggregate summary |
 | `train_combined_tosca.sh` | Train combined transformer model on TOSCA data (ring 3, gipdeep10) |
 | `train_combined_tosca_test.sh` | Train combined transformer model – testing config (ring 3, gipdeep6) |
 ```bash
@@ -235,6 +290,12 @@ bash scripts/tosca/train_gaussians/train_tosca_gaussian_all.sh --shapes "cat0,ca
 
 # Extract mesh for all already-trained outputs
 bash scripts/tosca/train_gaussians/mesh_extract_tosca_all.sh
+
+# Evaluate Gaussian-mesh quality for a single shape
+bash scripts/tosca/train_gaussians/evaluate_gaussian_mesh_quality_single.sh cat0
+
+# Evaluate all TOSCA shapes
+bash scripts/tosca/train_gaussians/evaluate_gaussian_mesh_quality_all.sh
 ```
 
 ### Combined Model Training (`tosca/train_model/`)
@@ -431,6 +492,22 @@ Results are saved to `geodesic_eval_results/tosca/<shape>/` with:
 | `build_geodesic_mesh.sh` | Build geodesic mesh for single surface |
 | `build_geodesic_mesh_polynomial_all.sh` | Build geodesic mesh for all surfaces |
 | `build_geodesic_mesh_tmux.sh` | tmux launcher |
+| `validate_geodesic_single.sh` | Validate geodesic data for a single polynomial output (source projection, triangle ineq, etc.) |
+| `validate_geodesic_polynomial_all.sh` | Validate all polynomial outputs and print aggregate pass/fail summary |
+
+```bash
+# Validate a single output (checks projection, triangle inequality, symmetry, etc.)
+bash scripts/polynomial/geodesic/validate_geodesic_single.sh \
+    TrainData/Polynomial/SyntheticColmapData/blue_texture/Paraboloid/level_04/light_0/output \
+    Paraboloid --verbose
+
+# Validate all polynomial outputs
+bash scripts/polynomial/geodesic/validate_geodesic_polynomial_all.sh
+
+# Validate only specific surfaces/levels
+bash scripts/polynomial/geodesic/validate_geodesic_polynomial_all.sh \
+    --surfaces Paraboloid,Saddle --levels 04 --verbose
+```
 
 ### Training Patches (`polynomial/patches/`)
 

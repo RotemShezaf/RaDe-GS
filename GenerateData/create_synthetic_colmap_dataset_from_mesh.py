@@ -99,6 +99,8 @@ from GenerateData.utils.camera_utils import (
     _rotation_matrix_from_quaternion,
     _random_rotation_matrix,
     _fibonacci_sphere,
+    align_mesh_principal_axes,
+    apply_rotation_to_mesh,
 )
 
 
@@ -147,9 +149,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera_radius", type=float, default=6, help="Absolute radius for camera placement (overrides orbit_radius_scale)")
     parser.add_argument(
         "--camera_distribution",
-        choices=["uniform_sphere", "orbit"],
+        choices=["uniform_sphere", "orbit", "n_circles"],
         default="uniform_sphere",
         help="Strategy for sampling camera centers",
+    )
+    parser.add_argument(
+        "--circle_elevations",
+        type=str,
+        default="25,55,85",
+        help="When --camera_distribution=n_circles, provide comma-separated elevation angles in degrees, e.g. '25,55,85'",
     )
     parser.add_argument("--light_intensity", type=float, default=3.5, help="Directional light intensity for pyrender")
     parser.add_argument("--points3d_thresh", type=float, default=None, help="Downsample density threshold for COLMAP points3D (minimum distance between points). If None, no downsampling is performed.")
@@ -159,6 +167,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_decoupled_appearance", action="store_true", help="Vary lighting across view groups to simulate appearance variations for training appearance networks")
     parser.add_argument("--light_id", type=int, default=None, help="Fixed lighting configuration ID (0-4) for consistent lighting across all views. 0=default balanced, 1-4=variations. Ignored if --use_decoupled_appearance is set.")
     parser.add_argument("--seed", type=int, default=13, help="Random seed for viewpoint shuffling and point sampling")
+    parser.add_argument("--align_principal_axes", action="store_true", help="Rotate mesh so principal axes align with world axes before rendering/sampling")
+    parser.add_argument("--major_to", choices=["x", "y", "z"], default="z", help="When --align_principal_axes is set, map the largest principal axis to this world axis (default: z)")
     return parser.parse_args()
 
 
@@ -287,6 +297,16 @@ def main() -> None:
     _ensure_dirs(dataset_dir)
 
     # Compute camera positions and render images using the image_mesh_level mesh
+    # Optionally align principal axes and apply same transform to colmap mesh later
+    rot_R = None
+    rot_centroid = None
+    if getattr(args, 'align_principal_axes', False):
+        major_to = getattr(args, 'major_to', 'z')
+        print(f"Aligning image mesh principal axes to world axes (major -> {major_to})...")
+        R, centroid = align_mesh_principal_axes(image_mesh, return_matrix=True, major_to=major_to)
+        rot_R = R
+        rot_centroid = centroid
+
     centers, targets = _compute_camera_centers(image_mesh, args.num_views, args, args.seed)
     samples, camera_intrinsics = _render_images(image_mesh, centers, targets, args, dataset_dir, args.texture_folder, args.texture_name)
 
@@ -296,6 +316,9 @@ def main() -> None:
     colmap_mesh = _load_mesh(data_root, args.surface, args.colmap_level, args.color_scheme, args.texture_folder, args.texture_name)
     # Load analytical normals if available, otherwise calculate from mesh
     _load_normals_if_available(data_root, args.surface, args.colmap_level, colmap_mesh)
+    # If we aligned the image mesh, apply the same rotation to colmap mesh for consistency
+    if rot_R is not None and rot_centroid is not None:
+        apply_rotation_to_mesh(colmap_mesh, rot_R, rot_centroid)
     points_xyz_colmap, points_rgb_colmap, points_normals_colmap = _sample_points(colmap_mesh, args.points3d_thresh, args.seed)
 
     sparse_dir = dataset_dir / "sparse" / "0"

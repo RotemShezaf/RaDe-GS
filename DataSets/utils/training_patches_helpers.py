@@ -564,10 +564,12 @@ def _filter_outliers_without_pu(
       against the cleaned references exceeds an adaptive threshold.
 
     **Stage 3 — direct geo/euc hard cap.**
-      Any visited neighbor whose geodesic / euclidean-distance-from-center
-      ratio exceeds a hard cap (50) is flagged as an outlier, regardless
-      of gradient consistency.  This catches the remaining edge cases
-      where fold neighbors "validate" each other.
+      Any visited neighbor whose *shifted* geodesic / euclidean-distance-
+      from-center ratio exceeds a hard cap (50) is flagged as an outlier.
+      The shift subtracts ``min(vis_u)`` so the ratio measures local
+      geodesic gradient rather than absolute distance from the source.
+      This catches the remaining edge cases where fold neighbors
+      "validate" each other.
 
     **Max removal cap** (optional):
       When *max_removal_fraction* is set (e.g. 0.5 for 50 %), at most that
@@ -596,7 +598,9 @@ def _filter_outliers_without_pu(
         visited_nbr = nbrs_u < sentinel
         if visited_nbr.any():
             euc_from_center = LA.norm(nbrs_xyz[visited_nbr], axis=1)
-            ratio = nbrs_u[visited_nbr] / np.maximum(euc_from_center, eps)
+            vis_geo = nbrs_u[visited_nbr]
+            shifted_geo = vis_geo - vis_geo.min()
+            ratio = shifted_geo / np.maximum(euc_from_center, eps)
             hard_outlier = ratio > 50.0
             if hard_outlier.any():
                 idx = np.where(visited_nbr)[0]
@@ -635,7 +639,8 @@ def _filter_outliers_without_pu(
 
     # Also apply geo/euc hard cap to ring-1 themselves.
     r1_euc_from_center = LA.norm(r1_xyz_v, axis=1)
-    r1_ratio = r1_u_v / np.maximum(r1_euc_from_center, eps)
+    r1_shifted_geo = r1_u_v - r1_u_v.min()
+    r1_ratio = r1_shifted_geo / np.maximum(r1_euc_from_center, eps)
     r1_clean_mask &= r1_ratio <= 50.0
 
     if r1_clean_mask.sum() < 2:
@@ -684,7 +689,8 @@ def _filter_outliers_without_pu(
 
     # --- Stage 3: geo/euc hard cap ---
     euc_from_center = LA.norm(vis_xyz, axis=1)
-    ratio = vis_u / np.maximum(euc_from_center, eps)
+    shifted_geo = vis_u - vis_u.min()
+    ratio = shifted_geo / np.maximum(euc_from_center, eps)
     outlier |= ratio > 50.0
 
     if outlier.any():
@@ -742,108 +748,71 @@ def create_train_example(
     geodesic_distances: np.ndarray,
     ring_nbrs: Dict[int, np.ndarray],
     ring1_nbrs: Dict[int, np.ndarray],
-    gaussian_data: Optional['GaussianData'] = None,
-    patch_config: Optional['PatchConfig'] = None,
-    # Legacy positional args (used when gaussian_data/patch_config not provided)
-    positions: Optional[np.ndarray] = None,
-    normals: Optional[np.ndarray] = None,
-    ring: Optional[int] = None,
-    normalization_factor: Optional[float] = None,
-    nn_mean: Optional[float] = None,
-    attributes: Optional[List[str]] = None,
-    scales: Optional[np.ndarray] = None,
-    rotations: Optional[np.ndarray] = None,
-    opacities: Optional[np.ndarray] = None,
-    sh_features: Optional[np.ndarray] = None,
-    use_mahalanobis: bool = False,
-    use_r1_min_val: bool = True,
-    mask_attributes: Optional[List[str]] = None,
-    mask_constant: float = -10.0,
-    ring_size_mapping: Optional[Dict] = None,
-    normalize_per_patch: bool = False,
-    per_point_nn_distances: Optional[np.ndarray] = None,
+    gaussian_data: 'GaussianData' = None,
+    patch_config: 'PatchConfig' = None,
     _stats_out: Optional[Dict] = None,
     skip_fold_check: bool = True,
     inverse_ring1_nbrs: Optional[Dict[int, np.ndarray]] = None,
 ) -> Optional[np.ndarray]:
     """
     Create a single training example for a point.
-    
-    Preferred calling convention (compact)::
+
+    Calling convention::
 
         example = create_train_example(
             point_idx, geodesic_distances, ring_nbrs, ring1_nbrs,
             gaussian_data=gdata, patch_config=pcfg,
         )
 
-    Legacy calling convention (all individual args) is still supported for
-    backward compatibility.
-    
     Args:
         point_idx: Index of the point to create example for
         geodesic_distances: (N,) geodesic distances from source
         ring_nbrs: Dictionary mapping point index to ring-k neighbor indices
         ring1_nbrs: Dictionary mapping point index to ring-1 neighbor indices
         gaussian_data: ``GaussianData`` bundle (positions, scales, …).
-            When provided, individual array args are ignored.
         patch_config: ``PatchConfig`` bundle (ring, attributes, …).
-            When provided, individual config args are ignored.
-    
+        _stats_out: Optional dict for collecting outlier stats.
+        skip_fold_check: Outlier filter mode (True=inference, False=training,
+            None=disabled).
+        inverse_ring1_nbrs: Optional inverse ring-1 map for r1_min_val.
+
     Returns:
         Training example array or None if invalid (e.g., too many neighbors)
     """
-    # Resolve from dataclasses or legacy args
-    surface_type = None  # default; overridden by patch_config if present
-    outlier_median_multiplier = 3.0
-    outlier_threshold_floor = 2.0
-    outlier_hard_cap = 500.0
-    outlier_fallback_multiplier = 5.0
-    outlier_fallback_floor = 3.0
-    outlier_max_removal_fraction = None
-    mask_outliers_only = False
-    if gaussian_data is not None:
-        positions = gaussian_data.positions
-        normals = gaussian_data.normals
-        scales = gaussian_data.scales
-        rotations = gaussian_data.rotations
-        opacities = gaussian_data.opacities
-        sh_features = gaussian_data.sh_features
-        per_point_nn_distances = gaussian_data.per_point_nn_distances
-    if patch_config is not None:
-        ring = patch_config.ring
-        normalization_factor = patch_config.normalization_factor
-        nn_mean = patch_config.nn_mean
-        attributes = patch_config.attributes
-        use_mahalanobis = patch_config.use_mahalanobis
-        use_r1_min_val = patch_config.use_r1_min_val
-        mask_attributes = patch_config.mask_attributes
-        mask_constant = patch_config.mask_constant
-        ring_size_mapping = patch_config.ring_size_mapping
-        normalize_per_patch = patch_config.normalize_per_patch
-        surface_type = patch_config.surface_type
-        outlier_median_multiplier = patch_config.outlier_median_multiplier
-        outlier_threshold_floor = patch_config.outlier_threshold_floor
-        outlier_hard_cap = patch_config.outlier_hard_cap
-        outlier_fallback_multiplier = patch_config.outlier_fallback_multiplier
-        outlier_fallback_floor = patch_config.outlier_fallback_floor
-        outlier_max_removal_fraction = patch_config.outlier_max_removal_fraction
-        mask_outliers_only = patch_config.mask_outliers_only
-        if patch_config.disable_outlier_filtering:
-            skip_fold_check = None  # sentinel: skip ALL outlier filtering
+    if gaussian_data is None:
+        raise ValueError("gaussian_data is required")
+    if patch_config is None:
+        raise ValueError("patch_config is required")
 
-    # Defaults for optional args not resolved above
-    if positions is None:
-        raise ValueError("positions must be provided via gaussian_data or directly")
-    if ring is None:
-        ring = 2
-    if normalization_factor is None:
-        normalization_factor = 1.0
-    if nn_mean is None:
-        nn_mean = 1.0
-    if attributes is None:
-        attributes = ["xyz"]
-    if mask_attributes is None:
-        mask_attributes = []
+    # Resolve from dataclasses
+    positions = gaussian_data.positions
+    normals = gaussian_data.normals
+    scales = gaussian_data.scales
+    rotations = gaussian_data.rotations
+    opacities = gaussian_data.opacities
+    sh_features = gaussian_data.sh_features
+    per_point_nn_distances = gaussian_data.per_point_nn_distances
+
+    ring = patch_config.ring
+    normalization_factor = patch_config.normalization_factor
+    nn_mean = patch_config.nn_mean
+    attributes = patch_config.attributes
+    use_mahalanobis = patch_config.use_mahalanobis
+    use_r1_min_val = patch_config.use_r1_min_val
+    mask_attributes = patch_config.mask_attributes
+    mask_constant = patch_config.mask_constant
+    ring_size_mapping = patch_config.ring_size_mapping
+    normalize_per_patch = patch_config.normalize_per_patch
+    surface_type = patch_config.surface_type
+    outlier_median_multiplier = patch_config.outlier_median_multiplier
+    outlier_threshold_floor = patch_config.outlier_threshold_floor
+    outlier_hard_cap = patch_config.outlier_hard_cap
+    outlier_fallback_multiplier = patch_config.outlier_fallback_multiplier
+    outlier_fallback_floor = patch_config.outlier_fallback_floor
+    outlier_max_removal_fraction = patch_config.outlier_max_removal_fraction
+    mask_outliers_only = patch_config.mask_outliers_only
+    if patch_config.disable_outlier_filtering:
+        skip_fold_check = None  # sentinel: skip ALL outlier filtering
     max_num_nbrs = get_ring_size_mapping(ring, use_mahalanobis, ring_size_mapping)
     
     # Get neighbors
@@ -1100,26 +1069,8 @@ def generate_training_examples(
     num_iterations: int,
     num_sources: int,
     num_train_points: int,
-    gaussian_data: Optional['GaussianData'] = None,
-    patch_config: Optional['PatchConfig'] = None,
-    # Legacy individual args (ignored when gaussian_data/patch_config given)
-    positions: Optional[np.ndarray] = None,
-    normals: Optional[np.ndarray] = None,
-    ring: Optional[int] = None,
-    normalization_factor: Optional[float] = None,
-    nn_mean: Optional[float] = None,
-    attributes: Optional[List[str]] = None,
-    scales: Optional[np.ndarray] = None,
-    rotations: Optional[np.ndarray] = None,
-    opacities: Optional[np.ndarray] = None,
-    sh_features: Optional[np.ndarray] = None,
-    use_mahalanobis: bool = False,
-    use_r1_min_val: bool = True,
-    mask_attributes: Optional[List[str]] = None,
-    mask_constant: float = -10.0,
-    ring_size_mapping: Optional[Dict] = None,
-    normalize_per_patch: bool = False,
-    per_point_nn_distances: Optional[np.ndarray] = None,
+    gaussian_data: 'GaussianData' = None,
+    patch_config: 'PatchConfig' = None,
     seed: int = 42,
     verbose: bool = True,
     num_workers: Optional[int] = None,
@@ -1128,16 +1079,14 @@ def generate_training_examples(
 ) -> np.ndarray:
     """
     Generate training examples by randomly sampling sources and training points.
-    
-    Preferred calling convention (compact)::
+
+    Calling convention::
 
         examples = generate_training_examples(
             geodesic_data, ring_nbrs_dict, ring1_nbrs,
             num_iterations, num_sources, num_train_points,
             gaussian_data=gdata, patch_config=pcfg, seed=42,
         )
-
-    Legacy calling convention (all individual args) is still supported.
 
     Args:
         geodesic_data: Dictionary with precomputed geodesic distances
@@ -1151,49 +1100,24 @@ def generate_training_examples(
         seed: Random seed
         verbose: Print progress information
         num_workers: Number of parallel workers.
+        _stats_out: Optional dict for collecting outlier stats.
         near_source_oversample: Fraction (0–1) of ``num_train_points`` that
             are sampled with inverse-geodesic-distance weighting so that
             points closer to the source are more likely to be selected.
-            0.0 (default) means uniform sampling (legacy behaviour).  
+            0.0 (default) means uniform sampling (legacy behaviour).
             0.5 means half the points are distance-weighted, half uniform.
-    
+
     Returns:
         (M, D) array of training examples
     """
-    # Resolve from dataclasses or legacy args
-    if gaussian_data is not None:
-        positions = gaussian_data.positions
-        normals = gaussian_data.normals
-        scales = gaussian_data.scales
-        rotations = gaussian_data.rotations
-        opacities = gaussian_data.opacities
-        sh_features = gaussian_data.sh_features
-        per_point_nn_distances = gaussian_data.per_point_nn_distances
-    if patch_config is not None:
-        ring = patch_config.ring
-        normalization_factor = patch_config.normalization_factor
-        nn_mean = patch_config.nn_mean
-        attributes = patch_config.attributes
-        use_mahalanobis = patch_config.use_mahalanobis
-        use_r1_min_val = patch_config.use_r1_min_val
-        mask_attributes = patch_config.mask_attributes
-        mask_constant = patch_config.mask_constant
-        ring_size_mapping = patch_config.ring_size_mapping
-        normalize_per_patch = patch_config.normalize_per_patch
+    if gaussian_data is None:
+        raise ValueError("gaussian_data is required")
+    if patch_config is None:
+        raise ValueError("patch_config is required")
 
-    # Defaults for optional args
-    if positions is None:
-        raise ValueError("positions must be provided via gaussian_data or directly")
-    if ring is None:
-        ring = 2
-    if normalization_factor is None:
-        normalization_factor = 1.0
-    if nn_mean is None:
-        nn_mean = 1.0
-    if attributes is None:
-        attributes = ["xyz"]
-    if mask_attributes is None:
-        mask_attributes = []
+    positions = gaussian_data.positions
+    ring = patch_config.ring
+    attributes = patch_config.attributes
 
     if verbose:
         print(f"\nGenerating training examples (ring {ring}):")
@@ -1203,20 +1127,6 @@ def generate_training_examples(
         print(f"  Attributes: {', '.join(attributes)}")
         if near_source_oversample > 0:
             print(f"  Near-source oversample ratio: {near_source_oversample:.0%}")
-
-    # Build canonical dataclass bundles for internal use
-    _gdata = gaussian_data if gaussian_data is not None else GaussianData(
-        positions=positions, scales=scales, rotations=rotations,
-        opacities=opacities, normals=normals, sh_features=sh_features,
-        per_point_nn_distances=per_point_nn_distances,
-    )
-    _pcfg = patch_config if patch_config is not None else PatchConfig(
-        ring=ring, normalization_factor=normalization_factor,
-        nn_mean=nn_mean, attributes=list(attributes),
-        use_mahalanobis=use_mahalanobis, use_r1_min_val=use_r1_min_val,
-        mask_attributes=list(mask_attributes), mask_constant=mask_constant,
-        ring_size_mapping=ring_size_mapping, normalize_per_patch=normalize_per_patch,
-    )
 
     # ------------------------------------------------------------------
     # Decide how many workers to use
@@ -1230,7 +1140,7 @@ def generate_training_examples(
     # ------------------------------------------------------------------
     if num_workers <= 1:
         return _generate_sequential(
-            _gdata, _pcfg,
+            gaussian_data, patch_config,
             geodesic_data, ring_nbrs_dict, ring1_nbrs,
             num_iterations, num_sources, num_train_points,
             seed, verbose,
@@ -1245,22 +1155,22 @@ def generate_training_examples(
         print(f"  Workers: {num_workers}")
 
     # Precompute inverse ring-1 for r1_min_val computation
-    _inv_ring1 = build_inverse_ring1(ring1_nbrs, len(_gdata.positions))
+    _inv_ring1 = build_inverse_ring1(ring1_nbrs, len(gaussian_data.positions))
 
     # Pack shared read-only data into a dict (inherited via fork on Linux)
     global _mp_shared
     _mp_shared = {
-        'positions': _gdata.positions,
-        'normals': _gdata.normals,
+        'positions': gaussian_data.positions,
+        'normals': gaussian_data.normals,
         'geodesic_data': geodesic_data,
         'ring_nbrs_dict': ring_nbrs_dict,
         'ring1_nbrs': ring1_nbrs,
         'inverse_ring1_nbrs': _inv_ring1,
-        'scales': _gdata.scales,
-        'rotations': _gdata.rotations,
-        'opacities': _gdata.opacities,
-        'sh_features': _gdata.sh_features,
-        'per_point_nn_distances': _gdata.per_point_nn_distances,
+        'scales': gaussian_data.scales,
+        'rotations': gaussian_data.rotations,
+        'opacities': gaussian_data.opacities,
+        'sh_features': gaussian_data.sh_features,
+        'per_point_nn_distances': gaussian_data.per_point_nn_distances,
     }
 
     # Split iterations into roughly equal chunks
@@ -1271,26 +1181,26 @@ def generate_training_examples(
             int(chunk_boundaries[w]),
             int(chunk_boundaries[w + 1]),
             seed,
-            _pcfg.ring,
+            patch_config.ring,
             num_sources,
             num_train_points,
-            _pcfg.normalization_factor,
-            _pcfg.nn_mean,
-            list(_pcfg.attributes),
-            _pcfg.use_mahalanobis,
-            _pcfg.use_r1_min_val,
-            list(_pcfg.mask_attributes),
-            _pcfg.mask_constant,
-            _pcfg.ring_size_mapping,
-            _pcfg.normalize_per_patch,
+            patch_config.normalization_factor,
+            patch_config.nn_mean,
+            list(patch_config.attributes),
+            patch_config.use_mahalanobis,
+            patch_config.use_r1_min_val,
+            list(patch_config.mask_attributes),
+            patch_config.mask_constant,
+            patch_config.ring_size_mapping,
+            patch_config.normalize_per_patch,
             near_source_oversample,
-            _pcfg.surface_type,
-            _pcfg.disable_outlier_filtering,
-            _pcfg.outlier_median_multiplier,
-            _pcfg.outlier_threshold_floor,
-            _pcfg.outlier_hard_cap,
-            _pcfg.outlier_fallback_multiplier,
-            _pcfg.outlier_fallback_floor,
+            patch_config.surface_type,
+            patch_config.disable_outlier_filtering,
+            patch_config.outlier_median_multiplier,
+            patch_config.outlier_threshold_floor,
+            patch_config.outlier_hard_cap,
+            patch_config.outlier_fallback_multiplier,
+            patch_config.outlier_fallback_floor,
         ))
 
     all_examples: List[np.ndarray] = []

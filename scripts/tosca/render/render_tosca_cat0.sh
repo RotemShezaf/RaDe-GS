@@ -19,12 +19,14 @@ python3 GenerateData/create_synthetic_colmap_dataset_from_mesh_tosca.py \
     --shape cat0 \
     --colmap_resolution high_res \
     --image_mesh_resolution high_res \
-    --num_views 400 \
-    --image_width 1024 \
-    --image_height 1024 \
+    --num_views 700\
+    --image_width 768 \
+    --image_height 768 \
     --auto_camera_radius \
     --texture_name blue \
-    --use_decoupled_appearance
+    --light_id 0
 
+    #--camera_distribution n_circles \
+    #--circle_elevations "85,45,15" \
 
 echo "cat0 rendering complete!"

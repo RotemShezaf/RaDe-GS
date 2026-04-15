@@ -227,7 +227,10 @@ class GaussianModel:
             valid_points = torch.logical_or(valid_points, valid)
             focal_length = max(focal_length, camera.Fx)
 
-        distance[~valid_points] = distance[valid_points].max()
+        if valid_points.any():
+            distance[~valid_points] = distance[valid_points].max()
+        else:
+            distance[:] = 1.0
 
         filter_3D = distance / focal_length * (0.2**0.5)
         self.filter_3D = filter_3D[..., None]
@@ -689,7 +692,9 @@ class GaussianModel:
 
     # Use the same densification strategy as GOF:
     # https://github.com/autonomousvision/gaussian-opacity-fields
-    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
+    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size,
+                          big_point_scale_factor=0.1, prune_min_scale_threshold=0.0,
+                          prune_scale_anisotropy=0.0):
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
 
@@ -706,10 +711,21 @@ class GaussianModel:
         split = self._xyz.shape[0]
 
         prune_mask = (self.get_opacity < min_opacity).squeeze()
-        # if max_screen_size:
-        #     big_points_vs = self.max_radii2D > max_screen_size
-        #     big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
-        #     prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
+        if max_screen_size:
+            big_points_vs = self.max_radii2D > max_screen_size
+            big_points_ws = self.get_scaling.max(dim=1).values > big_point_scale_factor * extent
+            prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
+        # Prune blobby/round floaters by min scale (surface Gaussians are flat pancakes)
+        if prune_min_scale_threshold > 0:
+            blobby = self.get_scaling.min(dim=1).values > prune_min_scale_threshold
+            prune_mask = torch.logical_or(prune_mask, blobby)
+        # Prune by anisotropy ratio: surface Gaussians have high max/min ratio (pancakes),
+        # floaters have low ratio (round blobs). Prune if ratio < threshold.
+        if prune_scale_anisotropy > 0:
+            scales = self.get_scaling
+            anisotropy = scales.max(dim=1).values / (scales.min(dim=1).values + 1e-8)
+            low_anisotropy = anisotropy < prune_scale_anisotropy
+            prune_mask = torch.logical_or(prune_mask, low_anisotropy)
         self.prune_points(prune_mask)
         prune = self._xyz.shape[0]
         return clone - before, split - clone, split - prune

@@ -389,7 +389,6 @@ class TestValidMask:
             attributes=['xyz', 'opacity'],
             ring=2,
             use_r1_min=False,
-            mask_constant=-10.0
         )
         
         for i in range(min(5, len(dataset))):
@@ -434,7 +433,6 @@ class TestValidMask:
             attributes=['xyz', 'opacity'],
             ring=2,
             use_r1_min=False,
-            mask_constant=-10.0
         )
         
         for i in range(len(dataset)):

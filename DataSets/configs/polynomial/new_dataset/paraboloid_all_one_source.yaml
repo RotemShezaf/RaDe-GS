@@ -7,7 +7,7 @@
 #   - adaptive_max_mean_cut: 0.00
 #   - adaptive_max_steps: 6 (matches run_adaptive_analysis.sh)
 #   - near_source_oversample: 0.3 (inverse-geodesic-weighted sampling)
-#   - disable_outlier_filtering: false (outlier removal enabled)
+#   - disable_outlier_filtering: true (outlier removal disabled)
 #
 # Usage:
 #   python DataSets/create_gaussian_training_patches.py \
@@ -64,7 +64,7 @@ attributes:
   - xyz
 
 # Outlier filtering
-disable_outlier_filtering: false
+disable_outlier_filtering: true
 
 # Normalization and padding
 nn_mean: 1

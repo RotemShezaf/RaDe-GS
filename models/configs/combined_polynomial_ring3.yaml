@@ -20,21 +20,24 @@ dataset:
   use_r1_min: true
   transforms:
     - name: GaussianPatchCanonicalRotate
-    - name: GaussianPatchDropout
-      max_dropout_ratio: 0.5
-  # Full dataset – all examples
+    - name: SparseContextDropout
+      min_valid: 1
+      max_valid_ratio: 1.00
+      p: 0.5
+      p_dropout: 1
+      max_dropout_ratio: 0.99
   max_examples: null
   subset_seed: 42
 
 # ── Model ──────────────────────────────────────────────────────────────
 model:
   embed_dim: 128
-  encoder_depth: 6
+  encoder_depth: 4
   num_heads: 8
   mlp_ratio: 4.0
-  dropout: 0.001
-  attn_dropout: 0.001
-  drop_path_rate: 0.001
+  dropout: 0.00005
+  attn_dropout: 0.00005
+  drop_path_rate: 0.00005
   point_attributes: null  # null = use all attributes
   # pool: max | mean | max_mean  (default: max)
   pool: max
@@ -51,18 +54,20 @@ model:
 # ── Training ───────────────────────────────────────────────────────────
 training:
   num_epochs: 150
-  batch_size: 512
+  batch_size: 264
   learning_rate: 6.0e-4
   warmup_epochs: 15
   min_learning_rate: 1.0e-6
   weight_decay: 5e-6
-  loss_type: mse        # mse | l1 | smooth_l1 | log_mse | log_l1
+  loss_type: mse
+  #huber_delta : 0.5 
+  #blended_mse_lambda: 0.5 # weight for linear-space MSE (1-lambda = log-space MSE)
   seed: 42
 
 # ── Early stopping ─────────────────────────────────────────────────────
 early_stopping_cfg:
   early_stopping: true
-  patience: 8
+  patience: 20
   min_delta: 0.0
 
 # ── Infrastructure ─────────────────────────────────────────────────────

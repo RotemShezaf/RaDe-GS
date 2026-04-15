@@ -19,7 +19,7 @@ def get_lighting_config(group_id: int, use_decoupled_appearance: bool = False) -
     Args:
         group_id: Lighting group ID
                  -1 = default/standard lighting
-                 0-4 = fixed light ID presets
+                 0-5 = fixed light ID presets (5 = natural sunlight)
                  0-9 = decoupled appearance groups (when use_decoupled_appearance=True)
         use_decoupled_appearance: If True, uses appearance variation mode
     
@@ -31,8 +31,8 @@ def get_lighting_config(group_id: int, use_decoupled_appearance: bool = False) -
         # DEFAULT/STANDARD MODE: Balanced lighting for clear shading
         return STANDARD_LIGHTING
     
-    elif group_id in [0, 1, 2, 3, 4] and not use_decoupled_appearance:
-        # FIXED LIGHT ID MODE: 5 preset configurations
+    elif group_id in LIGHT_ID_PRESETS and not use_decoupled_appearance:
+        # FIXED LIGHT ID MODE: preset configurations (0-5)
         return LIGHT_ID_PRESETS[group_id]
     
     elif use_decoupled_appearance:
@@ -47,80 +47,113 @@ def get_lighting_config(group_id: int, use_decoupled_appearance: bool = False) -
 
 # =============================================================================
 # STANDARD LIGHTING (Default/Baseline)
+# Natural, balanced lighting with gentle shading from multiple angles
+# for good detail capture when rendering from different viewpoints.
 # =============================================================================
 STANDARD_LIGHTING = (
     [
-        # Key light - strong directional from front-top-right
-        ("key_light", [1.0, 1.0, 1.0], [-0.3, -0.7, -0.8], 65000),
+        # Key light - warm directional from front-top-right (mimics sun at ~45°)
+        ("key_light", [1.0, 0.98, 0.95], [-0.3, -0.7, -0.8], 55000),
         
-        # Secondary lights - 6 directions for coverage
-        ("front_right", [0.98, 0.98, 1.0], [0.7, -0.4, -0.7], 12000),
-        ("front_left", [1.0, 0.98, 0.98], [-0.7, -0.4, -0.7], 12000),
-        ("top", [1.0, 1.0, 0.98], [0.0, -0.9, -0.3], 10000),
-        ("back_center", [0.96, 0.98, 1.0], [0.0, -0.3, 0.9], 22000),
+        # Fill lights - softer, from opposite sides to reduce harsh shadows
+        ("front_right", [0.98, 0.98, 1.0], [0.7, -0.4, -0.7], 18000),
+        ("front_left", [1.0, 0.98, 0.98], [-0.7, -0.4, -0.7], 18000),
+        ("top", [1.0, 1.0, 0.98], [0.0, -0.9, -0.3], 14000),
+        # Back/rim lights for edge definition from rear viewpoints
+        ("back_center", [0.96, 0.98, 1.0], [0.0, -0.3, 0.9], 20000),
         ("back_right", [0.98, 0.98, 1.0], [0.6, -0.3, 0.6], 16000),
         ("back_left", [1.0, 0.98, 0.98], [-0.6, -0.3, 0.6], 16000),
     ],
-    25000  # Indirect intensity
+    30000  # Indirect intensity - moderate ambient for shadow fill
 )
 
 
 # =============================================================================
-# FIXED LIGHT ID PRESETS (0-4)
+# FIXED LIGHT ID PRESETS (0-5)
+# Each preset provides natural lighting from different primary angles to ensure
+# good detail and shading regardless of the rendering viewpoint.
 # =============================================================================
 LIGHT_ID_PRESETS = {
-    0: STANDARD_LIGHTING,  # Light ID 0 = standard
-    
-    1: (  # Warmer variant with slightly different key angle
+    0: (  # Front-right key (default balanced, natural daylight)
         [
-            ("key_light", [1.0, 0.98, 0.93], [-0.4, -0.6, -0.7], 68000),
-            ("front_right", [1.0, 0.98, 0.95], [0.6, -0.5, -0.6], 13000),
-            ("front_left", [0.98, 0.98, 1.0], [-0.6, -0.5, -0.7], 11000),
-            ("top", [1.0, 0.99, 0.96], [0.0, -0.8, -0.4], 11000),
-            ("back_center", [0.95, 0.97, 1.0], [0.0, -0.4, 0.85], 23000),
-            ("back_right", [0.97, 0.98, 1.0], [0.5, -0.4, 0.7], 17000),
-            ("back_left", [1.0, 0.97, 0.95], [-0.5, -0.4, 0.7], 15000),
+            ("key_light", [1.0, 0.98, 0.95], [-0.3, -0.7, -0.8], 55000),
+            ("front_right", [0.98, 0.98, 1.0], [0.7, -0.4, -0.7], 18000),
+            ("front_left", [1.0, 0.98, 0.98], [-0.7, -0.4, -0.7], 18000),
+            ("top", [1.0, 1.0, 0.98], [0.0, -0.9, -0.3], 14000),
+            ("back_center", [0.96, 0.98, 1.0], [0.0, -0.3, 0.9], 20000),
+            ("back_right", [0.98, 0.98, 1.0], [0.6, -0.3, 0.6], 16000),
+            ("back_left", [1.0, 0.98, 0.98], [-0.6, -0.3, 0.6], 16000),
         ],
-        27000
+        30000
     ),
-    
-    2: (  # Cooler variant with top-down emphasis
+
+    1: (  # Front-left key with warm fill (morning light)
         [
-            ("key_light", [0.95, 0.98, 1.0], [-0.2, -0.8, -0.6], 62000),
-            ("front_right", [0.96, 0.98, 1.0], [0.7, -0.4, -0.6], 14000),
-            ("front_left", [0.98, 1.0, 1.0], [-0.7, -0.4, -0.6], 13000),
-            ("top", [0.96, 0.99, 1.0], [0.0, -0.9, -0.2], 12000),
-            ("back_center", [0.94, 0.97, 1.0], [0.0, -0.3, 0.9], 24000),
-            ("back_right", [0.96, 0.98, 1.0], [0.6, -0.3, 0.7], 18000),
-            ("back_left", [0.98, 0.98, 1.0], [-0.6, -0.3, 0.7], 17000),
+            ("key_light", [1.0, 0.97, 0.92], [-0.5, -0.6, -0.7], 58000),
+            ("fill_right", [0.96, 0.98, 1.0], [0.6, -0.4, -0.6], 16000),
+            ("fill_left", [1.0, 0.97, 0.94], [-0.6, -0.5, -0.6], 14000),
+            ("top", [1.0, 0.99, 0.96], [0.0, -0.85, -0.3], 13000),
+            ("back_center", [0.95, 0.97, 1.0], [0.0, -0.35, 0.85], 19000),
+            ("back_right", [0.97, 0.98, 1.0], [0.5, -0.35, 0.7], 15000),
+            ("back_left", [1.0, 0.97, 0.95], [-0.5, -0.35, 0.7], 15000),
         ],
-        29000
+        28000
     ),
-    
-    3: (  # Softer lighting with more ambient
+
+    2: (  # Top-down emphasis with cool tones (overcast daylight)
         [
-            ("key_light", [1.0, 1.0, 0.98], [-0.3, -0.7, -0.8], 58000),
-            ("front_right", [0.98, 0.98, 1.0], [0.7, -0.4, -0.7], 15000),
-            ("front_left", [1.0, 0.98, 0.98], [-0.7, -0.4, -0.7], 15000),
-            ("top", [0.99, 1.0, 0.98], [0.0, -0.9, -0.3], 13000),
-            ("back_center", [0.97, 0.98, 1.0], [0.0, -0.3, 0.9], 25000),
-            ("back_right", [0.98, 0.98, 1.0], [0.6, -0.3, 0.6], 19000),
-            ("back_left", [1.0, 0.98, 0.98], [-0.6, -0.3, 0.6], 18000),
+            ("key_light", [0.96, 0.98, 1.0], [-0.2, -0.8, -0.5], 52000),
+            ("fill_right", [0.97, 0.98, 1.0], [0.65, -0.4, -0.55], 18000),
+            ("fill_left", [0.98, 1.0, 1.0], [-0.65, -0.4, -0.55], 17000),
+            ("top", [0.97, 0.99, 1.0], [0.0, -0.9, -0.2], 16000),
+            ("back_center", [0.95, 0.97, 1.0], [0.0, -0.3, 0.88], 20000),
+            ("back_right", [0.96, 0.98, 1.0], [0.55, -0.3, 0.65], 16000),
+            ("back_left", [0.98, 0.98, 1.0], [-0.55, -0.3, 0.65], 16000),
         ],
         32000
     ),
-    
-    4: (  # High-contrast dramatic lighting
+
+    3: (  # Side key from right with softer fill (afternoon light)
         [
-            ("key_light", [1.0, 0.99, 0.96], [-0.5, -0.6, -0.7], 72000),
-            ("front_right", [0.98, 0.98, 1.0], [0.6, -0.5, -0.7], 10000),
-            ("front_left", [1.0, 0.98, 0.96], [-0.6, -0.5, -0.8], 9000),
-            ("top", [1.0, 1.0, 0.97], [0.0, -0.9, -0.4], 8000),
-            ("back_center", [0.95, 0.97, 1.0], [0.0, -0.2, 0.9], 20000),
-            ("back_right", [0.97, 0.98, 1.0], [0.7, -0.2, 0.5], 14000),
-            ("back_left", [1.0, 0.97, 0.95], [-0.7, -0.2, 0.5], 13000),
+            ("key_light", [1.0, 0.98, 0.94], [0.6, -0.65, -0.5], 54000),
+            ("fill_left", [0.96, 0.98, 1.0], [-0.6, -0.45, -0.6], 17000),
+            ("fill_front", [0.98, 0.98, 1.0], [0.0, -0.5, -0.8], 15000),
+            ("top", [0.99, 1.0, 0.98], [0.0, -0.88, -0.25], 14000),
+            ("back_center", [0.96, 0.97, 1.0], [0.0, -0.3, 0.88], 19000),
+            ("back_right", [0.97, 0.98, 1.0], [0.55, -0.3, 0.65], 16000),
+            ("back_left", [1.0, 0.98, 0.96], [-0.55, -0.35, 0.65], 16000),
         ],
-        22000
+        29000
+    ),
+
+    4: (  # Geometry-extraction: stronger key, lower ambient for shadow detail
+        [
+            ("key_light", [1.0, 0.99, 0.97], [-0.5, -0.65, -0.6], 65000),
+            ("fill_right", [0.96, 0.97, 1.0], [0.6, -0.35, -0.5], 12000),
+            ("top", [1.0, 1.0, 0.98], [0.0, -0.92, -0.1], 12000),
+            ("rim_back_right", [0.96, 0.97, 1.0], [0.6, -0.2, 0.7], 14000),
+            ("rim_back_left", [1.0, 0.97, 0.96], [-0.6, -0.2, 0.7], 14000),
+            ("bottom_bounce", [0.97, 0.98, 1.0], [0.0, 0.7, -0.3], 6000),
+        ],
+        8000  # Low indirect to preserve shadow detail for geometry
+    ),
+
+    5: (  # Natural sunlight: warm direct sun with sky-blue ambient fill
+        [
+            # Direct sun – warm white from upper-right at ~55° elevation
+            ("sun", [1.0, 0.96, 0.90], [0.4, -0.82, -0.4], 62000),
+            # Sky fill – cool blue diffuse from above (simulates sky dome)
+            ("sky_fill", [0.85, 0.92, 1.0], [0.0, -0.95, 0.0], 18000),
+            # Bounce fill – warm ground-reflected light from below
+            ("ground_bounce", [1.0, 0.95, 0.85], [0.0, 0.6, -0.3], 8000),
+            # Secondary fill – softer blue from opposite side for shadow detail
+            ("sky_fill_left", [0.88, 0.93, 1.0], [-0.6, -0.5, -0.5], 12000),
+            # Back rim – slight warm highlight from behind for edge separation
+            ("back_rim", [1.0, 0.96, 0.88], [0.0, -0.25, 0.9], 14000),
+            # Side kick – gentle fill from right for 3/4 views
+            ("side_kick_right", [0.95, 0.97, 1.0], [0.7, -0.35, -0.5], 10000),
+        ],
+        22000  # Moderate ambient for natural outdoor feel
     ),
 }
 

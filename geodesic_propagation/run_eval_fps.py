@@ -282,8 +282,6 @@ def main():
         rotations=rotations,
         opacities=opacities,
         device=str(device),
-        n_neighbors=args.n_neighbors,
-        use_mahalanobis=args.use_mahalanobis,
         transforms_config=transforms_cfg,
     )
 

@@ -677,13 +677,14 @@ class TestRingComputation:
     @pytest.fixture()
     def ring_builder(self, base_data):
         """Builder with n_neighbors=5, ring-2, internal ring computation."""
+        cfg = _make_config(["xyz"])
+        cfg["n_neighbors"] = 5
+        cfg["use_mahalanobis"] = False
         return GaussianInputBuilder(
             positions=base_data["positions"],
-            dataset_config=_make_config(["xyz"]),
+            dataset_config=cfg,
             ring=2,
             device="cpu",
-            n_neighbors=5,
-            use_mahalanobis=False,
         )
 
     def test_ring1_neighbors_populated(self, ring_builder):

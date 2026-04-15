@@ -825,34 +825,22 @@ def create_propagator(
     model_path: str,
     gaussian_data: Dict[str, np.ndarray],
     dataset_config: Optional[Union[str, Path, Dict]] = None,
-    n_neighbors: int = 16,
-    use_mahalanobis: bool = True,
     ring: Optional[int] = None,
     device: Optional[str] = None,
     verbose: bool = True,
-    # Adaptive kNN parameters
-    adaptive_target_ring: Optional[int] = None,
-    adaptive_target_neighbors: Optional[int] = None,
-    adaptive_k_boost: int = 20,
-    adaptive_max_mean_cut: float = 2.0,
-    adaptive_max_steps: int = 5,
-    # Legacy individual-array arguments (used when gaussian_data is not a dict)
-    positions: Optional[np.ndarray] = None,
-    scales: Optional[np.ndarray] = None,
-    rotations: Optional[np.ndarray] = None,
-    opacities: Optional[np.ndarray] = None,
-    sh_features: Optional[np.ndarray] = None,
 ) -> FastMarchingPropagator:
     """
     Factory function to create a Fast Marching propagator.
 
-    Accepts Gaussian data as a dict (preferred) or as individual arrays
-    (backward-compatible).
+    Accepts Gaussian data as a dict with keys ``'positions'``, ``'scales'``,
+    ``'rotations'``, ``'opacities'``, ``'sh_features'``.
 
     Ring-1/ring-k neighbour computation and inference-transform construction
     are handled internally by :class:`GaussianInputBuilder`.  The
     ``dataset_config`` and ``ring`` are automatically read from the model
-    checkpoint's companion YAML when not explicitly provided.
+    checkpoint's companion YAML when not explicitly provided.  All kNN
+    parameters (``n_neighbors``, ``use_mahalanobis``, adaptive kNN settings)
+    are read from ``dataset_config``.
 
     Args:
         model_path: Path to the trained model checkpoint.
@@ -860,36 +848,26 @@ def create_propagator(
             ``'rotations'``, ``'opacities'``, ``'sh_features'``.
         dataset_config: Dataset config YAML path/dict. If ``None``, read
             from the model checkpoint's companion YAML.
-        n_neighbors: Number of ring-1 neighbors.
-        use_mahalanobis: Whether to use Mahalanobis distance for neighbors.
         ring: Ring level for neighbor expansion. If ``None``, read from the
             model checkpoint's companion YAML (falls back to 2).
         device: Device for model.
         verbose: Whether to print progress.
-        adaptive_target_ring: Ring level for adaptive kNN binary search.
-        adaptive_target_neighbors: Desired ring-k cap for adaptive kNN.
-        adaptive_k_boost: Max boosted *k* for adaptive mode.
-        adaptive_max_mean_cut: Stop when average cut ≤ this.
-        adaptive_max_steps: Max binary-search iterations.
-        positions: (Legacy) Gaussian positions ``(N, 3)``.
-        scales: (Legacy) Gaussian scales ``(N, 3)``.
-        rotations: (Legacy) Gaussian rotations ``(N, 4)``.
-        opacities: (Legacy) Gaussian opacities ``(N, 1)``.
-        sh_features: (Legacy) SH features ``(N, 3)``.
 
     Returns:
         Configured :class:`FastMarchingPropagator`.
     """
-    # ── Resolve Gaussian arrays from dict or legacy args ──────────────
-    if gaussian_data is not None and isinstance(gaussian_data, dict):
-        positions = gaussian_data.get('positions', positions)
-        scales = gaussian_data.get('scales', scales)
-        rotations = gaussian_data.get('rotations', rotations)
-        opacities = gaussian_data.get('opacities', opacities)
-        sh_features = gaussian_data.get('sh_features', sh_features)
+    # ── Resolve Gaussian arrays from dict ─────────────────────────────
+    if gaussian_data is None or not isinstance(gaussian_data, dict):
+        raise ValueError("gaussian_data must be a dict with keys 'positions', 'scales', etc.")
+
+    positions = gaussian_data.get('positions')
+    scales = gaussian_data.get('scales')
+    rotations = gaussian_data.get('rotations')
+    opacities = gaussian_data.get('opacities')
+    sh_features = gaussian_data.get('sh_features')
 
     if positions is None:
-        raise ValueError("positions must be provided (via gaussian_data dict or positions=)")
+        raise ValueError("gaussian_data must contain 'positions'")
 
     # ── Load model ────────────────────────────────────────────────────
     model_handler = ModelHandler(model_path=model_path, device=device)
@@ -930,13 +908,6 @@ def create_propagator(
         opacities=opacities,
         sh_features=sh_features,
         device=device,
-        n_neighbors=n_neighbors,
-        use_mahalanobis=use_mahalanobis,
-        adaptive_target_ring=adaptive_target_ring,
-        adaptive_target_neighbors=adaptive_target_neighbors,
-        adaptive_k_boost=adaptive_k_boost,
-        adaptive_max_mean_cut=adaptive_max_mean_cut,
-        adaptive_max_steps=adaptive_max_steps,
         transforms_config=transforms_cfg,
     )
 
@@ -986,18 +957,26 @@ if __name__ == "__main__":
         'num_heads': 4,
     })
     
-    # Create input builder
+    # Create input builder with a dataset config dict
+    _test_config = {
+        "output_dir": "/tmp/nonexistent_test_dir",
+        "attributes": ["xyz", "opacity", "scale", "rotation", "sh"],
+        "nn_mean": 1.0,
+        "mask_constant": -10.0,
+        "use_r1_min_val": False,
+        "use_mahalanobis": False,
+        "ring_size_mapping": {"euclidean": {2: 32, 3: 128}},
+    }
     input_builder = GaussianInputBuilder(
         positions=positions,
+        dataset_config=_test_config,
+        ring=2,
+        normalization_factor=0.5,
         scales=scales,
         rotations=rotations,
         opacities=opacities,
         sh_features=sh_features,
-        attributes=["xyz", "opacity", "scale", "rotation", "sh"],
-        max_neighbors=32,
-        normalization_factor=0.5,
-        nn_mean=1.0,
-        device='cpu'
+        device='cpu',
     )
     
     # Create propagator

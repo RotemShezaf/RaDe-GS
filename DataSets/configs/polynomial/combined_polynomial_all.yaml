@@ -53,18 +53,18 @@ data_sources:
     iteration: null
 
 # Data generation parameters (shared across all sources)
-num_iterations: 1000
+num_iterations: 1500
 num_sources: 4
 num_train_points: 50
 seed: 42
 
 # Neighborhood computation
 use_mahalanobis: false
-n_neighbors: 12
+n_neighbors: 14
 # Adaptive kNN
 adaptive_target_ring: 3
 adaptive_target_neighbors: 128
-adaptive_k_boost: 18
+adaptive_k_boost: 22
 adaptive_max_mean_cut: 0.00
 adaptive_max_steps: 8
 normalize_per_patch: true

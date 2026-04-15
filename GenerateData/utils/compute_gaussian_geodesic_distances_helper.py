@@ -100,22 +100,44 @@ def _compute_batch_source_geodesic(
     batch_source_indices: np.ndarray,
     vertices: np.ndarray,
     faces: np.ndarray,
-    geodesic_method: str = 'vtp'
+    geodesic_method: str = 'vtp',
+    partial_save_dir: Optional[str] = None,
 ) -> np.ndarray:
     """
     Compute geodesic distances for a batch of sources to all vertices.
     Helper function for parallel processing.
-    
+
+    When *partial_save_dir* is provided, results are cached to disk so
+    that a subsequent call with the same source indices can skip
+    re-computation.  This provides crash-resilience for long-running
+    geodesic computations.
+
     Args:
         batch_source_indices: Array of source vertex indices for this batch
         vertices: (N, 3) array of mesh vertex positions
         faces: (M, 3) array of triangle indices
         geodesic_method: 'vtp' for exact VTP, 'mmp' for MMP via pygeodesic,
                          'fmm' for fast marching method
-    
+        partial_save_dir: If set, directory to cache per-batch mesh-level
+                          geodesic results.
+
     Returns:
         (batch_size, N) array of geodesic distances from batch sources to all vertices
     """
+    # -- Try to load cached result ----------------------------------------
+    save_path = None
+    if partial_save_dir is not None:
+        save_dir = Path(partial_save_dir)
+        save_path = save_dir / f"mesh_batch_{int(batch_source_indices[0])}_{int(batch_source_indices[-1])}.npz"
+        if save_path.exists():
+            try:
+                cached = np.load(save_path)
+                if (cached['source_indices'].shape == batch_source_indices.shape
+                        and np.array_equal(cached['source_indices'], batch_source_indices)):
+                    return cached['distances']
+            except Exception:
+                pass  # corrupted cache; recompute
+
     try:
         if geodesic_method == 'mmp':
             distances = compute_exact_geodesic(
@@ -151,7 +173,19 @@ def _compute_batch_source_geodesic(
                     sources_are_disjoint=True
                 )
                 distances[valid_mask, :] = distances_fix
-        
+
+        # -- Save to cache ------------------------------------------------
+        if save_path is not None:
+            try:
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                np.savez_compressed(
+                    save_path,
+                    source_indices=batch_source_indices,
+                    distances=distances,
+                )
+            except Exception as e:
+                print(f"Warning: Failed to save batch cache to {save_path}: {e}")
+
         return distances
     except Exception as e:
         print(f"Warning: Error computing geodesic for batch: {e}")
@@ -165,7 +199,8 @@ def compute_geodesic_distances_for_sources(
     source_indices: np.ndarray,
     verbose: bool = False,
     n_jobs: Optional[int] = None,
-    geodesic_method: str = 'vtp'
+    geodesic_method: str = 'vtp',
+    partial_save_dir: Optional[str] = None,
 ) -> np.ndarray:
     """
     Compute geodesic distances from each source to all vertices.
@@ -182,6 +217,9 @@ def compute_geodesic_distances_for_sources(
         geodesic_method: 'vtp' for exact VTP (requires manifold mesh),
                          'mmp' for MMP via pygeodesic (works on non-manifold meshes),
                          'fmm' for fast marching method.
+        partial_save_dir: If set, directory to cache per-batch mesh-level
+                          geodesic results for crash-resilience.  Batches
+                          whose results already exist on disk are skipped.
     
     Returns:
         (S, N) array of geodesic distances from each source to all vertices
@@ -205,7 +243,7 @@ def compute_geodesic_distances_for_sources(
     # Determine parallelization mode
     use_parallel = n_jobs is not None and n_jobs != 1
     if use_parallel:
-        n_processes = cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+        n_processes = cpu_count() if n_jobs == -1 else min(n_jobs-1, cpu_count()-1)
         # Don't use more processes than sources
         n_processes = min(n_processes, num_sources)
         print(f"\n  Parallelization: ENABLED ({n_processes} processes)")
@@ -229,7 +267,7 @@ def compute_geodesic_distances_for_sources(
         print(f"  Processing batches in parallel...\n")
         
         # Process batches in parallel
-        compute_func = partial(_compute_batch_source_geodesic, vertices=vertices, faces=faces, geodesic_method=geodesic_method)
+        compute_func = partial(_compute_batch_source_geodesic, vertices=vertices, faces=faces, geodesic_method=geodesic_method, partial_save_dir=partial_save_dir)
         
         with Pool(processes=n_processes) as pool:
             batch_results = list(tqdm(
@@ -245,40 +283,13 @@ def compute_geodesic_distances_for_sources(
     else:
         # Sequential processing: use single batch computation
         print(f"  Processing all sources in single batch...\n")
-        if geodesic_method == 'mmp':
-            distances = compute_exact_geodesic(
-                vertices=vertices,
-                faces=faces,
-                sources_id=source_indices,
-                sources_are_disjoint=True
-            )
-        elif geodesic_method == 'fmm':
-            distances = geodesic_via_fmm_vertex_distance(
-                v=vertices,
-                f=faces,
-                src_vi=source_indices.tolist(),
-                sources_are_disjoint=True
-            )
-        else:
-            distances = exact_geodesic_via_vtp_vertex_distance(
-                v=vertices,
-                f=faces,
-                src_vi=source_indices.tolist(),
-                sources_are_disjoint=True
-            )
-            
-            # Fix any problematic computations using regular MMP
-            valid_mask = distances.max(axis=1) > 10000
-            if valid_mask.any():
-                print(f"\n  Fixing {valid_mask.sum()} problematic sources with MMP algorithm...")
-                valid_indices = source_indices[valid_mask]
-                distances_fix = compute_exact_geodesic(
-                    vertices=vertices,
-                    faces=faces,
-                    sources_id=valid_indices,
-                    sources_are_disjoint=True
-                )
-                distances[valid_mask, :] = distances_fix
+        distances = _compute_batch_source_geodesic(
+            batch_source_indices=source_indices,
+            vertices=vertices,
+            faces=faces,
+            geodesic_method=geodesic_method,
+            partial_save_dir=partial_save_dir,
+        )
     
     # Cap inf/nan values for non-manifold meshes with disconnected components
     n_inf = np.isinf(distances).sum()
@@ -300,6 +311,257 @@ def compute_geodesic_distances_for_sources(
     print(f"    Std: {distances.std():.6f}")
     
     return distances
+
+
+def _compute_batch_pipeline(
+    batch_source_indices: np.ndarray,
+    batch_source_positions: np.ndarray,
+    batch_source_gaussian_indices: np.ndarray,
+    batch_index: int,
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    gaussian_positions: np.ndarray,
+    gaussian_to_mesh_indices: np.ndarray,
+    gaussian_to_mesh_distances: np.ndarray,
+    geodesic_method: str = 'mmp',
+    partial_save_dir: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    barycentric_face_vertices: Optional[np.ndarray] = None,
+    barycentric_weights: Optional[np.ndarray] = None,
+    gaussian_vertex_indices: Optional[np.ndarray] = None,
+) -> None:
+    """Compute geodesics, transfer to Gaussians, and save for one batch.
+
+    This is the per-worker function used by
+    :func:`compute_and_save_geodesic_pipeline`.  It chains:
+
+    1. ``_compute_batch_source_geodesic`` – mesh-level geodesic distances.
+    2. Transfer to Gaussians (direct indexing or barycentric interpolation).
+    3. ``save_partial_results`` – write the partial ``.npz`` file.
+
+    Args:
+        batch_source_indices:          (B,) mesh vertex indices for this batch.
+        batch_source_positions:        (B, 3) positions of these sources.
+        batch_source_gaussian_indices: (B,) Gaussian indices for each source.
+        batch_index:                   Numeric index of this batch (for naming).
+        vertices:                      (V, 3) mesh vertices.
+        faces:                         (F, 3) mesh faces.
+        gaussian_positions:            (G, 3) Gaussian centre positions.
+        gaussian_to_mesh_indices:      (G,) nearest mesh vertex per Gaussian.
+        gaussian_to_mesh_distances:    (G,) Euclidean distance to nearest vertex.
+        geodesic_method:               ``'mmp'``, ``'vtp'``, or ``'fmm'``.
+        partial_save_dir:              Directory for mesh-level batch cache.
+        output_dir:                    Directory for the partial ``.npz`` file.
+        barycentric_face_vertices:     (G, 3) – pass for barycentric interpolation.
+        barycentric_weights:           (G, 3) – pass for barycentric interpolation.
+        gaussian_vertex_indices:       (G,) – pass for direct-indexing transfer
+                                       (embedded Gaussians mode).
+    """
+    if len(batch_source_indices) == 0:
+        return
+
+    # 1. Geodesic distances on mesh
+    mesh_distances = _compute_batch_source_geodesic(
+        batch_source_indices=batch_source_indices,
+        vertices=vertices,
+        faces=faces,
+        geodesic_method=geodesic_method,
+        partial_save_dir=partial_save_dir,
+    )
+
+    # Cap inf/nan
+    n_inf = np.isinf(mesh_distances).sum()
+    n_nan = np.isnan(mesh_distances).sum()
+    if n_inf > 0 or n_nan > 0:
+        finite_vals = mesh_distances[np.isfinite(mesh_distances)]
+        cap_value = finite_vals.max() * 2.0 if len(finite_vals) > 0 else 1e6
+        mesh_distances = np.where(np.isfinite(mesh_distances), mesh_distances, cap_value)
+
+    # 2. Transfer to Gaussians
+    if gaussian_vertex_indices is not None:
+        gaussian_geodesic_distances = mesh_distances[:, gaussian_vertex_indices]
+    else:
+        gaussian_geodesic_distances = transfer_geodesic_to_gaussians(
+            mesh_geodesic_distances=mesh_distances,
+            gaussian_to_mesh_indices=gaussian_to_mesh_indices,
+            source_mesh_indices=batch_source_indices,
+            source_gaussian_indices=batch_source_gaussian_indices,
+            barycentric_face_vertices=barycentric_face_vertices,
+            barycentric_weights=barycentric_weights,
+        )
+
+    # 3. Save partial results
+    if output_dir is not None:
+        src_start = int(batch_source_indices[0])
+        src_end = int(batch_source_indices[-1]) + 1
+        output_path = Path(output_dir) / f"sources_batch_{batch_index}_{src_start}_{src_end}.npz"
+        save_partial_results(
+            output_path=output_path,
+            gaussian_positions=gaussian_positions,
+            source_indices=batch_source_indices,
+            source_positions=batch_source_positions,
+            geodesic_distances=gaussian_geodesic_distances,
+            closest_mesh_indices=gaussian_to_mesh_indices,
+            closest_mesh_distances=gaussian_to_mesh_distances,
+            source_gaussian_indices=batch_source_gaussian_indices,
+        )
+
+
+def compute_and_save_geodesic_pipeline(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    source_indices: np.ndarray,
+    source_positions: np.ndarray,
+    source_gaussian_indices: np.ndarray,
+    gaussian_positions: np.ndarray,
+    gaussian_to_mesh_indices: np.ndarray,
+    gaussian_to_mesh_distances: np.ndarray,
+    geodesic_method: str = 'mmp',
+    n_jobs: Optional[int] = None,
+    partial_save_dir: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    barycentric_face_vertices: Optional[np.ndarray] = None,
+    barycentric_weights: Optional[np.ndarray] = None,
+    gaussian_vertex_indices: Optional[np.ndarray] = None,
+    verbose: bool = False,
+) -> None:
+    """High-level pipeline: split sources → compute geodesics → transfer → save.
+
+    Splits *source_indices* into batches, then dispatches each batch to
+    :func:`_compute_batch_pipeline` either sequentially or via
+    ``multiprocessing.Pool``.  Each worker independently produces its own
+    partial ``.npz`` file inside *output_dir*, so a crash only loses the
+    currently running batch.
+
+    After all batches finish, the caller can invoke :func:`merge_partial_results`
+    to combine the partial files into the final ``gt_geodesic.npz``.
+
+    Args:
+        vertices / faces:              Mesh geometry.
+        source_indices:                (S,) mesh vertex indices of sources.
+        source_positions:              (S, 3) source positions.
+        source_gaussian_indices:       (S,) Gaussian index of each source.
+        gaussian_positions:            (G, 3) Gaussian centre positions.
+        gaussian_to_mesh_indices:      (G,) nearest mesh vertex per Gaussian.
+        gaussian_to_mesh_distances:    (G,) distance to nearest mesh vertex.
+        geodesic_method:               ``'mmp'``, ``'vtp'``, or ``'fmm'``.
+        n_jobs:                        Parallelism (None/1 = sequential, -1 = all CPUs).
+        partial_save_dir:              Dir for mesh-level per-batch cache.
+        output_dir:                    Dir for partial ``.npz`` results.
+        barycentric_face_vertices:     (G, 3) or *None*.
+        barycentric_weights:           (G, 3) or *None*.
+        gaussian_vertex_indices:       (G,) or *None* (embedded mode).
+        verbose:                       Print progress info.
+    """
+    num_sources = len(source_indices)
+    if num_sources == 0:
+        print("  No sources to compute. Skipping pipeline.")
+        return
+
+    # Determine parallelism
+    use_parallel = n_jobs is not None and n_jobs != 1
+    if use_parallel:
+        n_processes = cpu_count() if n_jobs == -1 else min(n_jobs, cpu_count())
+        n_processes = min(n_processes, num_sources)
+    else:
+        n_processes = 1
+
+    # Split sources into batches
+    batch_size = int(np.ceil(num_sources / n_processes))
+    batches = []
+    for i in range(n_processes):
+        s = i * batch_size
+        e = min((i + 1) * batch_size, num_sources)
+        if s < num_sources:
+            batches.append((
+                i,
+                source_indices[s:e],
+                source_positions[s:e],
+                source_gaussian_indices[s:e],
+            ))
+
+    method_labels = {'fmm': 'FMM', 'mmp': 'MMP', 'vtp': 'VTP'}
+    print(f"\n{'='*80}")
+    print(f"Geodesic Pipeline ({method_labels.get(geodesic_method, geodesic_method)})")
+    print(f"{'='*80}")
+    print(f"  Sources: {num_sources}")
+    print(f"  Mesh: {len(vertices)} vertices, {len(faces)} faces")
+    print(f"  Gaussians: {len(gaussian_positions)}")
+    print(f"  Batches: {len(batches)} ({n_processes} workers)")
+    print(f"  Batch sizes: {[len(b[1]) for b in batches]}")
+
+    # Build the partial function for workers
+    worker = partial(
+        _compute_batch_pipeline_wrapper,
+        vertices=vertices,
+        faces=faces,
+        gaussian_positions=gaussian_positions,
+        gaussian_to_mesh_indices=gaussian_to_mesh_indices,
+        gaussian_to_mesh_distances=gaussian_to_mesh_distances,
+        geodesic_method=geodesic_method,
+        partial_save_dir=partial_save_dir,
+        output_dir=output_dir,
+        barycentric_face_vertices=barycentric_face_vertices,
+        barycentric_weights=barycentric_weights,
+        gaussian_vertex_indices=gaussian_vertex_indices,
+    )
+
+    if use_parallel and n_processes > 1:
+        print(f"  Dispatching {len(batches)} batches across {n_processes} processes ...\n")
+        with Pool(processes=n_processes) as pool:
+            list(tqdm(
+                pool.imap_unordered(worker, batches),
+                total=len(batches),
+                desc="  Pipeline batches",
+                unit="batch",
+            ))
+    else:
+        print(f"  Running {len(batches)} batches sequentially ...\n")
+        for batch_args in tqdm(batches, desc="  Pipeline batches", unit="batch"):
+            worker(batch_args)
+
+    print(f"  Pipeline complete. Partial results in: {output_dir}")
+
+
+def _compute_batch_pipeline_wrapper(
+    batch_args: tuple,
+    *,
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    gaussian_positions: np.ndarray,
+    gaussian_to_mesh_indices: np.ndarray,
+    gaussian_to_mesh_distances: np.ndarray,
+    geodesic_method: str,
+    partial_save_dir: Optional[str],
+    output_dir: Optional[str],
+    barycentric_face_vertices: Optional[np.ndarray],
+    barycentric_weights: Optional[np.ndarray],
+    gaussian_vertex_indices: Optional[np.ndarray],
+) -> None:
+    """Unpack batch tuple and call :func:`_compute_batch_pipeline`.
+
+    ``multiprocessing.Pool.imap`` passes a single positional arg, so we
+    use ``functools.partial`` to bind the shared keyword arguments and this
+    wrapper to unpack the per-batch tuple.
+    """
+    batch_index, src_idx, src_pos, src_gauss_idx = batch_args
+    _compute_batch_pipeline(
+        batch_source_indices=src_idx,
+        batch_source_positions=src_pos,
+        batch_source_gaussian_indices=src_gauss_idx,
+        batch_index=batch_index,
+        vertices=vertices,
+        faces=faces,
+        gaussian_positions=gaussian_positions,
+        gaussian_to_mesh_indices=gaussian_to_mesh_indices,
+        gaussian_to_mesh_distances=gaussian_to_mesh_distances,
+        geodesic_method=geodesic_method,
+        partial_save_dir=partial_save_dir,
+        output_dir=output_dir,
+        barycentric_face_vertices=barycentric_face_vertices,
+        barycentric_weights=barycentric_weights,
+        gaussian_vertex_indices=gaussian_vertex_indices,
+    )
 
 
 def save_mesh_geodesic_gt(
@@ -868,8 +1130,9 @@ def merge_partial_results(output_folder: Path, verbose: bool = False) -> None:
         print(f"  Error: No partial results directory found at {partial_dir}")
         return
     
-    # Find all partial result files
-    partial_files = sorted(partial_dir.glob("sources_range_*.npz"))
+    # Find all partial result files (both old range and new batch formats)
+    partial_files = sorted(partial_dir.glob("sources_range_*.npz")) + \
+                    sorted(partial_dir.glob("sources_batch_*.npz"))
     if not partial_files:
         print(f"  Error: No partial result files found in {partial_dir}")
         return
@@ -1007,7 +1270,7 @@ def save_computation_metadata(
         'distance_computation': {
             'method': 'Mahalanobis' if args.use_mahalanobis else 'Euclidean',
             'description': 'Gaussian covariance-based distance' if args.use_mahalanobis else 'Standard Euclidean distance',
-            'geodesic_algorithm': 'MMP (exact geodesic via VTP)'
+            'geodesic_algorithm': getattr(args, 'geodesic_method', 'mmp')
         },
         'parameters': {
             'use_mahalanobis': args.use_mahalanobis,

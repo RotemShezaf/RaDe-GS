@@ -1,0 +1,407 @@
+{
+  "blue/HyperbolicParaboloid/L02/light_0": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1537937,
+    "pct_bad": 26.44,
+    "worst_ar": 22.69,
+    "min_angle": 0.04,
+    "max_edge": 0.009295
+  },
+  "blue/HyperbolicParaboloid/L02/light_1": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1573941,
+    "pct_bad": 24.98,
+    "worst_ar": 25.5,
+    "min_angle": 0.16,
+    "max_edge": 0.008966
+  },
+  "blue/HyperbolicParaboloid/L02/light_2": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1622250,
+    "pct_bad": 23.59,
+    "worst_ar": 41.84,
+    "min_angle": 0.05,
+    "max_edge": 0.008994
+  },
+  "blue/HyperbolicParaboloid/L02/light_3": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1624962,
+    "pct_bad": 24.51,
+    "worst_ar": 44.12,
+    "min_angle": 0.03,
+    "max_edge": 0.009046
+  },
+  "blue/HyperbolicParaboloid/L02/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1464182,
+    "pct_bad": 25.59,
+    "worst_ar": 56.32,
+    "min_angle": 0.17,
+    "max_edge": 0.009052
+  },
+  "blue/HyperbolicParaboloid/L03/light_0": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1322757,
+    "pct_bad": 28.5,
+    "worst_ar": 19.98,
+    "min_angle": 0.17,
+    "max_edge": 0.009462
+  },
+  "blue/HyperbolicParaboloid/L03/light_1": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1334402,
+    "pct_bad": 26.31,
+    "worst_ar": 21.47,
+    "min_angle": 0.01,
+    "max_edge": 0.009112
+  },
+  "blue/HyperbolicParaboloid/L03/light_2": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1146568,
+    "pct_bad": 24.08,
+    "worst_ar": 40.17,
+    "min_angle": 0.12,
+    "max_edge": 0.010979
+  },
+  "blue/HyperbolicParaboloid/L03/light_3": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1036653,
+    "pct_bad": 29.22,
+    "worst_ar": 34.22,
+    "min_angle": 0.55,
+    "max_edge": 0.010451
+  },
+  "blue/HyperbolicParaboloid/L03/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1268215,
+    "pct_bad": 28.11,
+    "worst_ar": 36.91,
+    "min_angle": 0.1,
+    "max_edge": 0.008861
+  },
+  "blue/HyperbolicParaboloid/L04/light_0": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1032624,
+    "pct_bad": 27.05,
+    "worst_ar": 17.66,
+    "min_angle": 0.01,
+    "max_edge": 0.010478
+  },
+  "blue/HyperbolicParaboloid/L04/light_1": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1281230,
+    "pct_bad": 27.35,
+    "worst_ar": 19.09,
+    "min_angle": 0.83,
+    "max_edge": 0.008997
+  },
+  "blue/HyperbolicParaboloid/L04/light_2": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1305800,
+    "pct_bad": 27.68,
+    "worst_ar": 18.64,
+    "min_angle": 0.18,
+    "max_edge": 0.00887
+  },
+  "blue/HyperbolicParaboloid/L04/light_3": {
+    "edge_length": 0.007,
+    "ring_fix_iterations": 2,
+    "n_vertices": 925307,
+    "pct_bad": 28.7,
+    "worst_ar": 28.2,
+    "min_angle": 0.1,
+    "max_edge": 0.012172
+  },
+  "blue/HyperbolicParaboloid/L04/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1260296,
+    "pct_bad": 27.01,
+    "worst_ar": 26.7,
+    "min_angle": 0.31,
+    "max_edge": 0.00925
+  },
+  "blue/Paraboloid/L02/light_0": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1177037,
+    "pct_bad": 21.36,
+    "worst_ar": 1276.86,
+    "min_angle": 0.04,
+    "max_edge": 0.010488
+  },
+  "blue/Paraboloid/L02/light_1": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1512011,
+    "pct_bad": 20.18,
+    "worst_ar": 55.45,
+    "min_angle": 0.13,
+    "max_edge": 0.008525
+  },
+  "blue/Paraboloid/L02/light_2": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1547478,
+    "pct_bad": 21.25,
+    "worst_ar": 406.0,
+    "min_angle": 0.02,
+    "max_edge": 0.008771
+  },
+  "blue/Paraboloid/L02/light_3": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1440120,
+    "pct_bad": 21.29,
+    "worst_ar": 109.89,
+    "min_angle": 0.07,
+    "max_edge": 0.008666
+  },
+  "blue/Paraboloid/L02/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1403402,
+    "pct_bad": 20.6,
+    "worst_ar": 44.63,
+    "min_angle": 0.1,
+    "max_edge": 0.008722
+  },
+  "blue/Paraboloid/L03/light_0": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1266565,
+    "pct_bad": 20.74,
+    "worst_ar": 39.9,
+    "min_angle": 0.22,
+    "max_edge": 0.008494
+  },
+  "blue/Paraboloid/L03/light_1": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1270110,
+    "pct_bad": 20.6,
+    "worst_ar": 39.64,
+    "min_angle": 0.04,
+    "max_edge": 0.00839
+  },
+  "blue/Paraboloid/L03/light_2": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1294764,
+    "pct_bad": 21.28,
+    "worst_ar": 33.53,
+    "min_angle": 0.01,
+    "max_edge": 0.00838
+  },
+  "blue/Paraboloid/L03/light_3": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1349717,
+    "pct_bad": 20.87,
+    "worst_ar": 58.08,
+    "min_angle": 0.42,
+    "max_edge": 0.008437
+  },
+  "blue/Paraboloid/L03/light_4": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 1,
+    "n_vertices": 992878,
+    "pct_bad": 21.79,
+    "worst_ar": 63.1,
+    "min_angle": 0.33,
+    "max_edge": 0.010063
+  },
+  "blue/Paraboloid/L04/light_0": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1217418,
+    "pct_bad": 21.91,
+    "worst_ar": 37.18,
+    "min_angle": 0.04,
+    "max_edge": 0.008378
+  },
+  "blue/Paraboloid/L04/light_1": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1191230,
+    "pct_bad": 22.37,
+    "worst_ar": 131.51,
+    "min_angle": 0.29,
+    "max_edge": 0.008311
+  },
+  "blue/Paraboloid/L04/light_2": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1209902,
+    "pct_bad": 22.65,
+    "worst_ar": 39.79,
+    "min_angle": 0.11,
+    "max_edge": 0.008787
+  },
+  "blue/Paraboloid/L04/light_3": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1392862,
+    "pct_bad": 21.2,
+    "worst_ar": 20.34,
+    "min_angle": 0.03,
+    "max_edge": 0.008739
+  },
+  "blue/Paraboloid/L04/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1196703,
+    "pct_bad": 22.14,
+    "worst_ar": 38.48,
+    "min_angle": 0.02,
+    "max_edge": 0.008473
+  },
+  "blue/Saddle/L02/light_0": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1474213,
+    "pct_bad": 18.1,
+    "worst_ar": 56.64,
+    "min_angle": 0.07,
+    "max_edge": 0.008712
+  },
+  "blue/Saddle/L02/light_1": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1256678,
+    "pct_bad": 19.47,
+    "worst_ar": 31.98,
+    "min_angle": 0.18,
+    "max_edge": 0.010134
+  },
+  "blue/Saddle/L02/light_2": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1469827,
+    "pct_bad": 18.66,
+    "worst_ar": 187.44,
+    "min_angle": 0.04,
+    "max_edge": 0.008348
+  },
+  "blue/Saddle/L02/light_3": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1378942,
+    "pct_bad": 19.34,
+    "worst_ar": 47.92,
+    "min_angle": 0.06,
+    "max_edge": 0.008436
+  },
+  "blue/Saddle/L02/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1345107,
+    "pct_bad": 18.55,
+    "worst_ar": 86.08,
+    "min_angle": 0.01,
+    "max_edge": 0.008495
+  },
+  "blue/Saddle/L03/light_0": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1293875,
+    "pct_bad": 18.4,
+    "worst_ar": 62.7,
+    "min_angle": 0.02,
+    "max_edge": 0.00852
+  },
+  "blue/Saddle/L03/light_1": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 1,
+    "n_vertices": 899585,
+    "pct_bad": 20.68,
+    "worst_ar": 98.23,
+    "min_angle": 0.44,
+    "max_edge": 0.009985
+  },
+  "blue/Saddle/L03/light_2": {
+    "edge_length": 0.007,
+    "ring_fix_iterations": 1,
+    "n_vertices": 818895,
+    "pct_bad": 21.99,
+    "worst_ar": 56.02,
+    "min_angle": 0.53,
+    "max_edge": 0.011659
+  },
+  "blue/Saddle/L03/light_3": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1239994,
+    "pct_bad": 19.89,
+    "worst_ar": 29.03,
+    "min_angle": 0.03,
+    "max_edge": 0.008351
+  },
+  "blue/Saddle/L03/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1242372,
+    "pct_bad": 17.75,
+    "worst_ar": 31.88,
+    "min_angle": 0.05,
+    "max_edge": 0.00811
+  },
+  "blue/Saddle/L04/light_0": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1170575,
+    "pct_bad": 19.66,
+    "worst_ar": 25.57,
+    "min_angle": 0.03,
+    "max_edge": 0.008791
+  },
+  "blue/Saddle/L04/light_1": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 2,
+    "n_vertices": 1183915,
+    "pct_bad": 18.71,
+    "worst_ar": 47.17,
+    "min_angle": 0.48,
+    "max_edge": 0.008951
+  },
+  "blue/Saddle/L04/light_2": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 2,
+    "n_vertices": 970368,
+    "pct_bad": 20.39,
+    "worst_ar": 113.23,
+    "min_angle": 0.07,
+    "max_edge": 0.010151
+  },
+  "blue/Saddle/L04/light_3": {
+    "edge_length": 0.006,
+    "ring_fix_iterations": 1,
+    "n_vertices": 878373,
+    "pct_bad": 21.55,
+    "worst_ar": 134.14,
+    "min_angle": 0.07,
+    "max_edge": 0.009823
+  },
+  "blue/Saddle/L04/light_4": {
+    "edge_length": 0.005,
+    "ring_fix_iterations": 1,
+    "n_vertices": 1122647,
+    "pct_bad": 19.67,
+    "worst_ar": 28.6,
+    "min_angle": 0.13,
+    "max_edge": 0.008844
+  }
+}

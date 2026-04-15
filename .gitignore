@@ -58,3 +58,4 @@ test_analysis_scripts/
 *.ncu-rep
 .clangd
 debug_depth*.py
+.nfs*
